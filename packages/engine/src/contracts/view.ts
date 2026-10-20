@@ -1,0 +1,38 @@
+import type { Role, Side } from '@lml/data/contracts';
+import type { ChampionState, GameState, Ward } from './state';
+
+/** What a side knows about one enemy champion. */
+export interface EnemyInfo {
+  id: string;
+  role: Role;
+  /** Seen when the last round resolved. */
+  visible: boolean;
+  /** Current position when visible, otherwise the last seen one (or null). */
+  position: string | null;
+  lastSeenRound: number | null;
+  /** Only known while visible. */
+  level: number | null;
+}
+
+/** The game as one side sees it through the fog of war. */
+export interface PlayerView {
+  side: Side;
+  round: number;
+  over: boolean;
+  winner: GameState['winner'];
+  allies: ChampionState[];
+  enemies: EnemyInfo[];
+  towers: GameState['towers'];
+  waves: GameState['waves'];
+  pits: GameState['pits'];
+  scuttles: GameState['scuttles'];
+  /** Own-side camps only. */
+  camps: GameState['camps'];
+  /** Own wards only. */
+  wards: Ward[];
+  grubs: GameState['grubs'];
+  baronUntilRound: GameState['baronUntilRound'];
+  objectivesTaken: GameState['objectivesTaken'];
+  platesTaken: GameState['platesTaken'];
+  towersDestroyed: GameState['towersDestroyed'];
+}
