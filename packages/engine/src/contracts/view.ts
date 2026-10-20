@@ -14,6 +14,9 @@ export interface EnemyInfo {
   level: number | null;
 }
 
+/** What a side assumes an enemy has (fog of war: never its true lead), as the AI and lane pressure estimate it. */
+export type EnemyEstimate = Pick<ChampionState, 'xp' | 'items' | 'bonusLead'>;
+
 /** League-style scoreboard: all public, except `goldEarned`, the README-declared exception to the fog. */
 export interface Scoreboard {
   kills: Record<Side, number>;

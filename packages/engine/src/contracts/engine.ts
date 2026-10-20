@@ -4,7 +4,7 @@ import type { GameEvent } from './events';
 import type { Order, Orders } from './orders';
 import type { GameState, Rng } from './state';
 import type { Explanation } from './teaching';
-import type { PlayerView } from './view';
+import type { EnemyEstimate, EnemyInfo, PlayerView } from './view';
 
 export type Draft = Record<Side, Record<Role, string>>;
 
@@ -32,6 +32,8 @@ export interface GameEngine {
   detectContacts(state: GameState, data: GameData, orders: Orders): Contact[];
   resolveRound(state: GameState, data: GameData, orders: Orders, choices: ContactChoices): RoundResult;
   viewFor(state: GameState, data: GameData, side: Side): PlayerView;
+  /** What `view.side` assumes `enemy` has (xp, items, lead), from what it knows; the AI uses the same estimate. */
+  estimateEnemy(view: PlayerView, data: GameData, enemy: EnemyInfo): EnemyEstimate;
   eventsFor(events: GameEvent[], after: GameState, data: GameData, side: Side): GameEvent[];
   /** AI orders from what its side sees (a view, never the state). */
   aiOrders(view: PlayerView, data: GameData, profile: AiProfile, rng: Rng): Order[];

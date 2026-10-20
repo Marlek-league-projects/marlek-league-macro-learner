@@ -14,7 +14,7 @@ import {
   viewFor,
 } from '@lml/engine';
 import type { ChampionState, ContactChoices, GameState, Order, Orders, Rng } from '@lml/engine/contracts';
-import { assignStances, makeContext } from '../src/ai/heuristics';
+import { assignStances, makeContext, planCandidates, rollMistakes } from '../src/ai/heuristics';
 
 const d = loadGameData();
 const profile = (rank: Rank): AiProfile => d.aiProfiles.find((p) => p.rank === rank)!;
@@ -346,11 +346,25 @@ describe('laning phase', () => {
     d.graph.positions[o.to]!.lane === undefined &&
     d.graph.distance(o.to, 'dragon-pit') < d.graph.distance(from, 'dragon-pit');
 
+  /**
+   * The ADC's chosen candidate is the objective rotation. From bot-t1-red the rotation now walks through bot-lane
+   * (lane positions win route ties), the same first step as falling back to its own tower, so the order alone
+   * cannot tell them apart: this replays aiOrders' mistake rolls and candidate ranking.
+   */
+  const adcRotates = (s: GameState, rank: Rank, rng: Rng): boolean => {
+    const view = viewFor(s, d, 'blue');
+    const p = profile(rank);
+    const mistakes = rollMistakes(view, p, rng);
+    const per = planCandidates(makeContext(view, d, p.waveSacrifice), mistakes, rng);
+    const i = view.allies.filter((c) => c.status !== 'dead').findIndex((c) => c.role === 'adc');
+    return per[i]![0]!.score === d.aiTuning.priorities.objective;
+  };
+
   test('a rotation to a Dragon with priority is rejected during the laning phase, taken after it', () => {
     // Diamond: wave sacrifice on, no look-ahead to second-guess the objective rule.
     for (const rank of ['diamond', 'challenger'] as Rank[]) {
       const o = adcOrder(dragonWithPriority(), rank, onlyMistake());
-      expect(towardDragon(o)).toBe(false);
+      expect(adcRotates(dragonWithPriority(), rank, onlyMistake())).toBe(false);
       expect(o.kind === 'move' && d.graph.positions[o.to]!.lane).toBe('bot');
     }
 
@@ -358,7 +372,8 @@ describe('laning phase', () => {
     late.round = 28; // 910–970 s
     late.pits['dragon-pit'].nextSpawn = 1000; // spawns next round
     for (const role of ['jungle', 'adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 27;
-    expect(towardDragon(adcOrder(late, 'diamond', onlyMistake()))).toBe(true);
+    expect(adcOrder(late, 'diamond', onlyMistake())).toMatchObject({ kind: 'move', to: 'bot-lane' });
+    expect(adcRotates(late, 'diamond', onlyMistake())).toBe(true);
   });
 
   test('a paying wave sacrifice is kept to the laner\'s half of the map: top stays, mid rotates to the Dragon', () => {
@@ -373,10 +388,26 @@ describe('laning phase', () => {
     expect(towardDragon(orderOf(orders, get(s, 'blue', 'mid').id), 'mid-t1-blue')).toBe(true);
   });
 
+  test('a laner rotating to a pit walks the lane, not through a camp, when both routes are as short', () => {
+    const s = newGame(d, 7);
+    s.round = 14; // Voidgrubs up; no enemy seen, so the top's wave sacrifice gives the numbers
+    s.pits['baron-pit'] = { objective: 'voidgrubs', nextSpawn: null, capture: null };
+    place(s, 'blue', 'top', 'top-t1-blue');
+    place(s, 'blue', 'jungle', 'bluebuff-blue');
+    // Both are one move from the top T1 and one from the pit; bluebuff-blue sorts first by id.
+    for (const via of ['top-lane', 'bluebuff-blue']) {
+      expect(d.graph.distance('top-t1-blue', via)).toBe(1);
+      expect(d.graph.distance(via, 'baron-pit')).toBe(1);
+    }
+    const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('diamond'), onlyMistake());
+    validateOrders(s, d, 'blue', orders);
+    expect(orderOf(orders, get(s, 'blue', 'top').id)).toMatchObject({ kind: 'move', to: 'top-lane' });
+  });
+
   test('rotateWithoutPriority still breaks the laning-phase rule', () => {
     const s = dragonWithPriority();
     s.waves.bot = -1;
-    expect(towardDragon(adcOrder(s, 'iron', onlyMistake('rotateWithoutPriority')))).toBe(true);
+    expect(adcRotates(s, 'iron', onlyMistake('rotateWithoutPriority'))).toBe(true);
   });
 
   test('an iron laner with a forced pointlessPlay roll may roam', () => {

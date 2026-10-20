@@ -95,11 +95,27 @@ function reach(ctx: Ctx, c: ChampionState): Record<string, number> {
   return reachableFrom(ctx.data, c.position, movesFor(c, ctx.data.rules), c.side, c.role);
 }
 
-/** Reachable position closest to `target`, fewest moves then id as tie-breaks. */
+/**
+ * How a laner likes to walk through `pos` when routes tie: lane positions (and bases) first, then the river
+ * (scuttles, pits), then its own camps, then enemy camps. A jungler has no preference.
+ */
+function routeRank(ctx: Ctx, c: ChampionState, pos: string): number {
+  if (c.role === 'jungle') return 0;
+  const p = ctx.data.graph.positions[pos]!;
+  if (p.kind === 'tower' || p.kind === 'laneMid' || p.kind === 'base') return 0;
+  if (p.kind === 'scuttle' || p.kind === 'pit') return 1;
+  return p.side === ctx.side ? 2 : 3;
+}
+
+/** Reachable position closest to `target`; ties: fewest moves, then `routeRank`, then id. */
 function step(ctx: Ctx, c: ChampionState, target: string): string {
   const r = reach(ctx, c);
   return Object.keys(r).sort(
-    (a, b) => dist(ctx.data, a, target) - dist(ctx.data, b, target) || r[a]! - r[b]! || a.localeCompare(b),
+    (a, b) =>
+      dist(ctx.data, a, target) - dist(ctx.data, b, target) ||
+      r[a]! - r[b]! ||
+      routeRank(ctx, c, a) - routeRank(ctx, c, b) ||
+      a.localeCompare(b),
   )[0]!;
 }
 

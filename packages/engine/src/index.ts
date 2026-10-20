@@ -9,6 +9,7 @@ import { resolveRound } from './round';
 import { newGame } from './setup';
 import { explainRound } from './teaching';
 import { eventsFor, viewFor } from './vision';
+import { estimateEnemy } from './estimate';
 
 export const ENGINE_PACKAGE = '@lml/engine';
 export { createRng } from './rng';
@@ -23,12 +24,13 @@ export { spawnObjectives, clearCamps, captureObjectives, launchHeralds } from '.
 export { level, applyKill, completeRecall, advanceRespawns, teamScore, finishIfOver } from './economy';
 export { visibleEnemies, viewFor, eventsFor } from './vision';
 export { resolveRound } from './round';
+export { estimateEnemy } from './estimate';
 export { explainRound } from './teaching';
 export { aiOrders, aiContactChoice, evaluate } from './ai';
 
 export function createEngine(): GameEngine {
   return {
-    newGame, defaultOrders, reachable, spawnPoints, validateOrders, detectContacts, resolveRound, viewFor, eventsFor,
+    newGame, defaultOrders, reachable, spawnPoints, validateOrders, detectContacts, resolveRound, viewFor, eventsFor, estimateEnemy,
     aiOrders, aiContactChoice, explainRound, createRng, roundWindow, totalRounds, level, teamScore,
   };
 }

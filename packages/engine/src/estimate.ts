@@ -1,25 +1,26 @@
 import type { GameData, Side } from '@lml/data/contracts';
-import type { ChampionState, EnemyInfo, PlayerView } from './contracts';
-import { roundWindow, totalRounds } from './time';
+import type { EnemyEstimate, EnemyInfo, PlayerView } from './contracts';
 
 const other = (s: Side): Side => (s === 'blue' ? 'red' : 'blue');
 
 /**
- * What an enemy is assumed to have, from what `view.side` knows: xp from its level when visible, otherwise the
- * expected farm so far; items from the expected farm and passive gold; lead from its side's dragons.
+ * What an enemy is assumed to have, from what `view.side` knows, sized on its own champion of the same role (the
+ * mirror): xp from its level when visible, otherwise the mirror's xp; items the mirror's, scaled by the enemy team's
+ * gold earned over its own (the public scoreboard); lead from the enemy side's dragons. Sizing on the mirror keeps
+ * the estimate as far along as the game really is, so neither side sees every unseen enemy ahead of it.
  */
 export function estimateEnemy(
-  view: Pick<PlayerView, 'round' | 'side' | 'objectivesTaken'>,
+  view: Pick<PlayerView, 'side' | 'allies' | 'objectivesTaken' | 'scoreboard'>,
   data: GameData,
   e: Pick<EnemyInfo, 'role' | 'level'>,
-): Pick<ChampionState, 'xp' | 'items' | 'bonusLead'> {
-  const { economy, buffs, phases } = data.rules;
-  const round = Math.min(view.round, totalRounds(data.rules));
-  const minutes = Math.max(0, roundWindow(data.rules, round).start - phases[0]!.start) / 60;
-  const share = e.role === 'support' ? economy.supportShare : 1;
-  const xpShare = e.role === 'adc' || e.role === 'support' ? economy.duoXpShare : 1;
-  const xp = e.level !== null ? economy.levelXp[e.level - 1]! : economy.farmXpPerMin * xpShare * minutes;
-  const items = (economy.farmGoldPerMin * share + economy.passiveGoldPerMin) * minutes;
-  const bonusLead = (view.objectivesTaken[other(view.side)].dragon ?? 0) * buffs.dragonLead;
+): EnemyEstimate {
+  const { economy, buffs } = data.rules;
+  const enemy = other(view.side);
+  const mirror = view.allies.find((a) => a.role === e.role);
+  const own = view.scoreboard.goldEarned[view.side];
+  const ratio = own > 0 ? view.scoreboard.goldEarned[enemy] / own : 1;
+  const xp = e.level !== null ? economy.levelXp[e.level - 1]! : (mirror?.xp ?? 0);
+  const items = (mirror?.items ?? 0) * ratio;
+  const bonusLead = (view.objectivesTaken[enemy].dragon ?? 0) * buffs.dragonLead;
   return { xp, items, bonusLead };
 }

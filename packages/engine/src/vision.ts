@@ -128,10 +128,11 @@ export function viewFor(state: GameState, data: GameData, side: Side): PlayerVie
  * estimate for them (never their true lead or items). An unseen side gives null.
  */
 function pressureSeen(s: GameState, data: GameData, side: Side, enemies: EnemyInfo[]): Record<Lane, Side | null> {
+  const known = { side, allies: s.champions.filter((c) => c.side === side), objectivesTaken: s.objectivesTaken, scoreboard: scoreboard(s) };
   const champions = s.champions.flatMap((c) => {
     if (c.side === side) return [c];
     const e = enemies.find((x) => x.id === c.id)!;
-    return e.visible ? [{ ...c, ...estimateEnemy({ round: s.round, side, objectivesTaken: s.objectivesTaken }, data, e) }] : [];
+    return e.visible ? [{ ...c, ...estimateEnemy(known, data, e) }] : [];
   });
   const seen = { ...s, champions };
   const out = {} as Record<Lane, Side | null>;
