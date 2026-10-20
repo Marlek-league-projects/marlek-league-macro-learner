@@ -71,7 +71,7 @@ When a contact happens, resolution pauses and each player involved chooses to **
 
 | Situation | Default choice |
 |---|---|
-| Even numbers in lane (1v1, 2v2) | **Trade**: spells are exchanged without going for the kill. Nobody dies. Matchup and lead decide who wins the trade, which moves the wave and the lead gauge. |
+| Even numbers in lane (1v1, 2v2) | **Farm** (play the lane normally). See *Lane contacts* below. |
 | Ganked (the enemy arrives outnumbering you) | **Flee** |
 | The ganker | Asked to choose: commit to the fight or not |
 | Neutral objective with an enemy already there | Asked to choose: fight or flee |
@@ -80,6 +80,15 @@ When a contact happens, resolution pauses and each player involved chooses to **
 - **Fight**: the winner takes the objective or the kill. Losers **die**.
 - If both sides flee, nobody takes the objective and it stays up for the next round. If one side flees and the other fights, the fighting side takes it without a fight.
 - *(design call)* In lane, if one side flees and the other trades or fights, the side that stayed wins the trade (wave and lead).
+
+**Lane contacts.** With even numbers in lane, each side picks one of four choices:
+
+- **Farm** (default): play the lane normally, with no trade. The wave moves by matchup and lead, as when the laners don't meet.
+- **Trade**: exchange spells without going for the kill. Nobody dies. The trade winner (fight score) gains lead and pushes the wave.
+- **All-in**: go for the kill, which turns the contact into a fight where the losers die.
+- **Flee**: leave the lane. The side that stayed wins the trade.
+
+Nobody can die in lane unless at least one side picks **All-in**. Farm against Trade is a trade. The AI only goes all-in with a large advantage (threshold in data).
 
 **Invading** enemy jungle is a commitment, with no option to flee. If you meet an enemy and lose the fight, you die.
 
@@ -160,10 +169,14 @@ The map positions form a graph, and a move is one step on it. Starting values:
 
 - **Laners**: 1 move per round. Going from a lane to another lane, or to a Scuttle, counts as 1 move.
 - **Junglers**: 2 moves per round. For example, Raptors → Krugs, Raptors → mid lane, or Raptors → enemy Blue Buff.
+- **Ganks from the outer camps**: an outer camp is 1 move from its nearby lane (Gromp and Blue Buff → top lane, Krugs and Red Buff → bot lane on the blue side, and the mirror on the red side), so a jungler can gank from there in one round.
+- **Neutral objectives**: from any jungle camp, both Scuttles, the Dragon pit and the Baron pit are at most 2 moves away, so a jungler reaches them in one round.
 
 - **Camps and Scuttle** are taken by ending the move on their position. **Pit objectives** (Dragon, Voidgrubs, Herald, Baron) take one extra round, unless 4 or more champions are on them (except Baron, which always takes the extra round) (see [Neutral objectives](#neutral-objectives)).
 - **Recall** keeps the champion in place for the round, and it respawns at a base position the next round, so a recall costs 1 round.
 - **Bases** are two more positions (Base blue and Base red), which brings the total to 39. *(design call)* A champion who respawns after death or recall picks a starting point: a laner picks the frontmost standing tower of the lane they choose, and a jungler picks a camp on their own side.
+
+**Sacrificing a wave.** Leaving a lane while the wave crashes under your own tower costs the wave (gold, XP, possibly plates), but it can be the right play when it gives your team the numbers on a neutral objective. Teaching mode doesn't call this a mistake when the champion went to an objective that was up or taken that round. It explains the trade-off instead, and higher AI ranks make this sacrifice when the objective is worth more than the wave.
 
 These values live in data files and are a starting point, to be tuned through playtesting. That includes whether longer rounds give more moves.
 
@@ -192,10 +205,14 @@ Vision is revealed when the round resolves, so you use what you saw this round t
 
 ## Game screen
 
+- **Round banner** (very top, large): round N/37, game time window of the round and phase.
 - **Top**: your team's status. Team lead (gold and XP), Dragons, Voidgrubs, towers taken, wards used this round (x/3). One card per champion with role icon, name, level, XP bar, lead bar and unspent gold.
-- **Center**: a flat map showing every playable position, with a tooltip on hover. One token per champion, with the official League role icon above it (from CommunityDragon) and its name below. Fog of war covers what you can't see.
+- **Center**: a flat map showing every playable position, with a tooltip on hover. One token per champion, with the official League role icon above it (from CommunityDragon) and its name below. Fog of war covers what you can't see. The map takes the full available height, and every position and token has a click target larger than its drawing.
+  - Each neutral objective and jungle camp shows, on its own position, the time left before it spawns, or that it is up. A cleared camp is greyed out with its respawn timer.
+  - Each lane shows its **wave** marker (near the blue tower, in the middle or near the red tower), so you can read lane priority.
 - **Left panel, actions**: the selected token's options. Place a ward or clear one, each on the starting or arrival position. Recall.
 - **Right panel, round summary**: current phase, round and game time, next objective spawn, the list of this round's orders, the **Confirm round** button, the fight or flee prompts when a contact happens during resolution, and teaching-mode explanations after the round resolves.
+- **Round replay**: after a round resolves, a short animation (about 2 s, with replay and skip buttons) plays it on the map: visible tokens slide to their destination, fights flash, deaths and taken objectives appear. Only what you saw is shown. The text log stays below.
 - **Bottom**: the enemy team, with the same layout, showing only what has been seen: where each champion was last seen and on which round, plus estimated gold and lead.
 - **Giving orders**: click a token, and only the positions it can reach this round light up. Then click its next position. A dashed arrow shows the move. A token with no order stays where it is.
 
