@@ -3,7 +3,7 @@ import type { Lane, Position, Role, Side } from '@lml/data/contracts';
 import type { PlayerView } from '@lml/engine/contracts';
 import type { Store } from '../store';
 import { dotRadius, hitRadius, spawnCountdown, wavePoint } from './map-marks';
-import { pawnClick, pawnHitPassesThrough } from './pawn-click';
+import { nodeClickKeepsSelection, pawnClick, pawnHitPassesThrough } from './pawn-click';
 import { ReplayLayer } from './ReplayLayer';
 import {
   championImage,
@@ -192,6 +192,9 @@ export function MapView({ store }: { store: Store }) {
         stroke="#111"
         stroke-width={1.5}
         pointer-events={ok ? 'none' : undefined}
+        onClick={(e: MouseEvent) => {
+          if (nodeClickKeepsSelection(p.id, reach)) e.stopPropagation();
+        }}
         onMouseMove={(e: MouseEvent) => setTip({ text: tipText(p), x: e.clientX, y: e.clientY })}
         onMouseLeave={() => setTip(null)}
       />

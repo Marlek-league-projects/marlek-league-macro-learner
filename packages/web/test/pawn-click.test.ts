@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { pawnClick, pawnHitPassesThrough } from '../src/components/pawn-click';
+import { nodeClickKeepsSelection, pawnClick, pawnHitPassesThrough } from '../src/components/pawn-click';
 
 const reach = { 'top-lane': 1, 'gromp-blue': 1 };
 
@@ -45,5 +45,16 @@ describe('pawnHitPassesThrough', () => {
 
   test('the selected pawn itself keeps its hit area', () => {
     expect(pawnHitPassesThrough({ id: 'Vi', position: 'bot-lane', ally: true }, 'Vi', reach)).toBe(false);
+  });
+});
+
+describe('nodeClickKeepsSelection', () => {
+  test('a click on an unreachable position keeps the selection', () => {
+    expect(nodeClickKeepsSelection('bot-lane', reach)).toBe(true);
+  });
+
+  test('reachable positions and clicks with nothing selected are left to the map', () => {
+    expect(nodeClickKeepsSelection('top-lane', reach)).toBe(false);
+    expect(nodeClickKeepsSelection('bot-lane', null)).toBe(false);
   });
 });

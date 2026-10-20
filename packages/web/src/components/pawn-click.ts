@@ -37,3 +37,11 @@ export function pawnHitPassesThrough(
 ): boolean {
   return selectedId !== null && selectedId !== pawn.id && reach?.[pawn.position] === undefined;
 }
+
+/**
+ * With a pawn selected, a click on a position it cannot reach does nothing: it must not reach the map
+ * background, which would deselect the pawn.
+ */
+export function nodeClickKeepsSelection(position: string, reach: Record<string, number> | null): boolean {
+  return reach !== null && reach[position] === undefined;
+}
