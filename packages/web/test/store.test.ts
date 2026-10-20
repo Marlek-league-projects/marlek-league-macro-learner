@@ -136,6 +136,27 @@ describe('store', () => {
     expect(store.view.value!.winner).not.toBeNull();
   });
 
+  test('the last round replays on the game over screen', () => {
+    const store = started(7);
+    for (let i = 0; i < 36; i++) {
+      store.confirmRound();
+      store.confirmContacts();
+      store.next();
+    }
+    const before = store.view.value!;
+    store.confirmRound();
+    store.confirmContacts();
+    expect(store.screen.value).toBe('over');
+    expect(store.previousView.value).toBe(before);
+    expect(store.replaying.value).toBe(true);
+    const run = store.replayRun.value;
+    store.skipReplay();
+    expect(store.replaying.value).toBe(false);
+    store.replay();
+    expect(store.replaying.value).toBe(true);
+    expect(store.replayRun.value).toBe(run + 1);
+  });
+
   test('finalScores is null during the game, and matches engine.teamScore at the end', () => {
     const store = started(7);
     expect(store.finalScores()).toBeNull();

@@ -37,7 +37,7 @@ export interface Store {
   data: GameData;
   screen: Signal<Screen>;
   view: Signal<PlayerView | null>;
-  /** The view before the last resolved round (the replay's starting point); null outside the review screen. */
+  /** The view before the last resolved round (the replay's starting point); null outside the review and game over screens. */
   previousView: Signal<PlayerView | null>;
   /** The round replay is playing on the map. */
   replaying: Signal<boolean>;
@@ -67,7 +67,7 @@ export interface Store {
   choose(contactId: string, choice: Choice): void;
   confirmContacts(): void;
   next(): void;
-  /** Restarts the round replay (review screen only). */
+  /** Restarts the round replay (review and game over screens). */
   replay(): void;
   /** Jumps to the end of the round replay. */
   skipReplay(): void;
@@ -186,8 +186,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     previousView.value = view.value;
     publish();
     screen.value = result.state.over ? 'over' : 'review';
-    if (screen.value === 'review') startReplay();
-    else stopReplay();
+    startReplay();
   };
 
   const startReplay = (): void => {
@@ -354,7 +353,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     },
 
     replay() {
-      if (screen.value === 'review' && previousView.value) startReplay();
+      if ((screen.value === 'review' || screen.value === 'over') && previousView.value) startReplay();
     },
 
     skipReplay() {

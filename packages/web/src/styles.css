@@ -89,7 +89,7 @@ button.wide { width:100%; margin:2px 0; }
 .field > span { color:var(--mut); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
 select, input[type=number] { background:#0d1117; color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font:inherit; }
 .seedrow { display:flex; gap:6px; } .seedrow input { flex:1; }
-.over { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:12px 0; }
+.over { display:grid; grid-template-columns:220px minmax(0,1fr) 220px; gap:12px; margin:12px 0; align-items:start; }
 .score { width:100%; border-collapse:collapse; }
 .score th, .score td { padding:4px 6px; text-align:right; border-bottom:1px solid var(--line); }
 .score th:first-child, .score td:first-child { text-align:left; color:var(--mut); }

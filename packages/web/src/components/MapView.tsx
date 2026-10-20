@@ -134,7 +134,8 @@ export function MapView({ store }: { store: Store }) {
 
   const now = store.roundWindow().start;
   const pending = store.pending.value;
-  const replaying = store.screen.value === 'review' && store.replaying.value && store.previousView.value !== null;
+  const replayable = store.screen.value === 'review' || store.screen.value === 'over';
+  const replaying = replayable && store.replaying.value && store.previousView.value !== null;
   const contactAt = new Set(store.screen.value === 'contacts' ? store.contacts.value.map((c) => c.position) : []);
 
   const order = (to: string) => {
