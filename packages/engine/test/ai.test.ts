@@ -180,7 +180,7 @@ describe('aiOrders', () => {
     s.waves.top = -1;
     for (const c of s.champions) if (c.side === 'blue' && c.role !== 'top') c.status = 'dead';
     const top = get(s, 'blue', 'top');
-    top.gold = 1200;
+    top.gold = d.aiTuning.recallGold + 100;
     const bad = MISTAKE_IDS.indexOf('badRecall');
     const onlyBadRecall = stubRng((n) => (n % MISTAKE_IDS.length === bad ? 0 : 0.99));
     const view = viewFor(s, d, 'blue');
