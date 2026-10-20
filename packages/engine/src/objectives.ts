@@ -4,7 +4,7 @@ import { lead } from './fight';
 import { damageTower, grant } from './lanes';
 import { roundWindow } from './time';
 
-type PitId = keyof GameState['pits'];
+export type PitId = keyof GameState['pits'];
 type ScuttleId = keyof GameState['scuttles'];
 
 const SIDES: Side[] = ['blue', 'red'];
@@ -18,7 +18,7 @@ const SCUTTLE_PIT: Record<ScuttleId, PitId> = { 'scuttle-top': 'baron-pit', 'scu
 const BUFF_CAMPS = new Set(['bluebuff', 'redbuff']);
 
 /** Objective of `pit` alive at time `t`: the first in its sequence not yet despawned. */
-function objectiveAt(data: GameData, pit: PitId, t: number): ObjectiveId {
+export function objectiveAt(data: GameData, pit: PitId, t: number): ObjectiveId {
   const seq = PIT_SEQUENCE[pit];
   return seq.find((id) => {
     const despawn = data.rules.objectives[id].despawnAt;

@@ -1,0 +1,420 @@
+import { MISTAKE_IDS } from '@lml/data';
+import type { AiProfile, GameData, Lane, MistakeId, ObjectiveId, Role, Side } from '@lml/data/contracts';
+import type { ChampionState, Choice, Contact, EnemyInfo, Order, PlayerView, Rng } from '../contracts';
+import { resolveFight } from '../fight';
+import { movesFor, reachableFrom, spawnPointsFor } from '../movement';
+import type { PitId } from '../objectives';
+import { roundWindow } from '../time';
+import { other, ourWave, PITS, pitTiming } from './evaluate';
+import { stateFromView } from './simulate';
+
+export type Mistakes = Map<string, Set<MistakeId>>;
+
+export interface Candidate {
+  order: Order;
+  score: number;
+  /** Lane a jungler gank targets, for the laners to join. */
+  gank?: Lane;
+}
+
+interface Ctx {
+  view: PlayerView;
+  data: GameData;
+  side: Side;
+  enemy: Side;
+  /** End time (s) of the view's round. */
+  end: number;
+  jungler: EnemyInfo | undefined;
+  gank: { lane: Lane; target: string } | null;
+}
+
+const LANES: Lane[] = ['top', 'mid', 'bot'];
+const SCUTTLES = ['scuttle-top', 'scuttle-bot'] as const;
+const HOME_LANE: Record<Exclude<Role, 'jungle'>, Lane> = { top: 'top', mid: 'mid', adc: 'bot', support: 'bot' };
+const PIT_LANE: Record<PitId, Lane> = { 'dragon-pit': 'bot', 'baron-pit': 'top' };
+const PIT_ROLES: Record<ObjectiveId, Role[]> = {
+  dragon: ['jungle', 'adc', 'support'],
+  voidgrubs: ['jungle', 'top'],
+  herald: ['jungle', 'top'],
+  baron: ['jungle', 'top', 'mid'],
+  scuttle: ['jungle'],
+};
+/** AI tuning: gold that makes a recall worth it. */
+const RECALL_GOLD = 1100;
+/** AI tuning: rounds an enemy laner seen in lane still counts as "was there" for the conversion rule. */
+const CONVERT_MEMORY = 3;
+/** AI tuning: candidate priorities, higher first. */
+const SCORE = {
+  pointless: 100,
+  herald: 90,
+  objective: 70,
+  recall: 60,
+  convert: 55,
+  joinGank: 52,
+  lane: 50,
+  gank: 45,
+  laneAlt: 40,
+  scuttle: 36,
+  buff: 35,
+  invade: 32,
+  camp: 30,
+  wait: 10,
+};
+
+// ---------- map helpers ----------
+
+const distCache = new WeakMap<GameData, Map<string, Record<string, number>>>();
+
+/** Graph distance, cached per data set (the AI asks for thousands per game; an uncached BFS triples the fuzz time). */
+function dist(data: GameData, a: string, b: string): number {
+  let cache = distCache.get(data);
+  if (!cache) distCache.set(data, (cache = new Map()));
+  let from = cache.get(a);
+  if (!from) {
+    from = { [a]: 0 };
+    const queue = [a];
+    for (let i = 0; i < queue.length; i++) {
+      const cur = queue[i]!;
+      for (const n of data.graph.adj[cur] ?? []) {
+        if (from[n] === undefined) {
+          from[n] = from[cur]! + 1;
+          queue.push(n);
+        }
+      }
+    }
+    cache.set(a, from);
+  }
+  return from[b] ?? Infinity;
+}
+
+const laneOf = (data: GameData, pos: string): Lane | undefined => data.graph.positions[pos]?.lane;
+
+function laneMid(data: GameData, lane: Lane): string {
+  return Object.values(data.graph.positions).find((p) => p.kind === 'laneMid' && p.lane === lane)!.id;
+}
+
+/** Map half by the closest pit; null when equally far. */
+function half(data: GameData, pos: string): PitId | null {
+  const top = dist(data, pos, 'baron-pit');
+  const bot = dist(data, pos, 'dragon-pit');
+  return top < bot ? 'baron-pit' : bot < top ? 'dragon-pit' : null;
+}
+
+function front(ctx: Ctx, side: Side, lane: Lane): string | null {
+  return ctx.data.graph.towers(side, lane).find((t) => (ctx.view.towers[t] ?? 0) > 0) ?? null;
+}
+
+function reach(ctx: Ctx, c: ChampionState): Record<string, number> {
+  return reachableFrom(ctx.data, c.position, movesFor(c, ctx.data.rules), c.side);
+}
+
+/** Reachable position closest to `target`, fewest moves then id as tie-breaks. */
+function step(ctx: Ctx, c: ChampionState, target: string): string {
+  const r = reach(ctx, c);
+  return Object.keys(r).sort(
+    (a, b) => dist(ctx.data, a, target) - dist(ctx.data, b, target) || r[a]! - r[b]! || a.localeCompare(b),
+  )[0]!;
+}
+
+const moveTo = (c: ChampionState, to: string): Order => ({ kind: 'move', champion: c.id, to });
+
+/** Seen when the last round resolved, so its position is current. */
+const known = (view: PlayerView, e: EnemyInfo | undefined): e is EnemyInfo & { position: string } =>
+  !!e && e.position !== null && e.lastSeenRound !== null && view.round - e.lastSeenRound <= 1;
+
+// ---------- context and mistakes ----------
+
+export function makeContext(view: PlayerView, data: GameData): Ctx {
+  return {
+    view,
+    data,
+    side: view.side,
+    enemy: other(view.side),
+    end: roundWindow(data.rules, view.round).end,
+    jungler: view.enemies.find((e) => e.role === 'jungle'),
+    gank: null,
+  };
+}
+
+/** One roll per ally and mistake, in `MISTAKE_IDS` order. */
+export function rollMistakes(view: PlayerView, profile: AiProfile, rng: Rng): Mistakes {
+  const out: Mistakes = new Map();
+  for (const c of view.allies) {
+    const set = new Set<MistakeId>();
+    for (const id of MISTAKE_IDS) if (rng.next() < profile.mistakes[id]) set.add(id);
+    out.set(c.id, set);
+  }
+  return out;
+}
+
+// ---------- rules ----------
+
+function spawnOrder(ctx: Ctx, c: ChampionState): Order {
+  const points = spawnPointsFor(ctx.view, ctx.data, c.id);
+  let to: string;
+  if (c.role === 'jungle') {
+    const alive = points.filter((p) => (ctx.view.camps[p] ?? Infinity) <= ctx.end);
+    to = alive.find((p) => /^(blue|red)buff-/.test(p)) ?? alive[0] ?? points[0]!;
+  } else {
+    const mid = laneMid(ctx.data, HOME_LANE[c.role]);
+    to = [...points].sort((a, b) => dist(ctx.data, a, mid) - dist(ctx.data, b, mid))[0]!;
+  }
+  return { kind: 'spawn', champion: c.id, to };
+}
+
+/** Back to lane for a laner, to the nearest own camp for the jungler. */
+function home(ctx: Ctx, c: ChampionState): Order {
+  if (c.role !== 'jungle') {
+    const lane = HOME_LANE[c.role];
+    return moveTo(c, step(ctx, c, front(ctx, ctx.side, lane) ?? laneMid(ctx.data, lane)));
+  }
+  const camps = Object.keys(ctx.view.camps).sort((a, b) => dist(ctx.data, c.position, a) - dist(ctx.data, c.position, b));
+  return moveTo(c, step(ctx, c, camps[0] ?? c.position));
+}
+
+/** `pointlessPlay`: a random invade (jungler) or roam. */
+function pointless(ctx: Ctx, c: ChampionState, rng: Rng): Order {
+  const r = Object.keys(reach(ctx, c)).sort();
+  const invades = r.filter((p) => ctx.data.graph.positions[p]?.kind === 'camp' && ctx.data.graph.positions[p]!.side === ctx.enemy);
+  const roams = r.filter((p) => p !== c.position);
+  const pool = c.role === 'jungle' && invades.length > 0 ? invades : roams.length > 0 ? roams : r;
+  return moveTo(c, rng.pick(pool));
+}
+
+function herald(ctx: Ctx, c: ChampionState): Order {
+  const r = reach(ctx, c);
+  const targets = LANES.map((l) => front(ctx, ctx.enemy, l)).filter((t): t is string => t !== null);
+  const inRange = targets.find((t) => r[t] !== undefined);
+  if (inRange) return { kind: 'move', champion: c.id, to: inRange, launchHerald: true };
+  const nearest = [...targets].sort((a, b) => dist(ctx.data, c.position, a) - dist(ctx.data, c.position, b))[0];
+  return moveTo(c, nearest ? step(ctx, c, nearest) : c.position);
+}
+
+/** Objective setup: to the pit one round before spawn (or while up), with lane priority. */
+function objectives(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, o: Order) => void): void {
+  for (const pit of PITS) {
+    const t = pitTiming(ctx.view, ctx.data, pit);
+    if (!t.objective || (!t.live && !t.soon)) continue;
+    const roles = PIT_ROLES[t.objective];
+    if (!roles.includes(c.role)) continue;
+    const able = ctx.view.allies.filter((a) => a.status !== 'dead' && roles.includes(a.role)).length;
+    if (able < ctx.data.rules.objectives[t.objective].minChampions) continue;
+    if (t.soon && m.has('objectiveTiming')) continue;
+    const lane = c.role === 'jungle' ? PIT_LANE[pit] : HOME_LANE[c.role];
+    if (ourWave(ctx.view, lane) < 0 && !m.has('rotateWithoutPriority')) continue;
+    add(SCORE.objective, moveTo(c, step(ctx, c, pit)));
+  }
+}
+
+/** Recall on a shoved or even wave (no objective coming for the jungler); `badRecall` inverts it. */
+function recall(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, o: Order) => void): void {
+  if (c.gold < RECALL_GOLD) return;
+  const good =
+    c.role === 'jungle'
+      ? !PITS.some((p) => {
+          const t = pitTiming(ctx.view, ctx.data, p);
+          return t.live || t.soon;
+        })
+      : ourWave(ctx.view, HOME_LANE[c.role]) >= 0;
+  if (good !== m.has('badRecall')) add(SCORE.recall, { kind: 'recall', champion: c.id });
+}
+
+/**
+ * After a won fight: in a lane whose enemy laners were just there and are gone, take the tower; next to an
+ * objective that is up with no enemy in sight, take it. `noConversion` walks back instead.
+ */
+function conversion(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, o: Order) => void): void {
+  const { view, data } = ctx;
+  const lane = laneOf(data, c.position);
+  if (lane) {
+    const laners = view.enemies.filter((e) => e.role !== 'jungle' && HOME_LANE[e.role] === lane);
+    const gone = laners.every(
+      (e) =>
+        !e.visible && e.position !== null && e.lastSeenRound !== null &&
+        view.round - e.lastSeenRound <= CONVERT_MEMORY && laneOf(data, e.position) === lane,
+    );
+    const target = front(ctx, ctx.enemy, lane);
+    if (laners.length > 0 && gone && target) {
+      add(SCORE.convert, m.has('noConversion') ? home(ctx, c) : moveTo(c, step(ctx, c, target)));
+    }
+  }
+  const r = reach(ctx, c);
+  for (const pit of PITS) {
+    if (r[pit] === undefined || !pitTiming(view, data, pit).live) continue;
+    if (view.enemies.some((e) => e.visible && e.position !== null && dist(data, e.position, pit) <= 1)) continue;
+    add(SCORE.convert, m.has('noConversion') ? home(ctx, c) : moveTo(c, pit));
+  }
+}
+
+/** Laner: farm in lane, step onto the enemy front tower when the wave is there and the enemy jungler is known far. */
+function laning(ctx: Ctx, c: ChampionState, lane: Lane, m: Set<MistakeId>, add: (s: number, o: Order) => void): void {
+  const { view, data } = ctx;
+  const wave = ourWave(view, lane);
+  const enemyFront = front(ctx, ctx.enemy, lane);
+  const mid = laneMid(data, lane);
+  const own = front(ctx, ctx.side, lane) ?? mid;
+  const jg = ctx.jungler;
+  const jgMoves = data.rules.moves.jungler;
+  const safe = known(view, jg) && enemyFront !== null && dist(data, jg.position, enemyFront) > jgMoves;
+  const threatened = !m.has('ignoreJungler') && known(view, jg) && dist(data, jg.position, mid) <= jgMoves;
+  let spot: string;
+  if (wave === 1 && enemyFront && (safe || m.has('greed'))) spot = enemyFront;
+  else if (wave === 1 && !threatened) spot = mid;
+  else spot = own;
+  add(SCORE.lane, moveTo(c, step(ctx, c, spot)));
+  add(SCORE.laneAlt, moveTo(c, step(ctx, c, spot === own ? mid : own)));
+  if (ctx.gank?.lane === lane && reach(ctx, c)[ctx.gank.target] !== undefined) {
+    add(SCORE.joinGank, moveTo(c, ctx.gank.target));
+  }
+}
+
+/** Jungler: gank an overextended laner (away from the enemy jungler), take scuttles, clear or invade camps. */
+function jungling(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, o: Order, gank?: Lane) => void): void {
+  const { view, data } = ctx;
+  const r = reach(ctx, c);
+  const jg = ctx.jungler;
+  const jgKnown = known(view, jg);
+
+  for (const lane of LANES) {
+    const mid = laneMid(data, lane);
+    if (!m.has('ignoreJungler') && jgKnown) {
+      const h = half(data, jg.position);
+      if ((h !== null && h === half(data, mid)) || dist(data, jg.position, mid) <= data.rules.moves.jungler) continue;
+    }
+    const inLane = (pos: string | null): boolean => pos !== null && laneOf(data, pos) === lane;
+    const enemies = view.enemies.filter((e) => e.visible && inLane(e.position));
+    const allies = view.allies.filter((a) => a.status === 'alive' && inLane(a.position));
+    const target = enemies.find((e) => {
+      const p = data.graph.positions[e.position!]!;
+      const overextended = p.kind === 'laneMid' || (p.kind === 'tower' && p.side === ctx.side);
+      return overextended && r[e.position!] !== undefined;
+    });
+    if (target && allies.length + 1 > enemies.length) add(SCORE.gank, moveTo(c, target.position!), lane);
+  }
+
+  for (const id of SCUTTLES) {
+    if (view.scuttles[id] <= ctx.end && r[id] !== undefined) add(SCORE.scuttle, moveTo(c, id));
+  }
+  for (const [camp, t] of Object.entries(view.camps)) {
+    if (t > ctx.end || r[camp] === undefined) continue;
+    const buff = /^(blue|red)buff-/.test(camp);
+    add(buff ? SCORE.buff : SCORE.camp, moveTo(c, camp));
+  }
+  if (jgKnown) {
+    const opposite = half(data, jg.position);
+    for (const p of Object.keys(r).sort()) {
+      const pos = data.graph.positions[p]!;
+      const h = half(data, p);
+      if (pos.kind === 'camp' && pos.side === ctx.enemy && opposite !== null && h !== null && h !== opposite) {
+        add(SCORE.invade, moveTo(c, p));
+      }
+    }
+  }
+  const soonest = Object.entries(view.camps).sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))[0];
+  add(SCORE.wait, moveTo(c, soonest ? step(ctx, c, soonest[0]) : c.position));
+}
+
+/** Scored candidate orders for one champion, best first, without duplicates. */
+function candidatesFor(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, rng: Rng): Candidate[] {
+  if (c.status === 'respawning') return [{ order: spawnOrder(ctx, c), score: 0 }];
+  const out: Candidate[] = [];
+  const add = (score: number, order: Order, gank?: Lane): void => {
+    out.push(gank ? { score, order, gank } : { score, order });
+  };
+  if (m.has('pointlessPlay')) add(SCORE.pointless, pointless(ctx, c, rng));
+  if (c.hasHerald) add(SCORE.herald, herald(ctx, c));
+  objectives(ctx, c, m, add);
+  recall(ctx, c, m, add);
+  conversion(ctx, c, m, add);
+  if (c.role === 'jungle') jungling(ctx, c, m, add);
+  else laning(ctx, c, HOME_LANE[c.role], m, add);
+  const seen = new Set<string>();
+  return out
+    .sort((a, b) => b.score - a.score)
+    .filter((x) => {
+      const key = JSON.stringify(x.order);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+/** Candidates for every ally with an order to give (in ally order); the jungler decides first so laners can join its gank. */
+export function planCandidates(ctx: Ctx, mistakes: Mistakes, rng: Rng): Candidate[][] {
+  const active = ctx.view.allies.filter((c) => c.status !== 'dead');
+  const byId = new Map<string, Candidate[]>();
+  const order = [...active].sort((a, b) => Number(b.role === 'jungle') - Number(a.role === 'jungle'));
+  for (const c of order) {
+    const cs = candidatesFor(ctx, c, mistakes.get(c.id) ?? new Set(), rng);
+    byId.set(c.id, cs);
+    const best = cs[0]!;
+    if (best.gank && best.order.kind === 'move') ctx.gank = { lane: best.gank, target: best.order.to };
+  }
+  return active.map((c) => byId.get(c.id)!);
+}
+
+/** The best set, then the sets where one champion takes its second choice, cheapest swap first. */
+export function candidateSets(per: Candidate[][], n: number): Order[][] {
+  const base = per.map((cs) => cs[0]!.order);
+  const swaps = per
+    .flatMap((cs, i) => (cs.length > 1 ? [{ i, loss: cs[0]!.score - cs[1]!.score, order: cs[1]!.order }] : []))
+    .sort((a, b) => a.loss - b.loss || a.i - b.i);
+  return [base, ...swaps.slice(0, n - 1).map((s) => base.map((o, j) => (j === s.i ? s.order : o)))];
+}
+
+/**
+ * Wards the pit one round before its spawn (from or to), and jungler/support unward a pit with an objective
+ * up or coming. `poorVision` skips both.
+ */
+export function assignWards(ctx: Ctx, orders: Order[], mistakes: Mistakes): Order[] {
+  const { rules } = ctx.data;
+  let wards = 0;
+  let unwards = 0;
+  const warded = new Set<string>();
+  return orders.map((o) => {
+    if (o.kind !== 'move' || mistakes.get(o.champion)?.has('poorVision')) return o;
+    const c = ctx.view.allies.find((a) => a.id === o.champion)!;
+    const out = { ...o };
+    for (const [spot, pos] of [['to', o.to], ['from', c.position]] as const) {
+      if (!(PITS as string[]).includes(pos)) continue;
+      const t = pitTiming(ctx.view, ctx.data, pos as PitId);
+      if (!t.objective || (!t.live && !t.soon)) continue;
+      if (spot === 'to' && out.unward === undefined && rules.wards.unwardRoles.includes(c.role) && unwards < rules.wards.unwardPerRound) {
+        out.unward = 'to';
+        unwards++;
+      }
+      if (t.soon && out.ward === undefined && !warded.has(pos) && wards < rules.wards.perRound) {
+        out.ward = spot;
+        wards++;
+        warded.add(pos);
+      }
+    }
+    return out;
+  });
+}
+
+/** The mistake-free plan, used for the rounds the look-ahead plays after the first. */
+export function bestOrders(view: PlayerView, data: GameData, rng: Rng): Order[] {
+  const ctx = makeContext(view, data);
+  const none: Mistakes = new Map(view.allies.map((a) => [a.id, new Set<MistakeId>()]));
+  return assignWards(ctx, candidateSets(planCandidates(ctx, none, rng), 1)[0]!, none);
+}
+
+/**
+ * Fight when the fight, scored with what `view.side` knows, is won; trade an even one when offered;
+ * otherwise flee, unless `chase` and outnumbered.
+ */
+export function contactChoice(view: PlayerView, data: GameData, contact: Contact, chase: boolean): Choice {
+  const side = view.side;
+  const options = contact.options[side];
+  if (options.length === 1) return options[0]!;
+  const state = stateFromView(view, data);
+  const stage = roundWindow(data.rules, view.round).stage;
+  const { winner } = resolveFight(state, data, contact.position, contact.blue, contact.red, stage);
+  const outnumbered = contact[side].length < contact[other(side)].length;
+  let choice: Choice;
+  if (winner === side || (chase && outnumbered)) choice = 'fight';
+  else if (winner === null && options.includes('trade')) choice = 'trade';
+  else choice = 'flee';
+  return options.includes(choice) ? choice : contact.defaults[side];
+}

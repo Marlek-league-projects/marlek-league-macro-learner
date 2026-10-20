@@ -1,5 +1,5 @@
 import type { GameData, Lane, Rules, Side } from '@lml/data/contracts';
-import type { ChampionState, GameState, Order } from './contracts';
+import type { ChampionState, GameState, Order, PlayerView } from './contracts';
 
 const LANES: Lane[] = ['top', 'mid', 'bot'];
 
@@ -18,13 +18,17 @@ function find(state: GameState, championId: string): ChampionState {
 /** Position to distance for everything the champion can reach this round, incl. its own position (0). */
 export function reachable(state: GameState, data: GameData, championId: string): Record<string, number> {
   const c = find(state, championId);
-  const banned = enemyBase(c.side);
-  const max = movesFor(c, data.rules);
-  const dist: Record<string, number> = { [c.position]: 0 };
-  const queue = [c.position];
+  return reachableFrom(data, c.position, movesFor(c, data.rules), c.side);
+}
+
+/** Position to distance within `moves` steps of `position` for a `side` champion (the enemy base is off limits). */
+export function reachableFrom(data: GameData, position: string, moves: number, side: Side): Record<string, number> {
+  const banned = enemyBase(side);
+  const dist: Record<string, number> = { [position]: 0 };
+  const queue = [position];
   for (let i = 0; i < queue.length; i++) {
     const cur = queue[i]!;
-    if (dist[cur]! >= max) continue;
+    if (dist[cur]! >= moves) continue;
     for (const n of data.graph.adj[cur] ?? []) {
       if (n === banned || dist[n] !== undefined) continue;
       dist[n] = dist[cur]! + 1;
@@ -36,7 +40,17 @@ export function reachable(state: GameState, data: GameData, championId: string):
 
 /** Where a respawning champion may re-enter: front standing tower per lane, or own camps for the jungler. */
 export function spawnPoints(state: GameState, data: GameData, championId: string): string[] {
-  const c = find(state, championId);
+  return spawnPointsFor({ allies: state.champions, towers: state.towers }, data, championId);
+}
+
+/** `spawnPoints` from what a side knows: its own champions and the tower hp. */
+export function spawnPointsFor(
+  view: Pick<PlayerView, 'allies' | 'towers'>,
+  data: GameData,
+  championId: string,
+): string[] {
+  const c = view.allies.find((x) => x.id === championId);
+  if (!c) throw new Error(`${championId}: unknown champion`);
   const { graph } = data;
   if (c.role === 'jungle') {
     return Object.values(graph.positions)
@@ -45,7 +59,7 @@ export function spawnPoints(state: GameState, data: GameData, championId: string
   }
   const out: string[] = [];
   for (const lane of LANES) {
-    const front = graph.towers(c.side, lane).find((t) => (state.towers[t] ?? 0) > 0);
+    const front = graph.towers(c.side, lane).find((t) => (view.towers[t] ?? 0) > 0);
     if (front) out.push(front);
   }
   return out.length > 0 ? out : [`base-${c.side}`];

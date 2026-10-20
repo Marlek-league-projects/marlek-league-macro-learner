@@ -1,3 +1,4 @@
+import { aiContactChoice, aiOrders } from './ai';
 import type { GameEngine } from './contracts';
 import { detectContacts } from './contacts';
 import { defaultOrders, reachable, spawnPoints, validateOrders } from './movement';
@@ -10,7 +11,7 @@ export { createRng } from './rng';
 export { roundWindow, totalRounds } from './time';
 export type { RoundWindow } from './time';
 export { randomDraft, newGame } from './setup';
-export { movesFor, reachable, spawnPoints, validateOrders, defaultOrders } from './movement';
+export { movesFor, reachable, reachableFrom, spawnPoints, spawnPointsFor, validateOrders, defaultOrders } from './movement';
 export { arrivalPositions, detectContacts, resolveChoice } from './contacts';
 export { lead, fightScore, resolveFight } from './fight';
 export { damageTower, frontTower, towerMultiplier, updateLanes } from './lanes';
@@ -18,7 +19,11 @@ export { spawnObjectives, clearCamps, captureObjectives, launchHeralds } from '.
 export { level, applyKill, completeRecall, advanceRespawns, teamScore, finishIfOver } from './economy';
 export { visibleEnemies, viewFor, eventsFor } from './vision';
 export { resolveRound } from './round';
+export { aiOrders, aiContactChoice, evaluate } from './ai';
 
 export function createEngine(): GameEngine {
-  return { newGame, defaultOrders, reachable, spawnPoints, validateOrders, detectContacts, resolveRound, viewFor, eventsFor };
+  return {
+    newGame, defaultOrders, reachable, spawnPoints, validateOrders, detectContacts, resolveRound, viewFor, eventsFor,
+    aiOrders, aiContactChoice,
+  };
 }

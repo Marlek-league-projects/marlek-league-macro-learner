@@ -21,7 +21,8 @@ import type {
   TeachingRule,
 } from './contracts';
 
-const MISTAKE_IDS: MistakeId[] = [
+/** Every mistake id, in the order the AI rolls them. */
+export const MISTAKE_IDS: MistakeId[] = [
   'greed',
   'objectiveTiming',
   'pointlessPlay',
