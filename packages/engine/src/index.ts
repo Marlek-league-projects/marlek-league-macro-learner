@@ -1,3 +1,6 @@
+import { createRng } from './rng';
+import { roundWindow, totalRounds } from './time';
+import { level, teamScore } from './economy';
 import { aiContactChoice, aiOrders } from './ai';
 import type { GameEngine } from './contracts';
 import { detectContacts } from './contacts';
@@ -26,6 +29,6 @@ export { aiOrders, aiContactChoice, evaluate } from './ai';
 export function createEngine(): GameEngine {
   return {
     newGame, defaultOrders, reachable, spawnPoints, validateOrders, detectContacts, resolveRound, viewFor, eventsFor,
-    aiOrders, aiContactChoice, explainRound,
+    aiOrders, aiContactChoice, explainRound, createRng, roundWindow, totalRounds, level, teamScore,
   };
 }

@@ -1,12 +1,7 @@
-import type { Rules, Stage } from '@lml/data/contracts';
+import type { Rules } from '@lml/data/contracts';
+import type { RoundWindow } from './contracts';
 
-export interface RoundWindow {
-  start: number;
-  end: number;
-  phase: number;
-  stage: Stage;
-  seconds: number;
-}
+export type { RoundWindow };
 
 /** Number of rounds in a phase (its duration divided by its round length). */
 function phaseRounds(p: Rules['phases'][number]): number {

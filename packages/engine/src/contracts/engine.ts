@@ -1,4 +1,4 @@
-import type { AiProfile, GameData, Role, Side } from '@lml/data/contracts';
+import type { AiProfile, GameData, Role, Rules, Side, Stage } from '@lml/data/contracts';
 import type { Choice, Contact, ContactChoices } from './contacts';
 import type { GameEvent } from './events';
 import type { Order, Orders } from './orders';
@@ -7,6 +7,15 @@ import type { Explanation } from './teaching';
 import type { PlayerView } from './view';
 
 export type Draft = Record<Side, Record<Role, string>>;
+
+/** Time window covered by one round. */
+export interface RoundWindow {
+  start: number;
+  end: number;
+  phase: number;
+  stage: Stage;
+  seconds: number;
+}
 
 export interface RoundResult {
   state: GameState;
@@ -29,4 +38,9 @@ export interface GameEngine {
   aiContactChoice(view: PlayerView, data: GameData, contact: Contact, profile: AiProfile, rng: Rng): Choice;
   /** Tempo lessons for `side` from the round `before` → `after`, using only what `side` saw. */
   explainRound(before: GameState, after: GameState, events: GameEvent[], data: GameData, side: Side): Explanation[];
+  createRng(seed: number): Rng;
+  roundWindow(rules: Rules, round: number): RoundWindow;
+  totalRounds(rules: Rules): number;
+  level(xp: number, rules: Rules): number;
+  teamScore(state: GameState, data: GameData, side: Side): number;
 }
