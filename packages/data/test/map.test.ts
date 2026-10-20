@@ -1,0 +1,27 @@
+import { expect, test } from 'bun:test';
+import { buildGraph, mirrorId, type MapData } from '@lml/data';
+import mapJson from '../data/map.json';
+
+const g = buildGraph(mapJson as MapData);
+
+test('39 positions', () => expect(Object.keys(g.positions)).toHaveLength(39));
+test('mirrorId', () => {
+  expect(mirrorId('top-t1-blue')).toBe('bot-t1-red');
+  expect(mirrorId('mid-t2-red')).toBe('mid-t2-blue');
+  expect(mirrorId('raptors-blue')).toBe('raptors-red');
+  expect(mirrorId('scuttle-top')).toBe('scuttle-bot');
+  expect(mirrorId('baron-pit')).toBe('dragon-pit');
+  expect(mirrorId('mid-lane')).toBe('mid-lane');
+});
+test('graph is symmetric under mirror', () => {
+  for (const [a, ns] of Object.entries(g.adj)) for (const b of ns) expect(g.adj[mirrorId(a)]).toContain(mirrorId(b));
+});
+test('laner reach: mid T1 reaches top, bot and both scuttles in 1', () => {
+  for (const p of ['top-t1-blue', 'bot-t1-blue', 'scuttle-top', 'scuttle-bot']) expect(g.distance('mid-t1-blue', p)).toBe(1);
+});
+test('jungler examples in 2', () => {
+  expect(g.distance('raptors-blue', 'krugs-blue')).toBe(2);
+  expect(g.distance('raptors-blue', 'bluebuff-red')).toBe(2);
+});
+test('towers ordered T1..T3', () => expect(g.towers('red', 'top')).toEqual(['top-t1-red', 'top-t2-red', 'top-t3-red']));
+test('lanePositions(top) = 7 towers/laneMid, no camps', () => expect(g.lanePositions('top')).toHaveLength(7));
