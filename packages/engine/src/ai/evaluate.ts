@@ -46,7 +46,8 @@ export function estimateEnemy(view: PlayerView, data: GameData, e: EnemyInfo): P
   const round = Math.min(view.round, totalRounds(data.rules));
   const minutes = Math.max(0, roundWindow(data.rules, round).start - phases[0]!.start) / 60;
   const share = e.role === 'support' ? economy.supportShare : 1;
-  const xp = e.level !== null ? economy.levelXp[e.level - 1]! : economy.farmXpPerMin * share * minutes;
+  const xpShare = e.role === 'adc' || e.role === 'support' ? economy.duoXpShare : 1;
+  const xp = e.level !== null ? economy.levelXp[e.level - 1]! : economy.farmXpPerMin * xpShare * minutes;
   const items = (economy.farmGoldPerMin * share + economy.passiveGoldPerMin) * minutes;
   const bonusLead = (view.objectivesTaken[other(view.side)].dragon ?? 0) * buffs.dragonLead;
   return { xp, items, bonusLead };

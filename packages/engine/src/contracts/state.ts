@@ -66,6 +66,8 @@ export interface GameState {
   objectivesTaken: Record<Side, Partial<Record<ObjectiveId, number>>>;
   platesTaken: Record<Side, number>;
   towersDestroyed: Record<Side, number>;
+  /** Enemy champions each side has killed. */
+  kills: Record<Side, number>;
   /** Per side, enemy champion id to last known position. */
   lastSeen: Record<Side, Record<string, { position: string; round: number } | null>>;
   winner: Side | 'draw' | null;

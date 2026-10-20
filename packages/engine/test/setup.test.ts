@@ -45,7 +45,8 @@ test('newGame is deterministic and well formed', () => {
   expect(Object.keys(g.towers)).toHaveLength(18);
   expect(Object.values(g.towers).every((hp) => hp === 5)).toBe(true);
   expect(g.waves).toEqual({ top: 0, mid: 0, bot: 0 });
-  expect(Object.values(g.camps).every((t) => t === 90)).toBe(true);
+  const startCamps = g.champions.filter((c) => c.role === 'jungle').map((c) => c.position);
+  expect(Object.entries(g.camps).every(([id, t]) => startCamps.includes(id) || t === 90)).toBe(true);
   expect(g.scuttles).toEqual({ 'scuttle-top': 210, 'scuttle-bot': 210 });
 
   const bj = g.champions.find((c) => c.side === 'blue' && c.role === 'jungle')!;
@@ -57,4 +58,25 @@ test('newGame is deterministic and well formed', () => {
   expect(g.pits['dragon-pit'].nextSpawn).toBe(300);
   expect(g.pits['baron-pit']).toEqual({ objective: null, nextSpawn: 360, capture: null });
   expect(g.rngState).not.toBe(7);
+});
+
+test('each jungler has already cleared its start buff camp', () => {
+  const { camps } = d.rules;
+  for (const seed of [1, 2, 3, 4, 7]) {
+    const g = newGame(d, seed);
+    for (const side of ['blue', 'red'] as const) {
+      const j = g.champions.find((c) => c.side === side && c.role === 'jungle')!;
+      expect([`bluebuff-${side}`, `redbuff-${side}`]).toContain(j.position);
+      expect(g.camps[j.position]).toBe(camps.firstSpawn + camps.buffRespawn);
+      expect(g.campsSeen[side][j.position]).toBe(camps.firstSpawn + camps.buffRespawn);
+      const otherBuff = j.position.startsWith('bluebuff') ? `redbuff-${side}` : `bluebuff-${side}`;
+      expect(g.camps[otherBuff]).toBe(camps.firstSpawn);
+      expect(j.gold).toBe(camps.buffGold);
+      expect(j.goldEarned).toBe(camps.buffGold);
+      expect(j.xp).toBe(camps.buffXp);
+      const enemy = side === 'blue' ? 'red' : 'blue';
+      expect(g.lastSeen[enemy][j.id]).toEqual({ position: j.position, round: 0 });
+    }
+    for (const c of g.champions.filter((x) => x.role !== 'jungle')) expect([c.gold, c.xp]).toEqual([0, 0]);
+  }
 });

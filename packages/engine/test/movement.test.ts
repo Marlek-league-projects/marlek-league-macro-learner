@@ -157,13 +157,14 @@ describe('jungler objective reach', () => {
     const s = fresh();
     const top = get(s, 'blue', 'top');
     top.position = 'gromp-blue';
-    const r = reachable(s, d, top.id);
-    for (const o of OBJECTIVES) expect(r[o]).toBeUndefined();
+    // Every camp links to every river objective, so cut gromp's dragon link to see the bonus alone.
+    const adj = { ...d.graph.adj, 'gromp-blue': d.graph.adj['gromp-blue']!.filter((x) => x !== 'dragon-pit') };
+    expect(reachable(s, { ...d, graph: { ...d.graph, adj } }, top.id)['dragon-pit']).toBeUndefined();
   });
   test('the bonus needs a camp: a jungler in lane gets none', () => {
     const s = fresh();
     const j = get(s, 'blue', 'jungle');
-    j.position = 'top-t1-blue';
+    j.position = 'top-t3-blue';
     expect(reachable(s, d, j.id)['dragon-pit']).toBeUndefined();
   });
   test('mid T1 reaches neither pit in 1 move', () => {
@@ -187,7 +188,11 @@ describe('jungler objective reach', () => {
     const s = fresh();
     const j = get(s, 'blue', 'jungle');
     j.position = 'gromp-blue';
-    const off = { ...d, rules: { ...d.rules, moves: { ...d.rules.moves, junglerObjectiveReach: false } } };
+    // Every camp links to every river objective, so cut gromp's dragon link to see the bonus alone.
+    const adj = { ...d.graph.adj, 'gromp-blue': d.graph.adj['gromp-blue']!.filter((n) => n !== 'dragon-pit') };
+    const cut = { ...d, graph: { ...d.graph, adj }, rules: { ...d.rules, moves: { ...d.rules.moves, jungler: 1 } } };
+    expect(reachable(s, cut, j.id)['dragon-pit']).toBe(1);
+    const off = { ...cut, rules: { ...cut.rules, moves: { ...cut.rules.moves, junglerObjectiveReach: false } } };
     expect(reachable(s, off, j.id)['dragon-pit']).toBeUndefined();
   });
 });

@@ -148,7 +148,11 @@ describe('aiOrders', () => {
 
   test('challenger mid sacrifices its wave to rotate to a dragon where its side has the numbers', () => {
     expect(d.rules.objectives.dragon.value).toBeGreaterThan(d.aiTuning.waveSacrificeCost);
-    expect(midOrder(sacrificeScenario())).toMatchObject({ kind: 'move', to: 'scuttle-bot' });
+    const o = midOrder(sacrificeScenario());
+    expect(o.kind).toBe('move');
+    const to = (o as Extract<Order, { kind: 'move' }>).to;
+    expect(d.graph.distance(to, 'dragon-pit')).toBe(1);
+    expect(d.graph.positions[to]!.lane).toBeUndefined();
   });
 
   test('below Emerald the mid does not sacrifice its wave, even with no mistake rolled', () => {
@@ -170,8 +174,15 @@ describe('aiOrders', () => {
     for (const role of ['adc', 'jungle']) get(s, 'blue', role).status = 'dead';
     place(s, 'red', 'jungle', 'dragon-pit');
     s.lastSeen.blue[get(s, 'red', 'jungle').id] = { position: 'dragon-pit', round: 9 };
-    expect(midOrder(s)).toMatchObject({ kind: 'move', to: 'mid-t1-blue' });
+    const o = midOrder(s);
+    expect(o.kind).toBe('move');
+    expect(d.graph.positions[(o as Extract<Order, { kind: 'move' }>).to]!.lane).toBe('mid');
   });
+
+  /** Top T1s are two moves from the Dragon pit through the jungle: keep the Dragon away so no rotation pays. */
+  function noDragonSoon(s: GameState): void {
+    s.pits['dragon-pit'].nextSpawn = 600;
+  }
 
   /** Blue top on its lane, the red top seen in lane at the start of round 9 and gone since. */
   function vanishedLaner(wave: -1 | 0 | 1, bluePos: string): GameState {
@@ -181,6 +192,7 @@ describe('aiOrders', () => {
     place(s, 'blue', 'top', bluePos);
     place(s, 'red', 'top', 'krugs-red');
     s.lastSeen.blue[get(s, 'red', 'top').id] = { position: 'top-t1-red', round: 8 };
+    noDragonSoon(s);
     return s;
   }
 
@@ -194,8 +206,9 @@ describe('aiOrders', () => {
 
   test('after the enemy laner vanished next to us, with the jungler seen far away, the challenger takes the tower', () => {
     const s = vanishedLaner(0, 'top-lane');
-    s.lastSeen.blue[get(s, 'red', 'jungle').id] = { position: 'dragon-pit', round: 9 };
-    place(s, 'red', 'jungle', 'dragon-pit');
+    s.lastSeen.blue[get(s, 'red', 'jungle').id] = { position: 'bot-t2-red', round: 9 };
+    place(s, 'red', 'jungle', 'bot-t2-red');
+    expect(d.graph.distance('bot-t2-red', 'top-t1-red')).toBeGreaterThan(d.rules.moves.jungler);
     const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
     expect(orderOf(orders, get(s, 'blue', 'top').id)).toMatchObject({ kind: 'move', to: 'top-t1-red' });
   });
@@ -208,6 +221,7 @@ describe('aiOrders', () => {
     place(s, 'red', 'top', 'top-t2-red');
     s.lastSeen.blue[get(s, 'red', 'top').id] = { position: 'top-t2-red', round: 9 };
     // The red jungler was last seen at the start of the game.
+    noDragonSoon(s);
     return s;
   }
 
@@ -230,6 +244,7 @@ describe('aiOrders', () => {
     const s = newGame(d, 7);
     s.round = 10;
     s.waves.top = -1;
+    noDragonSoon(s);
     for (const c of s.champions) if (c.side === 'blue' && c.role !== 'top') c.status = 'dead';
     const top = get(s, 'blue', 'top');
     top.gold = d.aiTuning.recallGold + 100;

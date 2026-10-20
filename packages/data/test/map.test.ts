@@ -39,3 +39,22 @@ test('outer camps gank their lane in 1 move, on both sides', () => {
   ] as const)
     expect(g.distance(camp, tower)).toBe(1);
 });
+test('lane T1s and lane middle reach the nearby scuttle in 1, on both sides', () => {
+  for (const p of ['top-t1-blue', 'top-lane', 'top-t1-red']) expect(g.distance(p, 'scuttle-top')).toBe(1);
+  for (const p of ['bot-t1-blue', 'bot-lane', 'bot-t1-red']) expect(g.distance(p, 'scuttle-bot')).toBe(1);
+});
+test('laner reach from a lane T1 includes the nearby scuttle', () => {
+  for (const [t1, scuttle] of [
+    ['top-t1-blue', 'scuttle-top'],
+    ['top-t1-red', 'scuttle-top'],
+    ['bot-t1-blue', 'scuttle-bot'],
+    ['bot-t1-red', 'scuttle-bot'],
+  ] as const)
+    expect(g.adj[t1]).toContain(scuttle);
+});
+test('every scuttle and pit reaches all 12 camps in 1', () => {
+  const camps = Object.values(g.positions).filter((p) => p.kind === 'camp');
+  expect(camps).toHaveLength(12);
+  for (const river of ['scuttle-top', 'scuttle-bot', 'baron-pit', 'dragon-pit'])
+    for (const camp of camps) expect(g.distance(river, camp.id)).toBe(1);
+});

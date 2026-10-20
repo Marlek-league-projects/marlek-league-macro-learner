@@ -142,11 +142,13 @@ export function updateLanes(
     for (const side of ['blue', 'red'] as Side[]) {
       const here = present[side];
       const carries = here.filter((c) => c.role !== 'support');
+      const supported = carries.length < here.length;
       const gold = (rules.economy.farmGoldPerMin * win.seconds) / 60;
-      const xp = (rules.economy.farmXpPerMin * win.seconds) / 60;
-      for (const c of carries) grant(c, gold / carries.length, xp / carries.length);
-      const share = rules.economy.supportShare;
-      for (const c of here) if (c.role === 'support') grant(c, gold * share, xp * share);
+      const soloXp = (rules.economy.farmXpPerMin * win.seconds) / 60;
+      // With the support in lane, each duo laner gets `duoXpShare` of a solo laner's xp.
+      const duoXp = soloXp * rules.economy.duoXpShare;
+      for (const c of carries) grant(c, gold / carries.length, (supported ? duoXp : soloXp) / carries.length);
+      for (const c of here) if (c.role === 'support') grant(c, gold * rules.economy.supportShare, duoXp);
       // 6. trade winner lead
       if (winner === side) for (const c of here) c.bonusLead += rules.economy.tradeLead;
     }

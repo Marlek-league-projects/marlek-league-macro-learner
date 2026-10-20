@@ -52,6 +52,9 @@ export interface Rules {
   economy: {
     farmGoldPerMin: number;
     farmXpPerMin: number;
+    /** Share of a solo laner's farm xp each bot laner gets while the support is in lane. */
+    duoXpShare: number;
+    /** Support's share of the lane farm gold. */
     supportShare: number;
     passiveGoldPerMin: number;
     killGold: number;

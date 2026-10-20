@@ -1,5 +1,6 @@
 import type { GameData, Role, Side } from '@lml/data/contracts';
 import type { ChampionState, Draft, GameState, PitState, Rng } from './contracts';
+import { grant } from './lanes';
 import { createRng } from './rng';
 
 const SIDES: Side[] = ['blue', 'red'];
@@ -50,6 +51,12 @@ export function newGame(data: GameData, seed: number, draft?: Draft): GameState 
     else if (p.kind === 'camp') camps[p.id] = rules.camps.firstSpawn;
   }
 
+  // Each jungler has already cleared its start buff camp.
+  for (const j of champions.filter((c) => c.role === 'jungle')) {
+    camps[j.position] = rules.camps.firstSpawn + rules.camps.buffRespawn;
+    grant(j, rules.camps.buffGold, rules.camps.buffXp);
+  }
+
   const scuttleSpawn = rules.objectives.scuttle.firstSpawn;
   const pit = (spawn: number): PitState => ({ objective: null, nextSpawn: spawn, capture: null });
 
@@ -86,6 +93,7 @@ export function newGame(data: GameData, seed: number, draft?: Draft): GameState 
     objectivesTaken: { blue: {}, red: {} },
     platesTaken: { blue: 0, red: 0 },
     towersDestroyed: { blue: 0, red: 0 },
+    kills: { blue: 0, red: 0 },
     lastSeen,
     winner: null,
   };

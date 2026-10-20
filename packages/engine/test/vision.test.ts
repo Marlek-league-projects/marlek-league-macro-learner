@@ -228,3 +228,24 @@ describe('eventsFor', () => {
     expect(eventsFor(events, state, d, 'blue')).toContainEqual({ type: 'moved', champion: rm, from: 'mid-t1-red', to: 'mid-lane' });
   });
 });
+
+describe('scoreboard', () => {
+  test('shows kills, towers, dragons, barons and the true gold earned per team', () => {
+    const s = newGame(d, 5);
+    s.kills = { blue: 3, red: 1 };
+    s.towersDestroyed = { blue: 2, red: 0 };
+    s.objectivesTaken = { blue: { dragon: 2 }, red: { baron: 1, dragon: 1 } };
+    get(s, 'red', 'mid').goldEarned = 1234;
+    const sum = (side: string): number =>
+      s.champions.filter((c) => c.side === side).reduce((t, c) => t + c.goldEarned, 0);
+    for (const side of ['blue', 'red'] as const) {
+      expect(viewFor(s, d, side).scoreboard).toEqual({
+        kills: { blue: 3, red: 1 },
+        towersDestroyed: { blue: 2, red: 0 },
+        dragons: { blue: 2, red: 1 },
+        barons: { blue: 0, red: 1 },
+        goldEarned: { blue: sum('blue'), red: sum('red') },
+      });
+    }
+  });
+});

@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
 import {
-  advanceRespawns, applyKill, completeRecall, finishIfOver, level, newGame, teamScore, totalRounds,
+  advanceRespawns, aiContactChoice, aiOrders, applyKill, createRng, detectContacts, resolveRound, viewFor, completeRecall, finishIfOver, level, newGame, teamScore, totalRounds,
 } from '@lml/engine';
-import type { GameEvent, GameState } from '@lml/engine/contracts';
+import type { ContactChoices, GameEvent, GameState, Orders } from '@lml/engine/contracts';
 
 const d = loadGameData();
 const fresh = (round: number): GameState => {
@@ -100,5 +100,39 @@ describe('verdict', () => {
     expect(teamScore(s, d, 'red')).toBe(2 * d.rules.verdict.plateValue);
     finishIfOver(s, d);
     expect(s.winner).toBe(2 * d.rules.verdict.plateValue > d.rules.verdict.towerValue ? 'red' : 'blue');
+  });
+});
+
+describe('kills counter', () => {
+  test('a new game has no kills', () => {
+    expect(newGame(d, 7).kills).toEqual({ blue: 0, red: 0 });
+  });
+  test('the winners side scores once per victim', () => {
+    const s = fresh(10);
+    applyKill(s, d, [id(s, 'red', 'top').id, id(s, 'red', 'mid').id], [id(s, 'blue', 'top').id], []);
+    expect(s.kills).toEqual({ blue: 2, red: 0 });
+  });
+  test('over a whole AI game, kills match the death events', () => {
+    const p = d.aiProfiles.find((x) => x.rank === 'gold')!;
+    const rng = createRng(3);
+    let s = newGame(d, 3);
+    const deaths = { blue: 0, red: 0 };
+    while (!s.over) {
+      const views = { blue: viewFor(s, d, 'blue'), red: viewFor(s, d, 'red') };
+      const orders: Orders = { blue: aiOrders(views.blue, d, p, rng), red: aiOrders(views.red, d, p, rng) };
+      const choices: ContactChoices = {};
+      for (const c of detectContacts(s, d, orders)) {
+        choices[c.id] = { blue: aiContactChoice(views.blue, d, c, p, rng), red: aiContactChoice(views.red, d, c, p, rng) };
+      }
+      const r = resolveRound(s, d, orders, choices);
+      for (const e of r.events) {
+        if (e.type !== 'death') continue;
+        const victim = r.state.champions.find((c) => c.id === e.champion)!;
+        deaths[victim.side === 'blue' ? 'red' : 'blue'] += 1;
+      }
+      s = r.state;
+    }
+    expect(deaths.blue + deaths.red).toBeGreaterThan(0);
+    expect(s.kills).toEqual(deaths);
   });
 });

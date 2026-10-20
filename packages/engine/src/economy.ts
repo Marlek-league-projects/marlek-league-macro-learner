@@ -30,6 +30,7 @@ export function applyKill(
     v.status = 'dead';
     v.respawnRound = state.round + 1 + extra;
     v.hasHerald = false;
+    state.kills[v.side === 'blue' ? 'red' : 'blue'] += 1;
     for (const w of takers) grant(w, economy.killGold / takers.length, economy.killXp / takers.length);
     events.push({ type: 'death', champion: v.id, position: v.position, respawnRound: v.respawnRound });
   }

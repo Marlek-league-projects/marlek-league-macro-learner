@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData, matchupAdvantage } from '@lml/data';
 import type { Lane, Side } from '@lml/data/contracts';
-import { frontTower, newGame, roundWindow, updateLanes } from '@lml/engine';
+import { frontTower, level, newGame, roundWindow, totalRounds, updateLanes } from '@lml/engine';
 import type { ChampionState, GameEvent, GameState } from '@lml/engine/contracts';
 
 const d = loadGameData();
@@ -142,7 +142,24 @@ describe('farming', () => {
     expect(get(s, 'blue', 'adc').gold - passive).toBeCloseTo(110, 6);
     expect(get(s, 'blue', 'support').gold - passive).toBeCloseTo(33, 6);
     expect(get(s, 'blue', 'adc').goldEarned).toBeCloseTo(110 + passive, 6);
-    expect(get(s, 'blue', 'adc').xp).toBeCloseTo((d.rules.economy.farmXpPerMin * 20) / 60, 6);
+    const duoXp = (d.rules.economy.farmXpPerMin * d.rules.economy.duoXpShare * 20) / 60;
+    expect(get(s, 'blue', 'adc').xp).toBeCloseTo(duoXp, 6);
+    expect(get(s, 'blue', 'support').xp).toBeCloseTo(duoXp, 6);
+  });
+  test('a solo laner who only farms hits level 6 by round 15, 11 by round 26 and 15 by the end', () => {
+    const s = fresh();
+    const top = get(s, 'blue', 'top');
+    top.position = 'top-lane';
+    const levels: Record<number, number> = {};
+    for (let r = 1; r <= totalRounds(d.rules); r++) {
+      s.round = r;
+      s.waves.top = 0;
+      run(s);
+      levels[r] = level(top.xp, d.rules);
+    }
+    expect(levels[15]).toBeGreaterThanOrEqual(6);
+    expect(levels[26]).toBeGreaterThanOrEqual(11);
+    expect(levels[totalRounds(d.rules)]).toBeGreaterThanOrEqual(15);
   });
 });
 

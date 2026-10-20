@@ -14,6 +14,16 @@ export interface EnemyInfo {
   level: number | null;
 }
 
+/** League-style scoreboard: all public, except `goldEarned`, the README-declared exception to the fog. */
+export interface Scoreboard {
+  kills: Record<Side, number>;
+  towersDestroyed: Record<Side, number>;
+  dragons: Record<Side, number>;
+  barons: Record<Side, number>;
+  /** True team sum of gold earned, for the gold advantage. */
+  goldEarned: Record<Side, number>;
+}
+
 /** The game as one side sees it through the fog of war. */
 export interface PlayerView {
   side: Side;
@@ -35,4 +45,5 @@ export interface PlayerView {
   objectivesTaken: GameState['objectivesTaken'];
   platesTaken: GameState['platesTaken'];
   towersDestroyed: GameState['towersDestroyed'];
+  scoreboard: Scoreboard;
 }

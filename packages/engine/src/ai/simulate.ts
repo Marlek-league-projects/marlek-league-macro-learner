@@ -51,6 +51,7 @@ export function stateFromView(view: PlayerView, data: GameData): GameState {
     objectivesTaken: view.objectivesTaken,
     platesTaken: view.platesTaken,
     towersDestroyed: view.towersDestroyed,
+    kills: view.scoreboard.kills,
     lastSeen,
     winner: view.winner,
   });

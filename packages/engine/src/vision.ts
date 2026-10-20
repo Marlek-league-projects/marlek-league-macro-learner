@@ -1,5 +1,5 @@
 import type { GameData, Lane, Side } from '@lml/data/contracts';
-import type { ChampionState, EnemyInfo, GameEvent, GameState, PlayerView } from './contracts';
+import type { ChampionState, EnemyInfo, GameEvent, GameState, PlayerView, Scoreboard } from './contracts';
 import { level } from './economy';
 
 type ScuttleId = keyof GameState['scuttles'];
@@ -116,6 +116,18 @@ export function viewFor(state: GameState, data: GameData, side: Side): PlayerVie
     objectivesTaken: s.objectivesTaken,
     platesTaken: s.platesTaken,
     towersDestroyed: s.towersDestroyed,
+    scoreboard: scoreboard(s),
+  };
+}
+
+function scoreboard(s: GameState): Scoreboard {
+  const perSide = (f: (side: Side) => number): Record<Side, number> => ({ blue: f('blue'), red: f('red') });
+  return {
+    kills: { ...s.kills },
+    towersDestroyed: { ...s.towersDestroyed },
+    dragons: perSide((side) => s.objectivesTaken[side].dragon ?? 0),
+    barons: perSide((side) => s.objectivesTaken[side].baron ?? 0),
+    goldEarned: perSide((side) => s.champions.reduce((t, c) => (c.side === side ? t + c.goldEarned : t), 0)),
   };
 }
 
