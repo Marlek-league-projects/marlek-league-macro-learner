@@ -1,7 +1,6 @@
 import { useState } from 'preact/hooks';
 import type { ChampionState, Order, Stance } from '@lml/engine/contracts';
 import type { Store } from '../store';
-import { ContactPrompt } from './ContactPrompt';
 import { EventLog } from './EventLog';
 import { shownRound } from './RoundBanner';
 import { championName, clock, errorText, OBJECTIVE_LABEL, objectiveTimers, positionLabel } from './format';
@@ -92,21 +91,6 @@ function Orders({ store }: { store: Store }) {
   );
 }
 
-function Contacts({ store }: { store: Store }) {
-  return (
-    <>
-      <div>
-        <h3>Contacts</h3>
-        <div class="note">Tes champions croisent l'adversaire. Choisis la réaction de chacun.</div>
-      </div>
-      <div class="contacts">
-        {store.contacts.value.map((c) => <ContactPrompt key={c.id} store={store} contact={c} />)}
-      </div>
-      <button class="go" onClick={() => store.confirmContacts()}>Valider les choix</button>
-    </>
-  );
-}
-
 export function RoundPanel({ store }: { store: Store }) {
   const view = store.view.value;
   if (!view) return null;
@@ -125,7 +109,7 @@ export function RoundPanel({ store }: { store: Store }) {
         {screen !== 'review' && <NextObjective store={store} />}
       </div>
       {screen === 'orders' && <Orders store={store} />}
-      {screen === 'contacts' && <Contacts store={store} />}
+      {screen === 'contacts' && <div class="note">Réponds aux contacts dans le panneau sur la carte.</div>}
       {screen === 'review' && (
         <>
           {store.previousView.value && (

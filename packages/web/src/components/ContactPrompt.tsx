@@ -35,3 +35,22 @@ export function ContactPrompt({ store, contact }: { store: Store; contact: Conta
     </div>
   );
 }
+
+/**
+ * The round's contact prompts and their confirm button, docked over the map edge that `dock` names so they show
+ * without scrolling; the panel scrolls inside itself when there are many.
+ */
+export function ContactsOverlay({ store, dock }: { store: Store; dock: 'top' | 'bottom' }) {
+  return (
+    <div class={`contacts-overlay ${dock}`}>
+      <div>
+        <strong>Contacts</strong>
+        <span class="note"> · Tes champions croisent l'adversaire. Choisis la réaction de chacun.</span>
+      </div>
+      <div class="contacts">
+        {store.contacts.value.map((c) => <ContactPrompt key={c.id} store={store} contact={c} />)}
+      </div>
+      <button class="go" onClick={() => store.confirmContacts()}>Valider les choix</button>
+    </div>
+  );
+}

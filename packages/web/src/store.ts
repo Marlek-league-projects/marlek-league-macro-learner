@@ -4,6 +4,8 @@ import type {
   Choice,
   Contact,
   ContactChoices,
+  EnemyEstimate,
+  EnemyInfo,
   Explanation,
   GameEngine,
   GameEvent,
@@ -80,6 +82,8 @@ export interface Store {
   roundWindow(round?: number): RoundWindow;
   totalRounds(): number;
   level(xp: number): number;
+  /** What the player assumes a visible enemy has (engine estimate, fog of war holds). */
+  estimateEnemy(enemy: EnemyInfo): EnemyEstimate;
   spawnPointsFor(champion: string): string[];
   setLaunchHerald(champion: string, on: boolean): void;
   /** Both sides' scores once the game is over, otherwise null. */
@@ -394,6 +398,10 @@ export function createStore(data: GameData, engine: GameEngine): Store {
 
     level(xp) {
       return engine.level(xp, data.rules);
+    },
+
+    estimateEnemy(enemy) {
+      return engine.estimateEnemy(view.value ?? engine.viewFor(current(), data, PLAYER), data, enemy);
     },
 
     spawnPointsFor(id) {

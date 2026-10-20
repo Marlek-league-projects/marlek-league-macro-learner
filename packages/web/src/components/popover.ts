@@ -55,3 +55,12 @@ export function placePopover(
   }
   return best;
 }
+
+/**
+ * Which edge of the map the contact prompts dock to: the half (by height, `ys` relative 0..1) holding fewer of the
+ * round's contacts, so the prompts leave the contact rings visible; the bottom on a tie.
+ */
+export function contactDock(ys: number[]): 'top' | 'bottom' {
+  const upper = ys.filter((y) => y < 0.5).length;
+  return ys.length - upper > upper ? 'top' : 'bottom';
+}

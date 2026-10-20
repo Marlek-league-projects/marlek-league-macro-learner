@@ -3,6 +3,8 @@ import type { Lane, Position, Role, Side } from '@lml/data/contracts';
 import type { PlayerView } from '@lml/engine/contracts';
 import type { Store } from '../store';
 import { ActionsPanel } from './ActionsPanel';
+import { ContactsOverlay } from './ContactPrompt';
+import { contactDock } from './popover';
 import { dotRadius, hitRadius, pressureDirection, spawnCountdown, strengthFills, wavePoint } from './map-marks';
 import { nodeClickKeepsSelection, pawnClick, pawnHitPassesThrough } from './pawn-click';
 import { ReplayLayer } from './ReplayLayer';
@@ -268,7 +270,7 @@ export function MapView({ store }: { store: Store }) {
     const i = group.indexOf(pawn);
     return { x: p.x + (i - (group.length - 1) / 2) * 42, y: p.y };
   };
-  const strength = strengthFills(view, data, store.level);
+  const strength = strengthFills(view, store.estimateEnemy);
   const selectedPawn = pawns.find((pawn) => pawn.ally && pawn.id === selected?.id);
   const anchor = selectedPawn ? pawnPoint(selectedPawn) : null;
 
@@ -351,6 +353,9 @@ export function MapView({ store }: { store: Store }) {
             return p ? [{ x: p.x / SIZE, y: p.y / SIZE }] : [];
           })}
         />
+      )}
+      {contactAt.size > 0 && (
+        <ContactsOverlay store={store} dock={contactDock([...contactAt].map((id) => (positions[id]?.y ?? 0) / SIZE))} />
       )}
       {tip && (
         <div class="tip" style={{ left: `${tip.x + 12}px`, top: `${tip.y + 12}px` }}>

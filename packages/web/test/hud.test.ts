@@ -4,7 +4,7 @@ import { createEngine } from '@lml/engine';
 import type { Contact } from '@lml/engine/contracts';
 import { goldLead } from '../src/components/format';
 import { MIN_STRENGTH_FILL, pressureDirection, strengthFill, strengthFills } from '../src/components/map-marks';
-import { placePopover, POPOVER_GAP } from '../src/components/popover';
+import { contactDock, placePopover, POPOVER_GAP } from '../src/components/popover';
 import { createStore, promptContacts } from '../src/store';
 
 const data = loadGameData();
@@ -45,27 +45,46 @@ describe('strengthFill', () => {
 });
 
 describe('strengthFills', () => {
+  const engine = createEngine();
+
   test('every alive ally and only visible enemies, the strongest at 1', () => {
     const store = started();
     const v = structuredClone(store.view.value!);
-    const fills = strengthFills(v, data, store.level);
+    const fills = strengthFills(v, store.estimateEnemy);
     for (const c of v.allies) expect(fills[c.id]).toBeDefined();
     for (const e of v.enemies) expect(fills[e.id] !== undefined).toBe(e.visible && e.level !== null);
     expect(Math.max(...Object.values(fills))).toBe(1);
   });
 
-  test('more gold earned means a fuller bar; a dead ally has none', () => {
+  test('more items means a fuller bar; a dead ally has none', () => {
     const store = started();
     const v = structuredClone(store.view.value!);
     const [a, b] = v.allies.filter((c) => c.role !== 'jungle');
     a!.xp = b!.xp = 0;
     a!.bonusLead = b!.bonusLead = 0;
-    a!.goldEarned = 2000;
-    b!.goldEarned = 1000;
-    const fills = strengthFills(v, data, store.level);
+    a!.items = 2000;
+    b!.items = 1000;
+    const fills = strengthFills(v, store.estimateEnemy);
     expect(fills[a!.id]!).toBeGreaterThan(fills[b!.id]!);
     b!.status = 'dead';
-    expect(strengthFills(v, data, store.level)[b!.id]).toBeUndefined();
+    expect(strengthFills(v, store.estimateEnemy)[b!.id]).toBeUndefined();
+  });
+
+  test("a visible enemy's bar is the engine's estimate, not its team's average gold", () => {
+    const store = started();
+    const v = structuredClone(store.view.value!);
+    for (const c of v.allies) Object.assign(c, { xp: 0, items: 0, bonusLead: 0 });
+    const top = v.allies.find((c) => c.role === 'top')!;
+    const enemy = v.enemies.find((e) => e.role === 'mid')!;
+    Object.assign(enemy, { visible: true, position: top.position, level: 3 });
+    // A huge enemy gold total no longer inflates the bar by itself: the estimate sizes on the mirror's items (0 here).
+    v.scoreboard.goldEarned[v.side === 'blue' ? 'red' : 'blue'] = 1_000_000;
+    const est = engine.estimateEnemy(v, data, enemy);
+    expect(est.items).toBe(0);
+    top.items = 2 * (est.xp + est.items + est.bonusLead);
+    const fills = strengthFills(v, (e) => engine.estimateEnemy(v, data, e));
+    expect(fills[top.id]).toBe(1);
+    expect(fills[enemy.id]).toBeCloseTo(0.5);
   });
 });
 
@@ -100,6 +119,16 @@ describe('placePopover', () => {
     expect(at.left).toBeGreaterThanOrEqual(0);
     expect(at.left + pop.width).toBeLessThanOrEqual(narrow.width);
     expect(placePopover({ x: 50, y: 50 }, { width: 400, height: 900 }, narrow)).toEqual({ left: 0, top: 0 });
+  });
+});
+
+describe('contactDock', () => {
+  test('the prompts dock over the half with fewer contacts, the bottom on a tie', () => {
+    expect(contactDock([0.2])).toBe('bottom');
+    expect(contactDock([0.8])).toBe('top');
+    expect(contactDock([0.1, 0.7, 0.9])).toBe('top');
+    expect(contactDock([0.3, 0.7])).toBe('bottom');
+    expect(contactDock([])).toBe('bottom');
   });
 });
 
@@ -177,5 +206,52 @@ describe('store stance and move + recall', () => {
     store.setMove(jg.id, two);
     store.setRecall(jg.id);
     expect(store.pending.value[jg.id]).toEqual({ kind: 'recall', champion: jg.id });
+  });
+});
+
+describe('after the merge with the engine lanes (Task 2)', () => {
+  const engine = createEngine();
+
+  test('a stance alone keeps the engine follow-the-wave default move', () => {
+    const store = started();
+    const state = engine.newGame(data, 1);
+    for (const c of store.view.value!.allies.filter((a) => a.role !== 'jungle')) {
+      store.setStance(c.id, 'trade');
+      const def = engine.defaultOrders(state, data, 'blue').find((o) => o.champion === c.id)!;
+      expect(store.pending.value[c.id]).toEqual({ ...def, stance: 'trade' });
+    }
+  });
+
+  test('stances and a move + recall pass validation and the round resolves; the stance sticks', () => {
+    const store = started();
+    const allies = store.view.value!.allies;
+    const mid = allies.find((c) => c.role === 'mid')!;
+    const top = allies.find((c) => c.role === 'top')!;
+    store.setStance(top.id, 'allin');
+    store.select(mid.id);
+    const step = Object.entries(store.reachableForSelected()).find(([, d]) => d === 1)![0];
+    store.setMove(mid.id, step);
+    store.setRecall(mid.id);
+    expect(store.pending.value[mid.id]).toMatchObject({ kind: 'recall', to: step });
+    store.confirmRound();
+    if (store.screen.value === 'contacts') store.confirmContacts();
+    expect(store.screen.value).toBe('review');
+    expect(store.view.value!.round).toBe(2);
+    expect(store.view.value!.allies.find((c) => c.id === top.id)!.stance).toBe('allin');
+  });
+
+  test('automatic lane contacts never reach the prompts and still resolve', () => {
+    const store = started(1);
+    let autoTrades = 0;
+    for (let round = 1; round <= 12 && store.screen.value === 'orders'; round++) {
+      store.confirmRound();
+      if ((store.screen.value as string) === 'contacts') {
+        for (const c of store.contacts.value) expect(c.auto).toBe(false);
+        store.confirmContacts();
+      }
+      autoTrades += store.lastEvents.value.filter((e) => e.type === 'trade').length;
+      store.next();
+    }
+    expect(autoTrades).toBeGreaterThan(0);
   });
 });

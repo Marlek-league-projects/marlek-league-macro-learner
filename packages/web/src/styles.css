@@ -88,7 +88,9 @@ svg { width:100%; display:block; }
 .seg { display:flex; gap:4px; } .seg button { flex:1; }
 .choices { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
 .choices button { min-width:0; white-space:normal; }
-.contacts { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:8px; }
+.contacts { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:8px; }
+.contacts-overlay { position:absolute; z-index:6; left:12px; right:12px; max-height:48%; overflow:auto; background:#161b22eb; border:1px solid #6e7681; border-radius:8px; padding:8px 10px; font-size:13px; display:flex; flex-direction:column; gap:8px; box-shadow:0 6px 18px #000a; }
+.contacts-overlay.top { top:12px; } .contacts-overlay.bottom { bottom:12px; }
 .seg.indent { margin:2px 0 6px 18px; }
 .stack { display:flex; flex-direction:column; gap:4px; }
 button { background:#21262d; color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font:inherit; cursor:pointer; }

@@ -1,6 +1,6 @@
 // Map geometry and timers, from the player's view only (fog of war holds).
 import type { GameData, Lane, Position, Side } from '@lml/data/contracts';
-import type { PlayerView } from '@lml/engine/contracts';
+import type { EnemyEstimate, EnemyInfo, PlayerView } from '@lml/engine/contracts';
 
 export interface Point {
   x: number;
@@ -70,24 +70,20 @@ export function strengthFill(strength: number, strongest: number): number {
 }
 
 /**
- * Strength bar fill of every pawn on the map, keyed by champion id: the xp its level needs plus its lead
- * (fight score units). Allies use their own gold earned and bonus lead. A visible enemy only shows its
- * level, so its lead is its team's average gold earned (public, the scoreboard) plus its side's Dragons.
+ * Strength bar fill of every pawn on the map, keyed by champion id: its fight lead (xp + items + bonus lead,
+ * the fight score's lead). Allies show their own. A visible enemy shows what this side assumes it has, the
+ * engine's shared estimate (its level, the expected farm, its side's Dragons), never its true lead.
  */
-export function strengthFills(view: PlayerView, data: GameData, level: (xp: number) => number): Record<string, number> {
-  const { levelXp } = data.rules.economy;
-  const enemy: Side = view.side === 'blue' ? 'red' : 'blue';
-  const floor = (lvl: number) => levelXp[lvl - 1] ?? 0;
+export function strengthFills(view: PlayerView, estimate: (enemy: EnemyInfo) => EnemyEstimate): Record<string, number> {
   const strengths: Record<string, number> = {};
   for (const c of view.allies) {
     if (c.status === 'dead') continue;
-    strengths[c.id] = floor(level(c.xp)) + c.goldEarned + c.bonusLead;
+    strengths[c.id] = c.xp + c.items + c.bonusLead;
   }
-  const enemyLead = view.scoreboard.goldEarned[enemy] / Math.max(1, view.enemies.length)
-    + (view.objectivesTaken[enemy].dragon ?? 0) * data.rules.buffs.dragonLead;
   for (const e of view.enemies) {
     if (!e.visible || !e.position || e.level === null) continue;
-    strengths[e.id] = floor(e.level) + enemyLead;
+    const est = estimate(e);
+    strengths[e.id] = est.xp + est.items + est.bonusLead;
   }
   const strongest = Math.max(0, ...Object.values(strengths));
   return Object.fromEntries(Object.entries(strengths).map(([id, s]) => [id, strengthFill(s, strongest)]));
