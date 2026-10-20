@@ -60,6 +60,17 @@ test('engine importing preact or touching window is reported', () => {
   expect(checkDeps(root)).toHaveLength(2);
 });
 
+test('a relative import escaping its package is reported; one inside the package is allowed', () => {
+  const root = tree({
+    'packages/web/src/a.ts': "import { x } from '../../engine/src/round';\nimport { y } from './b';\nimport z from '../index.html';\n",
+    'packages/engine/src/ai/b.ts': "import { x } from '../round';\nexport { y } from '../../../data/src/load';\n",
+  });
+  const errors = checkDeps(root);
+  expect(errors).toHaveLength(2);
+  expect(errors).toContain('packages/web/src/a.ts: relative import ../../engine/src/round leaves packages/web');
+  expect(errors).toContain('packages/engine/src/ai/b.ts: relative import ../../../data/src/load leaves packages/engine');
+});
+
 test('the real repository passes', () => {
   expect(checkDeps('.')).toEqual([]);
 });

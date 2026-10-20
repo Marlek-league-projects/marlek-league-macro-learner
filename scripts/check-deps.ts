@@ -1,8 +1,8 @@
 // Enforces the one-way dependency rule: web → engine → data, and that
-// cross-module types come from `@lml/<pkg>/contracts`.
+// cross-module types come from `@lml/<pkg>/contracts`. Relative imports must stay inside their package.
 import { Glob } from 'bun';
 import * as fs from 'node:fs';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 
 const FORBIDDEN: Record<string, RegExp[]> = {
   data: [/^@lml\/engine/, /^@lml\/web/, /^preact/, /^@preact\//],
@@ -42,6 +42,11 @@ export function checkDeps(root: string = '.'): string[] {
       for (const m of src.matchAll(importRe)) {
         const typeOnly = !!m[1];
         const spec = m[3] ?? m[4] ?? '';
+        if (spec.startsWith('.')) {
+          const target = posix.normalize(posix.join(posix.dirname(file), spec));
+          if (!target.startsWith(`packages/${pkg}/`)) errors.push(`${file}: relative import ${spec} leaves packages/${pkg}`);
+          continue;
+        }
         if (FORBIDDEN[pkg]!.some((r) => r.test(spec))) {
           errors.push(`${file}: forbidden import ${spec}`);
           continue;
