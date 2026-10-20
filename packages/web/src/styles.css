@@ -54,6 +54,10 @@ svg { width:100%; display:block; }
 .timer.live { fill:#fde047; font-size:9px; }
 .wave polygon { opacity:.95; }
 .contact-ring { fill:none; stroke:#f87171; stroke-width:3; stroke-dasharray:4 3; }
+.replay-flash { fill:#fde047; fill-opacity:.35; stroke:#fff7ae; stroke-width:3; }
+.replay-label text { font-size:12px; font-weight:800; fill:#fde047; paint-order:stroke; stroke:#000; stroke-width:3px; }
+.replay-label.death text { fill:#fca5a5; }
+.replay-ctl { display:flex; gap:6px; } .replay-ctl button { flex:1; }
 .tip { position:fixed; pointer-events:none; background:#000c; color:#fff; font-size:12px; padding:4px 8px; border-radius:5px; z-index:9; }
 
 /* Side panels */

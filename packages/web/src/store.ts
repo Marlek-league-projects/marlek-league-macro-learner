@@ -37,6 +37,12 @@ export interface Store {
   data: GameData;
   screen: Signal<Screen>;
   view: Signal<PlayerView | null>;
+  /** The view before the last resolved round (the replay's starting point); null outside the review screen. */
+  previousView: Signal<PlayerView | null>;
+  /** The round replay is playing on the map. */
+  replaying: Signal<boolean>;
+  /** Bumped each time the replay (re)starts. */
+  replayRun: Signal<number>;
   selected: Signal<string | null>;
   pending: Signal<Record<string, Order>>;
   contacts: Signal<Contact[]>;
@@ -61,6 +67,10 @@ export interface Store {
   choose(contactId: string, choice: Choice): void;
   confirmContacts(): void;
   next(): void;
+  /** Restarts the round replay (review screen only). */
+  replay(): void;
+  /** Jumps to the end of the round replay. */
+  skipReplay(): void;
   /** Time window of `round` (default: the current round, capped at the last one). */
   roundWindow(round?: number): RoundWindow;
   totalRounds(): number;
@@ -77,6 +87,9 @@ const ENEMY: Side = 'red';
 export function createStore(data: GameData, engine: GameEngine): Store {
   const screen = signal<Screen>('start');
   const view = signal<PlayerView | null>(null);
+  const previousView = signal<PlayerView | null>(null);
+  const replaying = signal(false);
+  const replayRun = signal(0);
   const selected = signal<string | null>(null);
   const pending = signal<Record<string, Order>>({});
   const contacts = signal<Contact[]>([]);
@@ -170,8 +183,19 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     explanations.value = settings.value.teaching
       ? engine.explainRound(before, result.state, result.events, data, PLAYER)
       : [];
+    previousView.value = view.value;
     publish();
     screen.value = result.state.over ? 'over' : 'review';
+    if (screen.value === 'review') startReplay();
+    else stopReplay();
+  };
+
+  const startReplay = (): void => {
+    replayRun.value += 1;
+    replaying.value = true;
+  };
+  const stopReplay = (): void => {
+    replaying.value = false;
   };
 
   const breakdown = (s: GameState, side: Side): ScoreBreakdown => {
@@ -185,7 +209,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
   };
 
   return {
-    data, screen, view, selected, pending, contacts, choices, lastEvents, explanations, settings, recalled,
+    data, screen, view, previousView, replaying, replayRun, selected, pending, contacts, choices, lastEvents, explanations, settings, recalled,
 
     start(s) {
       settings.value = s;
@@ -202,6 +226,8 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       lastEvents.value = [];
       explanations.value = [];
       recalled.value = [];
+      previousView.value = null;
+      stopReplay();
       publish();
       screen.value = 'orders';
     },
@@ -217,6 +243,8 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       lastEvents.value = [];
       explanations.value = [];
       recalled.value = [];
+      previousView.value = null;
+      stopReplay();
       view.value = null;
       screen.value = 'start';
     },
@@ -320,7 +348,17 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       selected.value = null;
       contacts.value = [];
       choices.value = {};
+      previousView.value = null;
+      stopReplay();
       screen.value = 'orders';
+    },
+
+    replay() {
+      if (screen.value === 'review' && previousView.value) startReplay();
+    },
+
+    skipReplay() {
+      stopReplay();
     },
 
     roundWindow(round) {

@@ -4,6 +4,7 @@ import type { PlayerView } from '@lml/engine/contracts';
 import type { Store } from '../store';
 import { dotRadius, hitRadius, spawnCountdown, wavePoint } from './map-marks';
 import { pawnClick, pawnHitPassesThrough } from './pawn-click';
+import { ReplayLayer } from './ReplayLayer';
 import {
   championImage,
   championName,
@@ -133,6 +134,7 @@ export function MapView({ store }: { store: Store }) {
 
   const now = store.roundWindow().start;
   const pending = store.pending.value;
+  const replaying = store.screen.value === 'review' && store.replaying.value && store.previousView.value !== null;
   const contactAt = new Set(store.screen.value === 'contacts' ? store.contacts.value.map((c) => c.position) : []);
 
   const order = (to: string) => {
@@ -301,7 +303,7 @@ export function MapView({ store }: { store: Store }) {
           })}
         </g>
         <g pointer-events="none">{arrows}</g>
-        <g>{pawnNodes}</g>
+        {replaying ? <ReplayLayer key={store.replayRun.value} store={store} /> : <g>{pawnNodes}</g>}
         <g pointer-events="none">{timers}</g>
       </svg>
       {tip && (

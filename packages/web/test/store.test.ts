@@ -202,4 +202,26 @@ describe('store', () => {
     store.setLaunchHerald(top.id, false);
     expect(store.pending.value[top.id]).toEqual({ kind: 'move', champion: top.id, to: top.position });
   });
+
+  test('resolving a round keeps the previous view and starts the replay; skip, replay and next drive it', () => {
+    const store = started();
+    const before = store.view.value!;
+    store.confirmRound();
+    store.confirmContacts();
+    expect(store.screen.value).toBe('review');
+    expect(store.previousView.value).toBe(before);
+    expect(store.view.value).not.toBe(before);
+    expect(store.replaying.value).toBe(true);
+    const run = store.replayRun.value;
+    store.skipReplay();
+    expect(store.replaying.value).toBe(false);
+    store.replay();
+    expect(store.replaying.value).toBe(true);
+    expect(store.replayRun.value).toBe(run + 1);
+    store.next();
+    expect(store.previousView.value).toBeNull();
+    expect(store.replaying.value).toBe(false);
+    store.replay();
+    expect(store.replaying.value).toBe(false);
+  });
 });

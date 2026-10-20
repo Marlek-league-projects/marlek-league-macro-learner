@@ -119,6 +119,12 @@ export function RoundPanel({ store }: { store: Store }) {
       {screen === 'contacts' && <Contacts store={store} />}
       {screen === 'review' && (
         <>
+          {store.previousView.value && (
+            <div class="replay-ctl">
+              <button onClick={() => store.replay()}>Rejouer</button>
+              <button onClick={() => store.skipReplay()} disabled={!store.replaying.value}>Passer</button>
+            </div>
+          )}
           <EventLog store={store} />
           <button class="go" onClick={() => store.next()}>Round suivant</button>
         </>
