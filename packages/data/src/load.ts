@@ -70,6 +70,7 @@ export function validateAiProfiles(profiles: AiProfile[]): void {
     for (const id of MISTAKE_IDS) {
       if (typeof p.mistakes[id] !== 'number') fail('aiProfiles', `profile "${p.rank}" is missing mistake "${id}"`);
     }
+    if (typeof p.waveSacrifice !== 'boolean') fail('aiProfiles', `profile "${p.rank}" has no boolean waveSacrifice`);
   }
 }
 

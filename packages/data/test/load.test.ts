@@ -11,6 +11,9 @@ test('phases give 37 rounds: 6, 8, 12, 6, 5', () => {
 
 test('ai profiles: 10 ranks with scaled rates', () => {
   expect(data.aiProfiles).toHaveLength(10);
+  expect(data.aiProfiles.filter((p) => p.waveSacrifice).map((p) => p.rank)).toEqual([
+    'emerald', 'diamond', 'master', 'grandmaster', 'challenger',
+  ]);
   const iron = data.aiProfiles.find((p) => p.rank === 'iron')!;
   const challenger = data.aiProfiles.find((p) => p.rank === 'challenger')!;
   expect(iron.mistakes.greed).toBe(0.6);
@@ -59,6 +62,9 @@ test('validateAiProfiles and validateTeaching reject bad data', () => {
   const profiles = structuredClone(data.aiProfiles);
   delete (profiles[0]!.mistakes as Partial<Record<string, number>>).greed;
   expect(() => validateAiProfiles(profiles)).toThrow(/aiProfiles.*greed/);
+  const noFlag = structuredClone(data.aiProfiles);
+  delete (noFlag[1] as Partial<(typeof noFlag)[number]>).waveSacrifice;
+  expect(() => validateAiProfiles(noFlag)).toThrow(/aiProfiles.*waveSacrifice/);
   const teaching = structuredClone(data.teaching);
   teaching[0]!.text = ' ';
   expect(() => validateTeaching(teaching)).toThrow(/teaching/);

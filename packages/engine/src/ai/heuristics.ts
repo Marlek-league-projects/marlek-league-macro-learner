@@ -33,6 +33,8 @@ interface Ctx {
   end: number;
   jungler: EnemyInfo | undefined;
   gank: { lane: Lane; target: string } | null;
+  /** The profile's `waveSacrifice`: laners may rotate when `rotationPays`. */
+  waveSacrifice: boolean;
 }
 
 const LANES: Lane[] = ['top', 'mid', 'bot'];
@@ -109,7 +111,7 @@ const known = (ctx: Ctx, e: EnemyInfo | undefined): e is EnemyInfo & { position:
 
 // ---------- context and mistakes ----------
 
-export function makeContext(view: PlayerView, data: GameData): Ctx {
+export function makeContext(view: PlayerView, data: GameData, waveSacrifice: boolean): Ctx {
   return {
     view,
     data,
@@ -118,6 +120,7 @@ export function makeContext(view: PlayerView, data: GameData): Ctx {
     end: roundWindow(data.rules, view.round).end,
     jungler: view.enemies.find((e) => e.role === 'jungle'),
     gank: null,
+    waveSacrifice,
   };
 }
 
@@ -176,14 +179,14 @@ function herald(ctx: Ctx, c: ChampionState): Order {
 }
 
 /**
- * A laner leaving its lane for `pit` pays: the objective is worth more than `aiTuning.waveSacrificeCost` (the wave
+ * A laner leaving its lane for `pit` pays (only for profiles with `waveSacrifice`): the objective is worth more than `aiTuning.waveSacrificeCost` (the wave
  * it gives up) and the champion's arrival gives its side the numbers there. Allies count, and known enemies (seen
  * within `aiTuning.knownRounds`) count against, when within a jungler's move of the pit; the laner must be too.
  */
 function rotationPays(ctx: Ctx, c: ChampionState, pit: PitId, objective: ObjectiveId): boolean {
   const { data } = ctx;
   const rule = data.rules.objectives[objective];
-  if (c.role === 'jungle' || rule.value <= data.aiTuning.waveSacrificeCost) return false;
+  if (!ctx.waveSacrifice || c.role === 'jungle' || rule.value <= data.aiTuning.waveSacrificeCost) return false;
   const near = (pos: string): boolean => dist(data, pos, pit) <= data.rules.moves.jungler;
   if (!near(c.position)) return false;
   const ours = ctx.view.allies.filter((a) => a.status === 'alive' && near(a.position)).length;
@@ -409,9 +412,9 @@ export function assignWards(ctx: Ctx, orders: Order[], mistakes: Mistakes): Orde
   });
 }
 
-/** The mistake-free plan, used for the rounds the look-ahead plays after the first. */
-export function bestOrders(view: PlayerView, data: GameData, rng: Rng): Order[] {
-  const ctx = makeContext(view, data);
+/** The mistake-free plan (with the profile's `waveSacrifice`), used for the rounds the look-ahead plays after the first. */
+export function bestOrders(view: PlayerView, data: GameData, rng: Rng, waveSacrifice: boolean): Order[] {
+  const ctx = makeContext(view, data, waveSacrifice);
   const none: Mistakes = new Map(view.allies.map((a) => [a.id, new Set<MistakeId>()]));
   return assignWards(ctx, candidateSets(planCandidates(ctx, none, rng), 1)[0]!, none);
 }

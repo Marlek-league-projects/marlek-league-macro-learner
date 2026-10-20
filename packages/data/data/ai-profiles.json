@@ -13,7 +13,8 @@
       "noConversion": 0.48,
       "ignoreJungler": 0.6
     },
-    "lookahead": 0
+    "lookahead": 0,
+    "waveSacrifice": false
   },
   {
     "rank": "bronze",
@@ -29,7 +30,8 @@
       "noConversion": 0.4,
       "ignoreJungler": 0.5
     },
-    "lookahead": 0
+    "lookahead": 0,
+    "waveSacrifice": false
   },
   {
     "rank": "silver",
@@ -45,7 +47,8 @@
       "noConversion": 0.32,
       "ignoreJungler": 0.4
     },
-    "lookahead": 0
+    "lookahead": 0,
+    "waveSacrifice": false
   },
   {
     "rank": "gold",
@@ -61,7 +64,8 @@
       "noConversion": 0.256,
       "ignoreJungler": 0.32
     },
-    "lookahead": 0
+    "lookahead": 0,
+    "waveSacrifice": false
   },
   {
     "rank": "platinum",
@@ -77,7 +81,8 @@
       "noConversion": 0.176,
       "ignoreJungler": 0.22
     },
-    "lookahead": 0
+    "lookahead": 0,
+    "waveSacrifice": false
   },
   {
     "rank": "emerald",
@@ -93,7 +98,8 @@
       "noConversion": 0.128,
       "ignoreJungler": 0.16
     },
-    "lookahead": 0
+    "lookahead": 0,
+    "waveSacrifice": true
   },
   {
     "rank": "diamond",
@@ -109,7 +115,8 @@
       "noConversion": 0.064,
       "ignoreJungler": 0.08
     },
-    "lookahead": 0
+    "lookahead": 0,
+    "waveSacrifice": true
   },
   {
     "rank": "master",
@@ -125,7 +132,8 @@
       "noConversion": 0.024,
       "ignoreJungler": 0.03
     },
-    "lookahead": 1
+    "lookahead": 1,
+    "waveSacrifice": true
   },
   {
     "rank": "grandmaster",
@@ -141,7 +149,8 @@
       "noConversion": 0.016,
       "ignoreJungler": 0.02
     },
-    "lookahead": 1
+    "lookahead": 1,
+    "waveSacrifice": true
   },
   {
     "rank": "challenger",
@@ -157,6 +166,7 @@
       "noConversion": 0.008,
       "ignoreJungler": 0.01
     },
-    "lookahead": 2
+    "lookahead": 2,
+    "waveSacrifice": true
   }
 ]

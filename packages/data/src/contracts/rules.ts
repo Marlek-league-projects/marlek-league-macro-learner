@@ -100,6 +100,8 @@ export interface AiProfile {
   label: string;
   mistakes: Record<MistakeId, number>;
   lookahead: 0 | 1 | 2;
+  /** Leaves an unpushed wave to rotate to a high-value objective when that gives the numbers. */
+  waveSacrifice: boolean;
 }
 
 export type AiPriority =

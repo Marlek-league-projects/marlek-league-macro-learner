@@ -140,8 +140,8 @@ describe('aiOrders', () => {
     }
     return s;
   }
-  const midOrder = (s: GameState): Order => {
-    const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
+  const midOrder = (s: GameState, rank: Rank = 'challenger'): Order => {
+    const orders = aiOrders(viewFor(s, d, 'blue'), d, profile(rank), stubRng(() => 0.99));
     validateOrders(s, d, 'blue', orders);
     return orderOf(orders, get(s, 'blue', 'mid').id);
   };
@@ -149,6 +149,14 @@ describe('aiOrders', () => {
   test('challenger mid sacrifices its wave to rotate to a dragon where its side has the numbers', () => {
     expect(d.rules.objectives.dragon.value).toBeGreaterThan(d.aiTuning.waveSacrificeCost);
     expect(midOrder(sacrificeScenario())).toMatchObject({ kind: 'move', to: 'scuttle-bot' });
+  });
+
+  test('below Emerald the mid does not sacrifice its wave, even with no mistake rolled', () => {
+    expect(profile('challenger').waveSacrifice).toBe(true);
+    for (const rank of ['iron', 'gold'] as Rank[]) {
+      expect(profile(rank).waveSacrifice).toBe(false);
+      expect(midOrder(sacrificeScenario(), rank)).toMatchObject({ kind: 'move', to: 'mid-t1-blue' });
+    }
   });
 
   test('challenger mid stays in lane with no objective up', () => {
