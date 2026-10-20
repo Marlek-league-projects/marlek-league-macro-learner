@@ -130,6 +130,8 @@ export interface AiTuning {
   captureShare: number;
   /** Share credited for standing on an objective that is up or about to spawn (0..1). */
   presenceShare: number;
+  /** Fight-score margin over which an even lane contact is fought for the kill (and under whose negative it is fled) instead of traded. */
+  killMargin: number;
   /** Candidate priorities, higher first. */
   priorities: Record<AiPriority, number>;
 }

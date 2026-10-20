@@ -88,6 +88,7 @@ export function validateAiTuning(t: AiTuning): void {
   num('lookaheadSets', t.lookaheadSets, 1, Infinity, true);
   num('captureShare', t.captureShare, 0, 1);
   num('presenceShare', t.presenceShare, 0, 1);
+  num('killMargin', t.killMargin, 0);
   for (const id of AI_PRIORITIES) num(`priorities.${id}`, t.priorities?.[id], -Infinity);
 }
 

@@ -79,6 +79,13 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
         }
         for (const id of ids[side]) events.push({ type: 'fled', champion: id, to: byId(id).position });
       }
+      // In lane, the side that stayed (to trade or fight) wins the trade.
+      const lane = data.graph.positions[contact.position]!.lane;
+      if (fleeing.length === 1 && lane) {
+        const winner = other(fleeing[0]!);
+        tradeWinners[lane] = winner;
+        events.push({ type: 'trade', position: contact.position, lane, winner });
+      }
       continue;
     }
     const { winner, scores } = resolveFight(s, data, contact.position, contact.blue, contact.red, stage);

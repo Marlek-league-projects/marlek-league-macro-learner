@@ -9,13 +9,15 @@ import { estimateEnemy, other } from './evaluate';
 
 /**
  * A full state built from what `view.side` knows: its own champions as they are, enemies alive at their
- * last seen position (their base if never seen) with estimated stats, enemy camps mirroring ours.
+ * last seen position (their base if never seen, or not seen within `aiTuning.knownRounds`) with estimated stats,
+ * enemy camps mirroring ours.
  */
 export function stateFromView(view: PlayerView, data: GameData): GameState {
   const enemy = other(view.side);
   const enemies: ChampionState[] = view.enemies.map((e) => {
     const est = estimateEnemy(view, data, e);
-    const position = e.position ?? `base-${enemy}`;
+    const current = e.position !== null && e.lastSeenRound !== null && view.round - e.lastSeenRound <= data.aiTuning.knownRounds;
+    const position = current ? e.position! : `base-${enemy}`;
     return {
       id: e.id, side: enemy, role: e.role, position, previous: position, status: 'alive', respawnRound: null,
       xp: est.xp, gold: 0, items: est.items, bonusLead: est.bonusLead, goldEarned: est.items, hasHerald: false,

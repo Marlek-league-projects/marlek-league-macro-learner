@@ -387,8 +387,9 @@ export function bestOrders(view: PlayerView, data: GameData, rng: Rng): Order[] 
 }
 
 /**
- * Fight when the fight, scored with what `view.side` knows, is won; trade an even one when offered;
- * otherwise flee, unless `chase` and outnumbered.
+ * Even lane contact (trade offered): fight when the predicted score margin, with what `view.side` knows, exceeds
+ * `aiTuning.killMargin`, flee when it is below its negative, otherwise trade. Other contacts: fight when the fight
+ * is won, otherwise flee, unless `chase` and outnumbered.
  */
 export function contactChoice(view: PlayerView, data: GameData, contact: Contact, chase: boolean): Choice {
   const side = view.side;
@@ -396,11 +397,14 @@ export function contactChoice(view: PlayerView, data: GameData, contact: Contact
   if (options.length === 1) return options[0]!;
   const state = stateFromView(view, data);
   const stage = roundWindow(data.rules, view.round).stage;
-  const { winner } = resolveFight(state, data, contact.position, contact.blue, contact.red, stage);
+  const { winner, scores } = resolveFight(state, data, contact.position, contact.blue, contact.red, stage);
   const outnumbered = contact[side].length < contact[other(side)].length;
   let choice: Choice;
-  if (winner === side || (chase && outnumbered)) choice = 'fight';
-  else if (winner === null && options.includes('trade')) choice = 'trade';
+  if (options.includes('trade') && !outnumbered) {
+    const margin = scores[side] - scores[other(side)];
+    const { killMargin } = data.aiTuning;
+    choice = margin > killMargin ? 'fight' : margin < -killMargin ? 'flee' : 'trade';
+  } else if (winner === side || (chase && outnumbered)) choice = 'fight';
   else choice = 'flee';
   return options.includes(choice) ? choice : contact.defaults[side];
 }

@@ -75,6 +75,8 @@ describe('store', () => {
 
   test('respawning champion: move throws /spawn/, setSpawn accepts a spawn point', () => {
     const store = started();
+    // a recall makes the top respawn next round, whatever the AI does
+    store.setRecall(blue(store, 'top').id);
     // play until a blue champion respawns
     for (let i = 0; i < 37 && store.screen.value !== 'over'; i++) {
       const dead = store.view.value!.allies.find((c) => c.status === 'respawning');

@@ -241,6 +241,25 @@ describe('resolveRound', () => {
     expect([after.position, after.status]).toEqual(['top-t2-blue', 'alive']);
   });
 
+  test('a lane contact where one side flees is won by the side that stayed: wave and trade lead', () => {
+    const s = setup(10, [
+      ['blue', 'top', 'top-t1-blue'],
+      ['red', 'top', 'top-t1-red'],
+    ]);
+    const bt = get(s, 'blue', 'top');
+    const rt = get(s, 'red', 'top');
+    const lead0 = rt.bonusLead;
+    const o = ordersWith(s, [
+      { kind: 'move', champion: bt.id, to: 'top-lane' },
+      { kind: 'move', champion: rt.id, to: 'top-lane' },
+    ]);
+    const { state, events } = resolveRound(s, d, o, { 'top-lane': { blue: 'flee' } });
+    expect(events).toContainEqual({ type: 'fled', champion: bt.id, to: 'top-t1-blue' });
+    expect(events).toContainEqual({ type: 'trade', position: 'top-lane', lane: 'top', winner: 'red' });
+    expect(state.waves.top).toBe(-1);
+    expect(state.champions.find((c) => c.id === rt.id)!.bonusLead).toBe(lead0 + d.rules.economy.tradeLead);
+  });
+
   test('an unward removes an enemy ward before it gives vision', () => {
     const run = (unward: boolean): { state: GameState; events: ReturnType<typeof resolveRound>['events'] } => {
       const s = setup(4, [['blue', 'jungle', 'raptors-blue']]);

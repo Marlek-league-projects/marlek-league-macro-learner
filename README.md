@@ -79,6 +79,7 @@ When a contact happens, resolution pauses and each player involved chooses to **
 - **Flee**: the champion survives and goes back to its previous position. On an objective, it gives the objective up. *(design call)* A champion who did not move this round (or just spawned there) retreats one step toward its base instead: along its lane to the next own tower (T1 → T2 → T3 → base), elsewhere to the neighbouring position closest to its base. It no longer defends the tile it left.
 - **Fight**: the winner takes the objective or the kill. Losers **die**.
 - If both sides flee, nobody takes the objective and it stays up for the next round. If one side flees and the other fights, the fighting side takes it without a fight.
+- *(design call)* In lane, if one side flees and the other trades or fights, the side that stayed wins the trade (wave and lead).
 
 **Invading** enemy jungle is a commitment, with no option to flee. If you meet an enemy and lose the fight, you die.
 

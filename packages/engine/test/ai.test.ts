@@ -215,3 +215,39 @@ describe('aiContactChoice', () => {
     expect(aiContactChoice(view, d, contact, profile('challenger'), stubRng(() => 0.99))).toBe('flee');
   });
 });
+
+describe('aiContactChoice on an even lane contact', () => {
+  /** Blue and red tops meet on top-lane; blue's lead is shifted by `bonus`. */
+  function laneContact(bonus: number): { view: ReturnType<typeof viewFor>; contact: ReturnType<typeof detectContacts>[number] } {
+    const s = newGame(d, 7);
+    s.round = 10;
+    place(s, 'blue', 'top', 'top-t1-blue');
+    place(s, 'red', 'top', 'top-t1-red');
+    get(s, 'blue', 'top').bonusLead += bonus;
+    const ids = { bt: get(s, 'blue', 'top').id, rt: get(s, 'red', 'top').id };
+    const over = (side: 'blue' | 'red', o: Order[]): Order[] =>
+      defaultOrders(s, d, side).map((x) => o.find((y) => y.champion === x.champion) ?? x);
+    const orders: Orders = {
+      blue: over('blue', [{ kind: 'move', champion: ids.bt, to: 'top-lane' }]),
+      red: over('red', [{ kind: 'move', champion: ids.rt, to: 'top-lane' }]),
+    };
+    const contact = detectContacts(s, d, orders).find((c) => c.position === 'top-lane')!;
+    expect(contact.kind).toBe('trade');
+    return { view: viewFor(s, d, 'blue'), contact };
+  }
+  const never = stubRng(() => 0.99);
+
+  test('a margin above killMargin goes for the kill', () => {
+    const { view, contact } = laneContact(100_000);
+    expect(aiContactChoice(view, d, contact, profile('challenger'), never)).toBe('fight');
+  });
+  test('a predicted loss beyond killMargin flees', () => {
+    const { view, contact } = laneContact(-100_000);
+    expect(aiContactChoice(view, d, contact, profile('challenger'), never)).toBe('flee');
+  });
+  test('a margin within killMargin trades', () => {
+    const { view, contact } = laneContact(100_000);
+    const wide = { ...d, aiTuning: { ...d.aiTuning, killMargin: 1_000 } };
+    expect(aiContactChoice(view, wide, contact, profile('challenger'), never)).toBe('trade');
+  });
+});
