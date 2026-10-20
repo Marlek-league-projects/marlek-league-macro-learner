@@ -19,7 +19,7 @@ export function towerMultiplier(state: GameState, data: GameData, side: Side): n
   return (state.grubs[side] ? b.grubsMult : 1) * (state.baronUntilRound[side] >= state.round ? b.baronMult : 1);
 }
 
-function grant(c: ChampionState, gold: number, xp = 0): void {
+export function grant(c: ChampionState, gold: number, xp = 0): void {
   c.gold += gold;
   c.goldEarned += gold;
   c.xp += xp;

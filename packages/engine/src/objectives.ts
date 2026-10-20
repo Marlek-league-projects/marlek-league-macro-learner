@@ -1,7 +1,7 @@
 import type { GameData, ObjectiveId, Side } from '@lml/data/contracts';
 import type { ChampionState, GameEvent, GameState, Orders, PitState } from './contracts';
 import { lead } from './fight';
-import { damageTower } from './lanes';
+import { damageTower, grant } from './lanes';
 import { roundWindow } from './time';
 
 type PitId = keyof GameState['pits'];
@@ -16,12 +16,6 @@ const PIT_SEQUENCE: Record<PitId, ObjectiveId[]> = {
 /** Pit a scuttle's vision ward covers. */
 const SCUTTLE_PIT: Record<ScuttleId, PitId> = { 'scuttle-top': 'baron-pit', 'scuttle-bot': 'dragon-pit' };
 const BUFF_CAMPS = new Set(['bluebuff', 'redbuff']);
-
-function grant(c: ChampionState, gold: number, xp = 0): void {
-  c.gold += gold;
-  c.goldEarned += gold;
-  c.xp += xp;
-}
 
 /** Objective of `pit` alive at time `t`: the first in its sequence not yet despawned. */
 function objectiveAt(data: GameData, pit: PitId, t: number): ObjectiveId {

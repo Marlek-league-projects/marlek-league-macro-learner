@@ -8,3 +8,4 @@ export { arrivalPositions, detectContacts, resolveChoice } from './contacts';
 export { lead, fightScore, resolveFight } from './fight';
 export { damageTower, frontTower, towerMultiplier, updateLanes } from './lanes';
 export { spawnObjectives, clearCamps, captureObjectives, launchHeralds } from './objectives';
+export { level, applyKill, completeRecall, advanceRespawns, teamScore, finishIfOver } from './economy';
