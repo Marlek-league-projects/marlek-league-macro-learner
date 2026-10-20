@@ -6,16 +6,16 @@
     { "name": "Herald & mid game", "start": 850, "end": 1210, "roundSeconds": 60, "stage": 3 },
     { "name": "Baron", "start": 1210, "end": 1510, "roundSeconds": 60, "stage": 4 }
   ],
-  "moves": { "laner": 1, "jungler": 2 },
+  "moves": { "laner": 1, "jungler": 2, "junglerObjectiveReach": true },
   "wards": { "perRound": 3, "unwardPerRound": 1, "unwardRoles": ["jungle", "support"] },
   "towers": { "hp": 5, "pushDamage": [1, 1, 2, 3, 4], "heraldDamage": 3, "platesGoldUntil": 840, "plateGold": 160, "towerGold": 250, "absentLanerChip": 0.5 },
   "buffs": { "grubsMult": 1.5, "baronMult": 2, "baronRounds": 3, "dragonLead": 250 },
   "objectives": {
-    "scuttle": { "firstSpawn": 210, "respawn": 150, "despawnAt": null, "minChampions": 1, "extraRound": false, "instantAt": null, "gold": 100, "xp": 100, "value": 300 },
-    "dragon": { "firstSpawn": 300, "respawn": 300, "despawnAt": null, "minChampions": 1, "extraRound": true, "instantAt": 4, "gold": 100, "xp": 150, "value": 3000 },
-    "voidgrubs": { "firstSpawn": 360, "respawn": null, "despawnAt": 840, "minChampions": 1, "extraRound": true, "instantAt": 4, "gold": 100, "xp": 100, "value": 2000 },
-    "herald": { "firstSpawn": 840, "respawn": null, "despawnAt": 1200, "minChampions": 1, "extraRound": true, "instantAt": 4, "gold": 100, "xp": 150, "value": 2000 },
-    "baron": { "firstSpawn": 1200, "respawn": 360, "despawnAt": null, "minChampions": 3, "extraRound": true, "instantAt": null, "gold": 300, "xp": 300, "value": 4000 }
+    "scuttle": { "firstSpawn": 210, "respawn": 150, "despawnAt": null, "minChampions": 1, "extraRound": false, "instantAt": null, "gold": 100, "xp": 100, "value": 450 },
+    "dragon": { "firstSpawn": 300, "respawn": 300, "despawnAt": null, "minChampions": 1, "extraRound": true, "instantAt": 4, "gold": 100, "xp": 150, "value": 4500 },
+    "voidgrubs": { "firstSpawn": 360, "respawn": null, "despawnAt": 840, "minChampions": 1, "extraRound": true, "instantAt": 4, "gold": 100, "xp": 100, "value": 3000 },
+    "herald": { "firstSpawn": 840, "respawn": null, "despawnAt": 1200, "minChampions": 1, "extraRound": true, "instantAt": 4, "gold": 100, "xp": 150, "value": 3000 },
+    "baron": { "firstSpawn": 1200, "respawn": 360, "despawnAt": null, "minChampions": 3, "extraRound": true, "instantAt": null, "gold": 300, "xp": 300, "value": 6000 }
   },
   "camps": { "firstSpawn": 90, "buffRespawn": 300, "smallRespawn": 135, "buffGold": 90, "buffXp": 100, "smallGold": 60, "smallXp": 70, "fastClearAt": 7 },
   "economy": {

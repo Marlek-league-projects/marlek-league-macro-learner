@@ -170,7 +170,7 @@ The map positions form a graph, and a move is one step on it. Starting values:
 - **Laners**: 1 move per round. Going from a lane to another lane, or to a Scuttle, counts as 1 move.
 - **Junglers**: 2 moves per round. For example, Raptors → Krugs, Raptors → mid lane, or Raptors → enemy Blue Buff.
 - **Ganks from the outer camps**: an outer camp is 1 move from its nearby lane (Gromp and Blue Buff → top lane, Krugs and Red Buff → bot lane on the blue side, and the mirror on the red side), so a jungler can gank from there in one round.
-- **Neutral objectives**: from any jungle camp, both Scuttles, the Dragon pit and the Baron pit are at most 2 moves away, so a jungler reaches them in one round.
+- **Neutral objectives** *(jungler rule, not map links)*: a jungler standing on any jungle camp can reach both Scuttles, the Dragon pit and the Baron pit in one round. Laners get no such shortcut. Data flag `rules.moves.junglerObjectiveReach`.
 
 - **Camps and Scuttle** are taken by ending the move on their position. **Pit objectives** (Dragon, Voidgrubs, Herald, Baron) take one extra round, unless 4 or more champions are on them (except Baron, which always takes the extra round) (see [Neutral objectives](#neutral-objectives)).
 - **Recall** keeps the champion in place for the round, and it respawns at a base position the next round, so a recall costs 1 round.

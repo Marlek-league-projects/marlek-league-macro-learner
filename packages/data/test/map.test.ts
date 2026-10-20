@@ -26,12 +26,6 @@ test('jungler examples in 2', () => {
 });
 test('towers ordered T1..T3', () => expect(g.towers('red', 'top')).toEqual(['top-t1-red', 'top-t2-red', 'top-t3-red']));
 test('lanePositions(top) = 7 towers/laneMid, no camps', () => expect(g.lanePositions('top')).toHaveLength(7));
-test('every camp reaches both scuttles and both pits in at most 2 moves', () => {
-  for (const side of ['blue', 'red'])
-    for (const camp of ['gromp', 'bluebuff', 'wolves', 'raptors', 'redbuff', 'krugs'])
-      for (const obj of ['scuttle-top', 'scuttle-bot', 'baron-pit', 'dragon-pit'])
-        expect(g.distance(`${camp}-${side}`, obj)).toBeLessThanOrEqual(2);
-});
 test('outer camps gank their lane in 1 move, on both sides', () => {
   for (const [camp, tower] of [
     ['gromp-blue', 'top-t1-blue'],

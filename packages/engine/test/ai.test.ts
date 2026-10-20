@@ -142,8 +142,8 @@ describe('aiOrders', () => {
 
   test('after the enemy laner vanished next to us, with the jungler seen far away, the challenger takes the tower', () => {
     const s = vanishedLaner(0, 'top-lane');
-    s.lastSeen.blue[get(s, 'red', 'jungle').id] = { position: 'bot-lane', round: 9 };
-    place(s, 'red', 'jungle', 'bot-lane');
+    s.lastSeen.blue[get(s, 'red', 'jungle').id] = { position: 'dragon-pit', round: 9 };
+    place(s, 'red', 'jungle', 'dragon-pit');
     const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
     expect(orderOf(orders, get(s, 'blue', 'top').id)).toMatchObject({ kind: 'move', to: 'top-t1-red' });
   });

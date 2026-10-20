@@ -83,7 +83,7 @@ function front(ctx: Ctx, side: Side, lane: Lane): string | null {
 }
 
 function reach(ctx: Ctx, c: ChampionState): Record<string, number> {
-  return reachableFrom(ctx.data, c.position, movesFor(c, ctx.data.rules), c.side);
+  return reachableFrom(ctx.data, c.position, movesFor(c, ctx.data.rules), c.side, c.role);
 }
 
 /** Reachable position closest to `target`, fewest moves then id as tie-breaks. */

@@ -26,7 +26,7 @@ export interface ObjectiveRule {
 
 export interface Rules {
   phases: Phase[];
-  moves: { laner: number; jungler: number };
+  moves: { laner: number; jungler: number; junglerObjectiveReach: boolean };
   wards: { perRound: number; unwardPerRound: number; unwardRoles: Role[] };
   towers: {
     hp: number;

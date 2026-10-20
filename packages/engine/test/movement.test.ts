@@ -138,3 +138,47 @@ describe('defaultOrders and spawn validation', () => {
     ).toThrow(/spawn/);
   });
 });
+
+describe('jungler objective reach', () => {
+  const OBJECTIVES = ['scuttle-top', 'scuttle-bot', 'baron-pit', 'dragon-pit'];
+  const camps = Object.values(d.graph.positions).filter((p) => p.kind === 'camp');
+  test('a jungler on any camp reaches both scuttles and both pits', () => {
+    expect(camps).toHaveLength(12);
+    for (const camp of camps) {
+      const s = fresh();
+      const j = get(s, 'blue', 'jungle');
+      j.position = camp.id;
+      const r = reachable(s, d, j.id);
+      for (const o of OBJECTIVES) expect(r[o]).toBeLessThanOrEqual(2);
+      validateOrders(s, d, 'blue', orders(s, [{ kind: 'move', champion: j.id, to: 'dragon-pit' }]));
+    }
+  });
+  test('a laner standing on a camp gets no bonus', () => {
+    const s = fresh();
+    const top = get(s, 'blue', 'top');
+    top.position = 'gromp-blue';
+    const r = reachable(s, d, top.id);
+    for (const o of OBJECTIVES) expect(r[o]).toBeUndefined();
+  });
+  test('the bonus needs a camp: a jungler in lane gets none', () => {
+    const s = fresh();
+    const j = get(s, 'blue', 'jungle');
+    j.position = 'top-t1-blue';
+    expect(reachable(s, d, j.id)['dragon-pit']).toBeUndefined();
+  });
+  test('mid T1 reaches neither pit in 1 move', () => {
+    const s = fresh();
+    const mid = get(s, 'blue', 'mid');
+    mid.position = 'mid-t1-blue';
+    const r = reachable(s, d, mid.id);
+    expect(r['baron-pit']).toBeUndefined();
+    expect(r['dragon-pit']).toBeUndefined();
+  });
+  test('the flag turns the bonus off', () => {
+    const s = fresh();
+    const j = get(s, 'blue', 'jungle');
+    j.position = 'gromp-blue';
+    const off = { ...d, rules: { ...d.rules, moves: { ...d.rules.moves, junglerObjectiveReach: false } } };
+    expect(reachable(s, off, j.id)['dragon-pit']).toBeUndefined();
+  });
+});

@@ -50,6 +50,7 @@ function checkPerStage(section: string, value: readonly number[]): void {
 
 export function validateRules(rules: Rules): void {
   const { phases } = rules;
+  if (typeof rules.moves.junglerObjectiveReach !== 'boolean') fail('rules.moves', 'junglerObjectiveReach must be a boolean');
   if (phases.length === 0) fail('rules.phases', 'no phases');
   phases.forEach((p, i) => {
     if (p.roundSeconds <= 0 || (p.end - p.start) % p.roundSeconds !== 0 || p.end <= p.start) {

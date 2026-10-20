@@ -1,4 +1,4 @@
-import type { GameData, Lane, Rules, Side } from '@lml/data/contracts';
+import type { GameData, Lane, Role, Rules, Side } from '@lml/data/contracts';
 import type { ChampionState, GameState, Order, PlayerView } from './contracts';
 
 const LANES: Lane[] = ['top', 'mid', 'bot'];
@@ -18,11 +18,21 @@ function find(state: GameState, championId: string): ChampionState {
 /** Position to distance for everything the champion can reach this round, incl. its own position (0). */
 export function reachable(state: GameState, data: GameData, championId: string): Record<string, number> {
   const c = find(state, championId);
-  return reachableFrom(data, c.position, movesFor(c, data.rules), c.side);
+  return reachableFrom(data, c.position, movesFor(c, data.rules), c.side, c.role);
 }
 
+/** Positions a jungler standing on a camp reaches in 2 moves whatever the graph says. */
+const OBJECTIVE_POSITIONS = ['scuttle-top', 'scuttle-bot', 'baron-pit', 'dragon-pit'];
+const OBJECTIVE_REACH = 2;
+
 /** Position to distance within `moves` steps of `position` for a `side` champion (the enemy base is off limits). */
-export function reachableFrom(data: GameData, position: string, moves: number, side: Side): Record<string, number> {
+export function reachableFrom(
+  data: GameData,
+  position: string,
+  moves: number,
+  side: Side,
+  role?: Role,
+): Record<string, number> {
   const banned = enemyBase(side);
   const dist: Record<string, number> = { [position]: 0 };
   const queue = [position];
@@ -33,6 +43,11 @@ export function reachableFrom(data: GameData, position: string, moves: number, s
       if (n === banned || dist[n] !== undefined) continue;
       dist[n] = dist[cur]! + 1;
       queue.push(n);
+    }
+  }
+  if (role === 'jungle' && data.rules.moves.junglerObjectiveReach && data.graph.positions[position]?.kind === 'camp') {
+    for (const o of OBJECTIVE_POSITIONS) {
+      if (dist[o] === undefined || dist[o]! > OBJECTIVE_REACH) dist[o] = OBJECTIVE_REACH;
     }
   }
   return dist;

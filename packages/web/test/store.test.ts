@@ -75,7 +75,11 @@ describe('store', () => {
     play(); // round 1 clears redbuff, back at 110 + buffRespawn = 410
     store.setMove(j.id, 'raptors-blue');
     play();
-    while (store.view.value!.round < 15) play();
+    while (store.view.value!.round < 15) {
+      // The enemy jungler may kill the idle one meanwhile: respawn on raptors again.
+      if (blue(store, 'jungle').status === 'respawning') store.setSpawn(j.id, 'raptors-blue');
+      play();
+    }
     expect(blue(store, 'jungle').position).toBe('raptors-blue');
     const w = store.roundWindow();
     const back = store.view.value!.camps['redbuff-blue']!;
