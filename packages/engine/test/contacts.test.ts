@@ -24,8 +24,8 @@ describe('detectContacts', () => {
     const cs = detectContacts(s, d, stay(s)).filter((c) => c.position === 'top-lane');
     expect(cs).toHaveLength(1);
     expect(cs[0]!.kind).toBe('trade');
-    expect(cs[0]!.defaults).toEqual({ blue: 'trade', red: 'trade' });
-    expect(cs[0]!.options.blue).toEqual(['trade', 'fight', 'flee']);
+    expect(cs[0]!.defaults).toEqual({ blue: 'farm', red: 'farm' });
+    expect(cs[0]!.options.blue).toEqual(['farm', 'trade', 'fight', 'flee']);
   });
 
   test('outnumbering arrival is a gank', () => {

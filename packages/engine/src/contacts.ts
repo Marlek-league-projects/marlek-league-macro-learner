@@ -28,8 +28,8 @@ function build(
   for (const s of SIDES) defaults[s] = n[s] < n[other(s)] ? 'flee' : 'fight';
   if (kind === 'trade') {
     for (const s of SIDES) {
-      options[s] = ['trade', 'fight', 'flee'];
-      defaults[s] = 'trade';
+      options[s] = ['farm', 'trade', 'fight', 'flee'];
+      defaults[s] = 'farm';
     }
   } else if (kind === 'invade' && invader) {
     options[invader] = ['fight'];

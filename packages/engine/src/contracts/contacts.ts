@@ -1,6 +1,6 @@
 import type { Side } from '@lml/data/contracts';
 
-export type Choice = 'fight' | 'flee' | 'trade';
+export type Choice = 'farm' | 'trade' | 'fight' | 'flee';
 export type ContactKind = 'trade' | 'gank' | 'objective' | 'invade' | 'skirmish';
 
 export interface Contact {

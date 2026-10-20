@@ -4,7 +4,8 @@
   "lookaheadSets": 3,
   "captureShare": 0.5,
   "presenceShare": 0.25,
-  "killMargin": 1,
+  "allInMargin": 4,
+  "tradeMargin": 0.5,
   "priorities": {
     "pointless": 100,
     "herald": 90,

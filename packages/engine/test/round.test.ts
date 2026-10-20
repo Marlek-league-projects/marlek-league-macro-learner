@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
 import { defaultOrders, newGame, resolveFight, resolveRound, roundWindow } from '@lml/engine';
-import type { ChampionState, ContactChoices, GameState, Order, Orders } from '@lml/engine/contracts';
+import type { Choice, ChampionState, ContactChoices, GameState, Order, Orders } from '@lml/engine/contracts';
 
 const d = loadGameData();
 const get = (s: GameState, side: string, role: string): ChampionState =>
@@ -258,6 +258,52 @@ describe('resolveRound', () => {
     expect(events).toContainEqual({ type: 'trade', position: 'top-lane', lane: 'top', winner: 'red' });
     expect(state.waves.top).toBe(-1);
     expect(state.champions.find((c) => c.id === rt.id)!.bonusLead).toBe(lead0 + d.rules.economy.tradeLead);
+  });
+
+  describe('even lane contact choices', () => {
+    function laneRound(choices: { blue: Choice; red: Choice }) {
+      const s = setup(10, [
+        ['blue', 'top', 'top-t1-blue'],
+        ['red', 'top', 'top-t1-red'],
+      ]);
+      const bt = get(s, 'blue', 'top');
+      const rt = get(s, 'red', 'top');
+      bt.bonusLead += 100_000;
+      const o = ordersWith(s, [
+        { kind: 'move', champion: bt.id, to: 'top-lane' },
+        { kind: 'move', champion: rt.id, to: 'top-lane' },
+      ]);
+      const r = resolveRound(s, d, o, { 'top-lane': choices });
+      return { ...r, bt, rt };
+    }
+    const alive = (st: GameState, id: string) => st.champions.find((c) => c.id === id)!.status === 'alive';
+
+    test('farm vs farm: no fight, no trade, nobody dies, the fight-score push applies', () => {
+      const { state, events, bt, rt } = laneRound({ blue: 'farm', red: 'farm' });
+      expect(events.some((e) => e.type === 'fight' || e.type === 'trade')).toBe(false);
+      expect(alive(state, bt.id) && alive(state, rt.id)).toBe(true);
+      expect(state.waves.top).toBe(1);
+    });
+    test('farm vs trade: a trade won by the fight score, nobody dies', () => {
+      const { state, events, bt, rt } = laneRound({ blue: 'farm', red: 'trade' });
+      expect(events).toContainEqual({ type: 'trade', position: 'top-lane', lane: 'top', winner: 'blue' });
+      expect(events.some((e) => e.type === 'fight')).toBe(false);
+      expect(alive(state, bt.id) && alive(state, rt.id)).toBe(true);
+    });
+    test('trade vs trade is a trade', () => {
+      const { events } = laneRound({ blue: 'trade', red: 'trade' });
+      expect(events).toContainEqual({ type: 'trade', position: 'top-lane', lane: 'top', winner: 'blue' });
+    });
+    test.each<Choice>(['farm', 'trade'])('all-in vs %s is a fight and the loser dies', (other) => {
+      const { state, events, bt, rt } = laneRound({ blue: 'fight', red: other });
+      expect(events.some((e) => e.type === 'fight' && e.winner === 'blue')).toBe(true);
+      expect(alive(state, bt.id)).toBe(true);
+      expect(alive(state, rt.id)).toBe(false);
+    });
+    test('farm vs flee concedes the trade to the side that stayed', () => {
+      const { events } = laneRound({ blue: 'flee', red: 'farm' });
+      expect(events).toContainEqual({ type: 'trade', position: 'top-lane', lane: 'top', winner: 'red' });
+    });
   });
 
   test("a 'to' ward is not placed when the champion fled off its destination", () => {

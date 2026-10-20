@@ -237,17 +237,24 @@ describe('aiContactChoice on an even lane contact', () => {
   }
   const never = stubRng(() => 0.99);
 
-  test('a margin above killMargin goes for the kill', () => {
+  const tuned = (allInMargin: number, tradeMargin: number) => ({ ...d, aiTuning: { ...d.aiTuning, allInMargin, tradeMargin } });
+
+  test('a margin above allInMargin goes all-in', () => {
     const { view, contact } = laneContact(100_000);
     expect(aiContactChoice(view, d, contact, profile('challenger'), never)).toBe('fight');
   });
-  test('a predicted loss beyond killMargin flees', () => {
+  test('a predicted loss beyond allInMargin flees', () => {
     const { view, contact } = laneContact(-100_000);
     expect(aiContactChoice(view, d, contact, profile('challenger'), never)).toBe('flee');
   });
-  test('a margin within killMargin trades', () => {
+  test('a margin between tradeMargin and allInMargin trades', () => {
     const { view, contact } = laneContact(100_000);
-    const wide = { ...d, aiTuning: { ...d.aiTuning, killMargin: 1_000 } };
-    expect(aiContactChoice(view, wide, contact, profile('challenger'), never)).toBe('trade');
+    expect(aiContactChoice(view, tuned(1_000_000, 0), contact, profile('challenger'), never)).toBe('trade');
+  });
+  test('a margin within tradeMargin farms', () => {
+    const { view, contact } = laneContact(100_000);
+    expect(aiContactChoice(view, tuned(1_000_000, 1_000_000), contact, profile('challenger'), never)).toBe('farm');
+    const loss = laneContact(-100_000);
+    expect(aiContactChoice(loss.view, tuned(1_000_000, 0), loss.contact, profile('challenger'), never)).toBe('farm');
   });
 });

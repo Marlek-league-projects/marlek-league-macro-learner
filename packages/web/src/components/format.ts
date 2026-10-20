@@ -1,6 +1,6 @@
 // French display helpers shared by the components.
 import type { GameData, Lane, ObjectiveId, Position, Role, Side } from '@lml/data/contracts';
-import type { ContactKind, GameEvent, PlayerView, WavePos } from '@lml/engine/contracts';
+import type { Choice, ContactKind, GameEvent, PlayerView, WavePos } from '@lml/engine/contracts';
 
 const ASSETS = './assets/';
 
@@ -57,7 +57,12 @@ export const CONTACT_LABEL: Record<ContactKind, string> = {
   skirmish: 'Escarmouche',
 };
 
-export const CHOICE_LABEL = { fight: 'Combattre', flee: 'Fuir', trade: 'Échanger' } as const;
+const CHOICE_LABEL = { farm: 'Farmer', fight: 'Combattre', flee: 'Fuir', trade: 'Trade' } as const;
+
+/** Button label of a choice: the fight is an "All-in" on a lane contact. */
+export function choiceLabel(kind: ContactKind, choice: Choice): string {
+  return choice === 'fight' && kind === 'trade' ? 'All-in' : CHOICE_LABEL[choice];
+}
 
 const SIDE_LABEL: Record<Side, string> = { blue: 'Bleu', red: 'Rouge' };
 

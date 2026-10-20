@@ -88,8 +88,11 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
       }
       continue;
     }
+    const allIn = SIDES.some((side) => choice[side] === 'fight');
+    // Farm vs farm has no effect: the lane falls back to the fight-score push.
+    if (!allIn && choice.blue === 'farm' && choice.red === 'farm') continue;
     const { winner, scores } = resolveFight(s, data, contact.position, contact.blue, contact.red, stage);
-    if (choice.blue === 'trade' && choice.red === 'trade') {
+    if (!allIn) {
       const lane = data.graph.positions[contact.position]!.lane!;
       tradeWinners[lane] = winner;
       events.push({ type: 'trade', position: contact.position, lane, winner });

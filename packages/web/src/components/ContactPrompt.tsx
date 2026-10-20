@@ -1,6 +1,6 @@
 import type { Contact } from '@lml/engine/contracts';
 import type { Store } from '../store';
-import { championImage, championName, CHOICE_LABEL, CONTACT_LABEL, positionLabel } from './format';
+import { championImage, championName, choiceLabel, CONTACT_LABEL, positionLabel } from './format';
 
 function Names({ store, ids }: { store: Store; ids: string[] }) {
   return (
@@ -28,7 +28,7 @@ export function ContactPrompt({ store, contact }: { store: Store; contact: Conta
       <div class="seg">
         {contact.options.blue.map((choice) => (
           <button key={choice} class={choice === chosen ? 'on' : ''} onClick={() => store.choose(contact.id, choice)}>
-            {CHOICE_LABEL[choice]}
+            {choiceLabel(contact.kind, choice)}
           </button>
         ))}
       </div>
