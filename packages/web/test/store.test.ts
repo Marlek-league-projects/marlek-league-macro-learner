@@ -140,6 +140,34 @@ describe('store', () => {
     expect(store.spawnPointsFor(top.id)).toContain('top-t1-blue');
   });
 
+  test('a recalled champion is listed in recalled while respawning, a dead one is not', () => {
+    const store = started();
+    const top = blue(store, 'top');
+    store.setRecall(top.id);
+    store.confirmRound();
+    store.confirmContacts();
+    const after = blue(store, 'top');
+    expect(after.status).toBe('respawning');
+    expect(store.recalled.value).toEqual([top.id]);
+    store.next();
+    store.setSpawn(top.id, store.spawnPointsFor(top.id)[0]!);
+    store.confirmRound();
+    store.confirmContacts();
+    expect(store.recalled.value).not.toContain(top.id);
+  });
+
+  test('reset returns to the start screen and drops the game', () => {
+    const store = started();
+    store.setRecall(blue(store, 'top').id);
+    store.reset();
+    expect(store.screen.value).toBe('start');
+    expect(store.view.value).toBeNull();
+    expect(store.pending.value).toEqual({});
+    expect(store.finalScores()).toBeNull();
+    store.start({ rank: 'iron', teaching: false, seed: 3 });
+    expect(store.screen.value).toBe('orders');
+  });
+
   test('setLaunchHerald needs the herald and keeps the move', () => {
     const store = started();
     const top = blue(store, 'top');

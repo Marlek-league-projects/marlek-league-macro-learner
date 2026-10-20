@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import type { Position, Role, Side } from '@lml/data/contracts';
 import type { PlayerView } from '@lml/engine/contracts';
 import type { Store } from '../store';
+import { pawnClick } from './pawn-click';
 import {
   championImage,
   championName,
@@ -235,9 +236,10 @@ export function MapView({ store }: { store: Store }) {
         class={`pawn${pawn.ally ? ' mine' : ''}${isSel ? ' sel' : ''}${pawn.away ? ' away' : ''}`}
         onClick={(e: MouseEvent) => {
           e.stopPropagation();
-          if (pawn.ally && ordering) store.select(isSel ? null : pawn.id);
-          // An enemy standing on a reachable position does not hide it: clicking it orders the move.
-          else if (!pawn.ally && reach?.[pawn.position] !== undefined) order(pawn.position);
+          if (!ordering) return;
+          const action = pawnClick(pawn, selected?.id ?? null, reach);
+          if (action.kind === 'select') store.select(action.id);
+          else if (action.kind === 'order') order(action.to);
         }}
         onMouseMove={(e: MouseEvent) =>
           setTip({ text: `${name}${pawn.away ? ' · en base' : ''}`, x: e.clientX, y: e.clientY })}

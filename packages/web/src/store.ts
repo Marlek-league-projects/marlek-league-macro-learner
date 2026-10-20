@@ -44,7 +44,11 @@ export interface Store {
   lastEvents: Signal<GameEvent[]>;
   explanations: Signal<Explanation[]>;
   settings: Signal<Settings>;
+  /** Own champions back at base after a recall (respawning without a death). */
+  recalled: Signal<string[]>;
   start(s: Settings): void;
+  /** Back to the start screen, dropping the current game. */
+  reset(): void;
   select(id: string | null): void;
   reachableForSelected(): Record<string, number>;
   setMove(champion: string, to: string): void;
@@ -80,6 +84,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
   const lastEvents = signal<GameEvent[]>([]);
   const explanations = signal<Explanation[]>([]);
   const settings = signal<Settings>({ rank: 'gold', teaching: true, seed: 1 });
+  const recalled = signal<string[]>([]);
 
   // The full state never leaves the store; components only see `view`.
   let state: GameState | null = null;
@@ -153,6 +158,14 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     state = result.state;
     roundOrders = null;
     lastEvents.value = engine.eventsFor(result.events, result.state, data, PLAYER);
+    const back = new Set(recalled.value);
+    for (const e of result.events) {
+      if (e.type === 'recall') back.add(e.champion);
+      else if (e.type === 'death') back.delete(e.champion);
+    }
+    recalled.value = result.state.champions
+      .filter((c) => c.side === PLAYER && c.status === 'respawning' && back.has(c.id))
+      .map((c) => c.id);
     explanations.value = settings.value.teaching
       ? engine.explainRound(before, result.state, result.events, data, PLAYER)
       : [];
@@ -171,7 +184,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
   };
 
   return {
-    data, screen, view, selected, pending, contacts, choices, lastEvents, explanations, settings,
+    data, screen, view, selected, pending, contacts, choices, lastEvents, explanations, settings, recalled,
 
     start(s) {
       settings.value = s;
@@ -187,8 +200,24 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       choices.value = {};
       lastEvents.value = [];
       explanations.value = [];
+      recalled.value = [];
       publish();
       screen.value = 'orders';
+    },
+
+    reset() {
+      state = null;
+      roundOrders = null;
+      redChoices = {};
+      selected.value = null;
+      pending.value = {};
+      contacts.value = [];
+      choices.value = {};
+      lastEvents.value = [];
+      explanations.value = [];
+      recalled.value = [];
+      view.value = null;
+      screen.value = 'start';
     },
 
     select(id) {

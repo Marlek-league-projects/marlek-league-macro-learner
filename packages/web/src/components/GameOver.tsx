@@ -33,7 +33,7 @@ export function GameOver({ store }: { store: Store }) {
             <tr class="total"><td>Score</td><td>{num(mine.total)}</td><td>{num(theirs.total)}</td></tr>
           </tbody>
         </table>
-        <button class="go" onClick={() => { store.screen.value = 'start'; }}>Rejouer</button>
+        <button class="go" onClick={() => store.reset()}>Rejouer</button>
       </div>
       <div class="side">
         <h3>Dernier round</h3>

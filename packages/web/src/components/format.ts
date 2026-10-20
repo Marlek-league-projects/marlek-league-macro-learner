@@ -149,3 +149,13 @@ export function objectiveTimers(view: PlayerView, data: GameData): { alive: Obje
   }
   return { alive, next };
 }
+
+/** A side's objective score from public info only: objectives, plates and towers taken (no gold). */
+export function objectiveScore(view: PlayerView, data: GameData, side: Side): number {
+  const { objectives, verdict } = data.rules;
+  let score = 0;
+  for (const [id, n] of Object.entries(view.objectivesTaken[side])) {
+    score += (n ?? 0) * objectives[id as ObjectiveId].value;
+  }
+  return score + view.platesTaken[side] * verdict.plateValue + view.towersDestroyed[side] * verdict.towerValue;
+}

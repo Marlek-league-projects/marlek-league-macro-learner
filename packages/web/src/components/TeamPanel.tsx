@@ -1,7 +1,7 @@
 import type { ChampionState, EnemyInfo, PlayerView } from '@lml/engine/contracts';
 import type { Store } from '../store';
-import { estimateEnemy, leadShare, levelProgress, teamLead } from './estimate';
-import { championImage, championName, num, positionLabel, roleIcon, signed } from './format';
+import type { GameData } from '@lml/data/contracts';
+import { championImage, championName, num, objectiveScore, positionLabel, roleIcon } from './format';
 
 interface Props {
   store: Store;
@@ -9,7 +9,16 @@ interface Props {
 }
 
 const pct = (share: number): string => `${Math.round(share * 100)}%`;
-const tone = (n: number): string => (n >= 0 ? 'pos' : 'neg');
+const tone = (n: number): string => (n > 0 ? 'pos' : n < 0 ? 'neg' : '');
+
+/** 0..1 progress through the current level. */
+function levelProgress(data: GameData, xp: number, level: number): number {
+  const table = data.rules.economy.levelXp;
+  const from = table[level - 1] ?? 0;
+  const to = table[level];
+  if (to === undefined) return 1;
+  return Math.min(1, Math.max(0, (xp - from) / (to - from)));
+}
 
 export function TeamPanel({ store, team }: Props) {
   const view = store.view.value;
@@ -24,6 +33,7 @@ function Kpis({ view, side }: { view: PlayerView; side: 'blue' | 'red' }) {
       <span class="kpi">Dragons <strong>{taken.dragon ?? 0}</strong></span>
       <span class="kpi">Larves <strong>{taken.voidgrubs ?? 0}</strong></span>
       <span class="kpi">Tours prises <strong>{view.towersDestroyed[side]}</strong></span>
+      <span class="kpi">Plaques <strong>{view.platesTaken[side]}</strong></span>
     </>
   );
 }
@@ -43,18 +53,26 @@ function CardTitle({ store, id, role, level }: { store: Store; id: string; role:
 
 function AllyTeam({ store, view }: { store: Store; view: PlayerView }) {
   const { data } = store;
-  const start = store.roundWindow().start;
-  const lead = teamLead(view, data, start);
+  const enemySide = view.side === 'blue' ? 'red' : 'blue';
+  const gold = view.allies.reduce((sum, c) => sum + c.goldEarned, 0);
+  const xp = view.allies.reduce((sum, c) => sum + c.xp, 0);
+  const bestGold = Math.max(1, ...view.allies.map((c) => c.goldEarned));
+  const ours = objectiveScore(view, data, view.side);
+  const theirs = objectiveScore(view, data, enemySide);
   const wardsUsed = Object.values(store.pending.value).filter((o) => o.kind !== 'spawn' && o.ward !== undefined).length;
   const canSelect = store.screen.value === 'orders';
+  const recalled = store.recalled.value;
   return (
     <div class="team ally">
       <div class="teamhead">
         <b style="color:var(--blue)">Ton équipe (bleu)</b>
-        <span class="kpi">Avance équipe <strong class={tone(lead.gold)}>{signed(lead.gold)} or</strong></span>
-        <span class="kpi">XP <strong class={tone(lead.xp)}>{signed(lead.xp)}</strong></span>
+        <span class="kpi">Or gagné <strong>{num(gold)}</strong></span>
+        <span class="kpi">XP <strong>{num(xp)}</strong></span>
         <Kpis view={view} side={view.side} />
         <span class="kpi">Wards <strong>{wardsUsed} / {data.rules.wards.perRound}</strong></span>
+        <span class="kpi" title="Objectifs, plaques et tours pris, toi contre l'adversaire">
+          Objectifs <strong class={tone(ours - theirs)}>{num(ours)} – {num(theirs)}</strong>
+        </span>
       </div>
       <div class="cards">
         {view.allies.map((c) => {
@@ -68,9 +86,13 @@ function AllyTeam({ store, view }: { store: Store; view: PlayerView }) {
             >
               <CardTitle store={store} id={c.id} role={c.role} level={level} />
               <div class="bar xp"><i style={{ width: pct(levelProgress(data, c.xp, level)) }} /></div>
-              <div class="bar lead"><i style={{ width: pct(leadShare(view, data, c, start)) }} /></div>
+              <div class="bar lead" title={`Or gagné ${num(c.goldEarned)}`}>
+                <i style={{ width: pct(c.goldEarned / bestGold) }} />
+              </div>
               {out ? (
-                <span class="neg">Mort (retour round {c.respawnRound ?? view.round})</span>
+                <span class="neg">
+                  {recalled.includes(c.id) ? 'À la base' : 'Mort'} (retour round {c.respawnRound ?? view.round})
+                </span>
               ) : (
                 <span class="muted">Or non dépensé {num(c.gold)}{c.hasHerald ? ' · Herald' : ''}</span>
               )}
@@ -93,13 +115,11 @@ function seenText(store: Store, e: EnemyInfo): string {
 
 function EnemyTeam({ store, view }: { store: Store; view: PlayerView }) {
   const { data } = store;
-  const start = store.roundWindow().start;
   const enemySide = view.side === 'blue' ? 'red' : 'blue';
   return (
     <div class="team enemy">
       <div class="cards">
         {view.enemies.map((e) => {
-          const est = estimateEnemy(data, e, start);
           return (
             <div key={e.id} class="card">
               <CardTitle store={store} id={e.id} role={e.role} level={e.level} />
@@ -107,7 +127,6 @@ function EnemyTeam({ store, view }: { store: Store; view: PlayerView }) {
                 <i style={{ width: pct((e.level ?? 0) / data.rules.economy.levelXp.length) }} />
               </div>
               <div class="muted">{seenText(store, e)}</div>
-              <div class="muted small">Or estimé {num(est.gold)}</div>
             </div>
           );
         })}
@@ -115,7 +134,7 @@ function EnemyTeam({ store, view }: { store: Store; view: PlayerView }) {
       <div class="teamhead foot">
         <b style="color:var(--red)">Équipe adverse (rouge)</b>
         <Kpis view={view} side={enemySide} />
-        <span class="kpi muted">Or et avance adverses : estimés d'après ce qui a été vu</span>
+        <span class="kpi muted">Positions et niveaux : seulement ce qui a été vu</span>
       </div>
     </div>
   );
