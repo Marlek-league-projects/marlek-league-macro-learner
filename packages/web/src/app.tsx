@@ -2,6 +2,7 @@ import type { Store } from './store';
 import { ActionsPanel } from './components/ActionsPanel';
 import { GameOver } from './components/GameOver';
 import { MapView } from './components/MapView';
+import { RoundBanner } from './components/RoundBanner';
 import { RoundPanel } from './components/RoundPanel';
 import { StartScreen } from './components/StartScreen';
 import { TeamPanel } from './components/TeamPanel';
@@ -35,10 +36,13 @@ export function App({ store }: { store: Store }) {
   const playing = store.screen.value !== 'start';
   return (
     <div class="wrap">
-      <h1>
-        League Macro Learner
-        {playing && <span class="muted"> · IA {profile?.label ?? rank} · graine {seed}</span>}
-      </h1>
+      <header class="head">
+        {playing && <RoundBanner store={store} />}
+        <h1>
+          League Macro Learner
+          {playing && <span class="muted"> · IA {profile?.label ?? rank} · graine {seed}</span>}
+        </h1>
+      </header>
       {playing ? <Game store={store} /> : <StartScreen store={store} />}
       <footer class="legal">{LEGAL}</footer>
     </div>

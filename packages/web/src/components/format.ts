@@ -101,7 +101,7 @@ export function eventText(e: GameEvent, data: GameData): string {
     case 'objectiveTaken':
       return `${SIDE_LABEL[e.side]} prend ${OBJECTIVE_LABEL[e.objective]} à ${at(e.position)}`;
     case 'campCleared':
-      return `${name(e.champion)} nettoie ${at(e.camp)}`;
+      return `Camp nettoyé : ${at(e.camp)} par ${name(e.champion)}`;
     case 'wardPlaced':
       return `Ward ${SIDE_LABEL[e.side].toLowerCase()} posée à ${at(e.position)}`;
     case 'wardCleared':

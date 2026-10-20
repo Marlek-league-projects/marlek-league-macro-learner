@@ -3,6 +3,7 @@ import type { ChampionState, Order } from '@lml/engine/contracts';
 import type { Store } from '../store';
 import { ContactPrompt } from './ContactPrompt';
 import { EventLog } from './EventLog';
+import { shownRound } from './RoundBanner';
 import { championName, clock, errorText, OBJECTIVE_LABEL, objectiveTimers, positionLabel } from './format';
 
 /** Rounds until the objective spawning at `at` is up (it spawns during the round whose window ends at or after it). */
@@ -101,8 +102,7 @@ export function RoundPanel({ store }: { store: Store }) {
   const view = store.view.value;
   if (!view) return null;
   const screen = store.screen.value;
-  // In review, the view has already moved to the next round: describe the round just played.
-  const round = screen === 'review' ? view.round - 1 : view.round;
+  const round = shownRound(store);
   const win = store.roundWindow(round);
   const phase = store.data.rules.phases[win.phase];
   return (

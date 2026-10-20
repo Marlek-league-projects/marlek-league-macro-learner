@@ -1,8 +1,13 @@
 :root { --bg:#0d1117; --panel:#161b22; --line:#30363d; --txt:#e6edf3; --mut:#8b949e; --blue:#3b82f6; --red:#ef4444; --gold:#eab308; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--txt); font:14px/1.4 system-ui,-apple-system,sans-serif; }
-.wrap { max-width:1180px; margin:0 auto; padding:12px 16px 24px; }
+.wrap { max-width:1600px; margin:0 auto; padding:12px 16px 24px; }
 h1 { font-size:15px; margin:0 0 10px; color:var(--mut); font-weight:500; }
+.head { display:flex; justify-content:space-between; align-items:baseline; gap:16px; flex-wrap:wrap; }
+.head h1 { margin:0; font-size:13px; }
+.banner { font-size:26px; font-weight:700; letter-spacing:.01em; }
+.banner .phase { color:var(--gold); }
+.head + * { margin-top:10px; }
 h2 { font-size:18px; margin:0; }
 
 /* Team panels */
@@ -31,21 +36,23 @@ h2 { font-size:18px; margin:0; }
 .sq { width:16px; height:16px; border-radius:3px; vertical-align:-3px; margin-right:4px; }
 
 /* Middle row */
-.mid { display:grid; grid-template-columns:220px 1fr 220px; gap:12px; margin:12px 0; }
-.mapbox { background:#2b3428; border-radius:10px; padding:6px; }
+.mid { display:grid; grid-template-columns:190px minmax(0,1fr) 190px; gap:12px; margin:12px 0; align-items:start; }
+.mapbox { background:#2b3428; border-radius:10px; padding:6px; justify-self:center; width:100%; max-width:calc(100vh - 70px); }
 svg { width:100%; display:block; }
-.node { cursor:pointer; }
-.node:hover { stroke:#fff; stroke-width:3; }
+.mpos.act .hit { cursor:pointer; }
+.mpos:hover .node { stroke:#fff; stroke-width:3; }
 .node.off { opacity:.25; cursor:not-allowed; }
 .node.reach { stroke:#fde047; stroke-width:2.5; }
 .node.down { opacity:.55; }
+.node.cleared { opacity:.6; }
 .pawn.mine { cursor:pointer; }
 .pawn.sel circle.body { stroke:#fde047; stroke-width:3; }
 .pawn.away { opacity:.6; }
 .pname { font-size:9px; font-weight:600; fill:#e5e7eb; paint-order:stroke; stroke:#000; stroke-width:2px; stroke-opacity:.6; }
 .arrow { fill:none; stroke:#fde047; stroke-width:3; stroke-dasharray:6 4; }
 .timer { font-size:10px; font-weight:700; fill:#fff; paint-order:stroke; stroke:#000; stroke-width:3px; }
-.timer.live { fill:#fde047; }
+.timer.live { fill:#fde047; font-size:9px; }
+.wave polygon { opacity:.95; }
 .contact-ring { fill:none; stroke:#f87171; stroke-width:3; stroke-dasharray:4 3; }
 .tip { position:fixed; pointer-events:none; background:#000c; color:#fff; font-size:12px; padding:4px 8px; border-radius:5px; z-index:9; }
 
