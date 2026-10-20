@@ -76,7 +76,7 @@ When a contact happens, resolution pauses and each player involved chooses to **
 | The ganker | Asked to choose: commit to the fight or not |
 | Neutral objective with an enemy already there | Asked to choose: fight or flee |
 
-- **Flee**: the champion survives and goes back to its previous position. On an objective, it gives the objective up.
+- **Flee**: the champion survives and goes back to its previous position. On an objective, it gives the objective up. *(design call)* A champion who did not move this round (or just spawned there) retreats one step toward its base instead: along its lane to the next own tower (T1 → T2 → T3 → base), elsewhere to the neighbouring position closest to its base. It no longer defends the tile it left.
 - **Fight**: the winner takes the objective or the kill. Losers **die**.
 - If both sides flee, nobody takes the objective and it stays up for the next round. If one side flees and the other fights, the fighting side takes it without a fight.
 

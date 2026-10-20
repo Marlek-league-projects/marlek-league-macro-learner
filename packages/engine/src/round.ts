@@ -4,7 +4,7 @@ import { detectContacts, resolveChoice } from './contacts';
 import { advanceRespawns, applyKill, completeRecall, finishIfOver } from './economy';
 import { resolveFight } from './fight';
 import { updateLanes } from './lanes';
-import { validateOrders } from './movement';
+import { retreatStep, validateOrders } from './movement';
 import { captureObjectives, clearCamps, launchHeralds, spawnObjectives } from './objectives';
 import { roundWindow } from './time';
 import { updateVision } from './vision';
@@ -72,7 +72,11 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     const fleeing = SIDES.filter((side) => choice[side] === 'flee');
     if (fleeing.length > 0) {
       for (const side of fleeing) {
-        goBack(ids[side]);
+        // A champion who did not move (or just spawned here) has nowhere to go back to: it retreats one step.
+        for (const id of ids[side]) {
+          const c = byId(id);
+          c.position = c.previous === c.position ? retreatStep(data, c.side, c.position) : c.previous;
+        }
         for (const id of ids[side]) events.push({ type: 'fled', champion: id, to: byId(id).position });
       }
       continue;

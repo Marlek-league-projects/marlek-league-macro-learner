@@ -183,6 +183,64 @@ describe('resolveRound', () => {
     expect(r3.state.champions.find((c) => c.id === bt.id)!.hasHerald).toBe(false);
   });
 
+  test('a ganked laner who did not move flees one tower back; the tower takes push damage', () => {
+    const s = setup(10, [
+      ['blue', 'top', 'top-t1-blue'],
+      ['red', 'top', 'top-lane'],
+      ['red', 'mid', 'top-lane'],
+    ]);
+    s.waves.top = -1;
+    const bt = get(s, 'blue', 'top').id;
+    const o = ordersWith(s, [
+      { kind: 'move', champion: get(s, 'red', 'top').id, to: 'top-t1-blue' },
+      { kind: 'move', champion: get(s, 'red', 'mid').id, to: 'top-t1-blue' },
+    ]);
+    const { state, events } = resolveRound(s, d, o, {});
+    expect(events).toContainEqual({ type: 'fled', champion: bt, to: 'top-t2-blue' });
+    const after = state.champions.find((c) => c.id === bt)!;
+    expect([after.position, after.status]).toEqual(['top-t2-blue', 'alive']);
+    expect(state.towers['top-t1-blue']).toBe(d.rules.towers.hp - d.rules.towers.pushDamage[1]!);
+  });
+
+  test('fleeing in place off a T3 goes to base; off a non-lane tile to the neighbour closest to base', () => {
+    const s = setup(10, [
+      ['blue', 'top', 'top-t3-blue'],
+      ['red', 'top', 'top-t2-blue'],
+      ['red', 'mid', 'top-t2-blue'],
+      ['blue', 'jungle', 'raptors-blue'],
+      ['red', 'jungle', 'scuttle-bot'],
+      ['red', 'support', 'scuttle-bot'],
+    ]);
+    const o = ordersWith(s, [
+      { kind: 'move', champion: get(s, 'red', 'top').id, to: 'top-t3-blue' },
+      { kind: 'move', champion: get(s, 'red', 'mid').id, to: 'top-t3-blue' },
+      { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'raptors-blue' },
+      { kind: 'move', champion: get(s, 'red', 'support').id, to: 'raptors-blue' },
+    ]);
+    const { state } = resolveRound(s, d, o, {});
+    expect(get(state, 'blue', 'top').position).toBe('base-blue');
+    // raptors-blue neighbours: mid-t1-blue (3 from base), redbuff-blue, scuttle-bot, ...; mid-t1-blue is closest.
+    expect(get(state, 'blue', 'jungle').position).toBe('mid-t1-blue');
+  });
+
+  test('a spawning champion who flees retreats one tower back', () => {
+    const s = setup(10, [
+      ['red', 'top', 'top-lane'],
+      ['red', 'mid', 'top-lane'],
+    ]);
+    const bt = get(s, 'blue', 'top');
+    bt.status = 'respawning';
+    bt.respawnRound = 10;
+    const o = ordersWith(s, [
+      { kind: 'spawn', champion: bt.id, to: 'top-t1-blue' },
+      { kind: 'move', champion: get(s, 'red', 'top').id, to: 'top-t1-blue' },
+      { kind: 'move', champion: get(s, 'red', 'mid').id, to: 'top-t1-blue' },
+    ]);
+    const { state } = resolveRound(s, d, o, { 'top-t1-blue': { blue: 'flee' } });
+    const after = state.champions.find((c) => c.id === bt.id)!;
+    expect([after.position, after.status]).toEqual(['top-t2-blue', 'alive']);
+  });
+
   test('an unward removes an enemy ward before it gives vision', () => {
     const run = (unward: boolean): { state: GameState; events: ReturnType<typeof resolveRound>['events'] } => {
       const s = setup(4, [['blue', 'jungle', 'raptors-blue']]);
