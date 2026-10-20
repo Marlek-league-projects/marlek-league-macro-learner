@@ -20,7 +20,7 @@ bun run check-deps   # enforces the module boundaries (see Architecture)
 bun run build        # static site in packages/web/dist
 ```
 
-CI runs typecheck, check-deps, tests and build. For screenshots, the dev server accepts `?autostart=1&rank=gold&seed=42` to skip the start screen and launch a game directly.
+CI runs typecheck, check-deps, tests and build. For screenshots, the app (any build) accepts `?autostart=1&rank=gold&seed=42` to skip the start screen and launch a game directly.
 
 ## The idea
 
