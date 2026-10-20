@@ -39,28 +39,6 @@ const PIT_ROLES: Record<ObjectiveId, Role[]> = {
   baron: ['jungle', 'top', 'mid'],
   scuttle: ['jungle'],
 };
-/** AI tuning: gold that makes a recall worth it. */
-const RECALL_GOLD = 1100;
-/** AI tuning: rounds an enemy laner seen in lane still counts as "was there" for the conversion rule. */
-const CONVERT_MEMORY = 3;
-/** AI tuning: candidate priorities, higher first. */
-const SCORE = {
-  pointless: 100,
-  herald: 90,
-  objective: 70,
-  recall: 60,
-  convert: 55,
-  joinGank: 52,
-  lane: 50,
-  gank: 45,
-  laneAlt: 40,
-  scuttle: 36,
-  buff: 35,
-  invade: 32,
-  camp: 30,
-  wait: 10,
-};
-
 // ---------- map helpers ----------
 
 const distCache = new WeakMap<GameData, Map<string, Record<string, number>>>();
@@ -118,9 +96,9 @@ function step(ctx: Ctx, c: ChampionState, target: string): string {
 
 const moveTo = (c: ChampionState, to: string): Order => ({ kind: 'move', champion: c.id, to });
 
-/** Seen when the last round resolved, so its position is current. */
-const known = (view: PlayerView, e: EnemyInfo | undefined): e is EnemyInfo & { position: string } =>
-  !!e && e.position !== null && e.lastSeenRound !== null && view.round - e.lastSeenRound <= 1;
+/** Seen recently enough (`aiTuning.knownRounds`) that its position is current. */
+const known = (ctx: Ctx, e: EnemyInfo | undefined): e is EnemyInfo & { position: string } =>
+  !!e && e.position !== null && e.lastSeenRound !== null && ctx.view.round - e.lastSeenRound <= ctx.data.aiTuning.knownRounds;
 
 // ---------- context and mistakes ----------
 
@@ -202,13 +180,13 @@ function objectives(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: numb
     if (t.soon && m.has('objectiveTiming')) continue;
     const lane = c.role === 'jungle' ? PIT_LANE[pit] : HOME_LANE[c.role];
     if (ourWave(ctx.view, lane) < 0 && !m.has('rotateWithoutPriority')) continue;
-    add(SCORE.objective, moveTo(c, step(ctx, c, pit)));
+    add(ctx.data.aiTuning.priorities.objective, moveTo(c, step(ctx, c, pit)));
   }
 }
 
 /** Recall on a shoved or even wave (no objective coming for the jungler); `badRecall` inverts it. */
 function recall(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, o: Order) => void): void {
-  if (c.gold < RECALL_GOLD) return;
+  if (c.gold < ctx.data.aiTuning.recallGold) return;
   const good =
     c.role === 'jungle'
       ? !PITS.some((p) => {
@@ -216,7 +194,7 @@ function recall(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, 
           return t.live || t.soon;
         })
       : ourWave(ctx.view, HOME_LANE[c.role]) >= 0;
-  if (good !== m.has('badRecall')) add(SCORE.recall, { kind: 'recall', champion: c.id });
+  if (good !== m.has('badRecall')) add(ctx.data.aiTuning.priorities.recall, { kind: 'recall', champion: c.id });
 }
 
 /**
@@ -231,18 +209,18 @@ function conversion(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: numb
     const gone = laners.every(
       (e) =>
         !e.visible && e.position !== null && e.lastSeenRound !== null &&
-        view.round - e.lastSeenRound <= CONVERT_MEMORY && laneOf(data, e.position) === lane,
+        view.round - e.lastSeenRound <= data.aiTuning.convertMemoryRounds && laneOf(data, e.position) === lane,
     );
     const target = front(ctx, ctx.enemy, lane);
     if (laners.length > 0 && gone && target) {
-      add(SCORE.convert, m.has('noConversion') ? home(ctx, c) : moveTo(c, step(ctx, c, target)));
+      add(ctx.data.aiTuning.priorities.convert, m.has('noConversion') ? home(ctx, c) : moveTo(c, step(ctx, c, target)));
     }
   }
   const r = reach(ctx, c);
   for (const pit of PITS) {
     if (r[pit] === undefined || !pitTiming(view, data, pit).live) continue;
-    if (view.enemies.some((e) => e.visible && e.position !== null && dist(data, e.position, pit) <= 1)) continue;
-    add(SCORE.convert, m.has('noConversion') ? home(ctx, c) : moveTo(c, pit));
+    if (view.enemies.some((e) => e.visible && e.position !== null && dist(data, e.position, pit) <= data.aiTuning.pitThreatDistance)) continue;
+    add(ctx.data.aiTuning.priorities.convert, m.has('noConversion') ? home(ctx, c) : moveTo(c, pit));
   }
 }
 
@@ -255,16 +233,16 @@ function laning(ctx: Ctx, c: ChampionState, lane: Lane, m: Set<MistakeId>, add: 
   const own = front(ctx, ctx.side, lane) ?? mid;
   const jg = ctx.jungler;
   const jgMoves = data.rules.moves.jungler;
-  const safe = known(view, jg) && enemyFront !== null && dist(data, jg.position, enemyFront) > jgMoves;
-  const threatened = !m.has('ignoreJungler') && known(view, jg) && dist(data, jg.position, mid) <= jgMoves;
+  const safe = known(ctx, jg) && enemyFront !== null && dist(data, jg.position, enemyFront) > jgMoves;
+  const threatened = !m.has('ignoreJungler') && known(ctx, jg) && dist(data, jg.position, mid) <= jgMoves;
   let spot: string;
   if (wave === 1 && enemyFront && (safe || m.has('greed'))) spot = enemyFront;
   else if (wave === 1 && !threatened) spot = mid;
   else spot = own;
-  add(SCORE.lane, moveTo(c, step(ctx, c, spot)));
-  add(SCORE.laneAlt, moveTo(c, step(ctx, c, spot === own ? mid : own)));
+  add(ctx.data.aiTuning.priorities.lane, moveTo(c, step(ctx, c, spot)));
+  add(ctx.data.aiTuning.priorities.laneAlt, moveTo(c, step(ctx, c, spot === own ? mid : own)));
   if (ctx.gank?.lane === lane && reach(ctx, c)[ctx.gank.target] !== undefined) {
-    add(SCORE.joinGank, moveTo(c, ctx.gank.target));
+    add(ctx.data.aiTuning.priorities.joinGank, moveTo(c, ctx.gank.target));
   }
 }
 
@@ -273,7 +251,7 @@ function jungling(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number
   const { view, data } = ctx;
   const r = reach(ctx, c);
   const jg = ctx.jungler;
-  const jgKnown = known(view, jg);
+  const jgKnown = known(ctx, jg);
 
   for (const lane of LANES) {
     const mid = laneMid(data, lane);
@@ -289,16 +267,16 @@ function jungling(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number
       const overextended = p.kind === 'laneMid' || (p.kind === 'tower' && p.side === ctx.side);
       return overextended && r[e.position!] !== undefined;
     });
-    if (target && allies.length + 1 > enemies.length) add(SCORE.gank, moveTo(c, target.position!), lane);
+    if (target && allies.length + 1 > enemies.length) add(ctx.data.aiTuning.priorities.gank, moveTo(c, target.position!), lane);
   }
 
   for (const id of SCUTTLES) {
-    if (view.scuttles[id] <= ctx.end && r[id] !== undefined) add(SCORE.scuttle, moveTo(c, id));
+    if (view.scuttles[id] <= ctx.end && r[id] !== undefined) add(ctx.data.aiTuning.priorities.scuttle, moveTo(c, id));
   }
   for (const [camp, t] of Object.entries(view.camps)) {
     if (t > ctx.end || r[camp] === undefined) continue;
     const buff = /^(blue|red)buff-/.test(camp);
-    add(buff ? SCORE.buff : SCORE.camp, moveTo(c, camp));
+    add(buff ? ctx.data.aiTuning.priorities.buff : ctx.data.aiTuning.priorities.camp, moveTo(c, camp));
   }
   if (jgKnown) {
     const opposite = half(data, jg.position);
@@ -306,12 +284,12 @@ function jungling(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number
       const pos = data.graph.positions[p]!;
       const h = half(data, p);
       if (pos.kind === 'camp' && pos.side === ctx.enemy && opposite !== null && h !== null && h !== opposite) {
-        add(SCORE.invade, moveTo(c, p));
+        add(ctx.data.aiTuning.priorities.invade, moveTo(c, p));
       }
     }
   }
   const soonest = Object.entries(view.camps).sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))[0];
-  add(SCORE.wait, moveTo(c, soonest ? step(ctx, c, soonest[0]) : c.position));
+  add(ctx.data.aiTuning.priorities.wait, moveTo(c, soonest ? step(ctx, c, soonest[0]) : c.position));
 }
 
 /** Scored candidate orders for one champion, best first, without duplicates. */
@@ -321,8 +299,8 @@ function candidatesFor(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, rng: Rng):
   const add = (score: number, order: Order, gank?: Lane): void => {
     out.push(gank ? { score, order, gank } : { score, order });
   };
-  if (m.has('pointlessPlay')) add(SCORE.pointless, pointless(ctx, c, rng));
-  if (c.hasHerald) add(SCORE.herald, herald(ctx, c));
+  if (m.has('pointlessPlay')) add(ctx.data.aiTuning.priorities.pointless, pointless(ctx, c, rng));
+  if (c.hasHerald) add(ctx.data.aiTuning.priorities.herald, herald(ctx, c));
   objectives(ctx, c, m, add);
   recall(ctx, c, m, add);
   conversion(ctx, c, m, add);

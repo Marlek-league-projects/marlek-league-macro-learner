@@ -102,6 +102,42 @@ export interface AiProfile {
   lookahead: 0 | 1 | 2;
 }
 
+export type AiPriority =
+  | 'pointless'
+  | 'herald'
+  | 'objective'
+  | 'recall'
+  | 'convert'
+  | 'joinGank'
+  | 'lane'
+  | 'gank'
+  | 'laneAlt'
+  | 'scuttle'
+  | 'buff'
+  | 'invade'
+  | 'camp'
+  | 'wait';
+
+/** Weights and thresholds of the rule-based AI, shared by every rank. */
+export interface AiTuning {
+  /** Unspent gold that makes a recall worth it. */
+  recallGold: number;
+  /** An enemy seen at most this many rounds ago counts as known (its position is current). */
+  knownRounds: number;
+  /** Rounds an enemy laner seen in lane still counts as "was there" when converting a won fight. */
+  convertMemoryRounds: number;
+  /** A visible enemy within this distance of a pit blocks taking it. */
+  pitThreatDistance: number;
+  /** Candidate order sets compared by the look-ahead. */
+  lookaheadSets: number;
+  /** Share of an objective's value the evaluation credits for our capture in progress (0..1). */
+  captureShare: number;
+  /** Share credited for standing on an objective that is up or about to spawn (0..1). */
+  presenceShare: number;
+  /** Candidate priorities, higher first. */
+  priorities: Record<AiPriority, number>;
+}
+
 /** text uses {champion} {position} {n} {m} {objective} */
 export interface TeachingRule {
   id: string;

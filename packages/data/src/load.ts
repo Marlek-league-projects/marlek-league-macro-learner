@@ -1,13 +1,16 @@
 import mapJson from '../data/map.json';
 import rulesJson from '../data/rules.json';
 import aiProfilesJson from '../data/ai-profiles.json';
+import aiTuningJson from '../data/ai-tuning.json';
 import teachingJson from '../data/teaching.json';
 import championsJson from '../data/champions.json';
 import rosterJson from '../data/roster.json';
 import matchupsJson from '../data/matchups.json';
 import { buildGraph } from './map';
 import type {
+  AiPriority,
   AiProfile,
+  AiTuning,
   Champion,
   ChampionBase,
   DuoMatchup,
@@ -66,6 +69,27 @@ export function validateAiProfiles(profiles: AiProfile[]): void {
   }
 }
 
+const AI_PRIORITIES: AiPriority[] = [
+  'pointless', 'herald', 'objective', 'recall', 'convert', 'joinGank', 'lane',
+  'gank', 'laneAlt', 'scuttle', 'buff', 'invade', 'camp', 'wait',
+];
+
+export function validateAiTuning(t: AiTuning): void {
+  const num = (key: string, v: unknown, min: number, max = Infinity, integer = false): void => {
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max || (integer && !Number.isInteger(v))) {
+      fail('aiTuning', `${key} = ${String(v)} is not ${integer ? 'an integer ' : 'a number '}in ${min}..${max}`);
+    }
+  };
+  num('recallGold', t.recallGold, 0);
+  num('knownRounds', t.knownRounds, 0, Infinity, true);
+  num('convertMemoryRounds', t.convertMemoryRounds, 0, Infinity, true);
+  num('pitThreatDistance', t.pitThreatDistance, 0, Infinity, true);
+  num('lookaheadSets', t.lookaheadSets, 1, Infinity, true);
+  num('captureShare', t.captureShare, 0, 1);
+  num('presenceShare', t.presenceShare, 0, 1);
+  for (const id of AI_PRIORITIES) num(`priorities.${id}`, t.priorities?.[id], -Infinity);
+}
+
 export function validateTeaching(rules: TeachingRule[]): void {
   for (const r of rules) {
     if (!r.text || r.text.trim() === '') fail('teaching', `rule "${r.id}" has empty text`);
@@ -119,9 +143,11 @@ export function matchupAdvantage(data: GameData, a: string, b: string, stage: St
 export function loadGameData(): GameData {
   const rules = rulesJson as Rules;
   const aiProfiles = aiProfilesJson as AiProfile[];
+  const aiTuning = aiTuningJson as AiTuning;
   const teaching = teachingJson as TeachingRule[];
   validateRules(rules);
   validateAiProfiles(aiProfiles);
+  validateAiTuning(aiTuning);
   validateTeaching(teaching);
   const map = mapJson as MapData;
   const championList = championsJson as ChampionBase[];
@@ -142,6 +168,7 @@ export function loadGameData(): GameData {
     matchups,
     duoMatchups,
     aiProfiles,
+    aiTuning,
     teaching,
   };
 }

@@ -6,6 +6,7 @@ export {
   matchupAdvantage,
   validateRules,
   validateAiProfiles,
+  validateAiTuning,
   validateTeaching,
   validateChampions,
   validateMatchups,

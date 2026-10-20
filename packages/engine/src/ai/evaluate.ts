@@ -6,9 +6,6 @@ import { roundWindow, totalRounds } from '../time';
 
 const LANES: Lane[] = ['top', 'mid', 'bot'];
 export const PITS: PitId[] = ['dragon-pit', 'baron-pit'];
-/** AI tuning: share of an objective's value credited for a capture in progress, or for standing on it. */
-const CAPTURE_SHARE = 0.5;
-const PRESENCE_SHARE = 0.25;
 
 export const other = (s: Side): Side => (s === 'blue' ? 'red' : 'blue');
 
@@ -64,8 +61,8 @@ function pitControl(view: PlayerView, data: GameData): number {
     const rule = data.rules.objectives[t.objective];
     const capture = view.pits[id].capture;
     const here = view.allies.filter((c) => c.status === 'alive' && c.position === id).length;
-    if (capture?.side === view.side) score += rule.value * CAPTURE_SHARE;
-    else if (here >= rule.minChampions) score += rule.value * PRESENCE_SHARE;
+    if (capture?.side === view.side) score += rule.value * data.aiTuning.captureShare;
+    else if (here >= rule.minChampions) score += rule.value * data.aiTuning.presenceShare;
   }
   return score;
 }

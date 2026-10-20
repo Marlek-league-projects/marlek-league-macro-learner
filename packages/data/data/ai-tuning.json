@@ -1,0 +1,25 @@
+{
+  "recallGold": 1100,
+  "knownRounds": 1,
+  "convertMemoryRounds": 3,
+  "pitThreatDistance": 1,
+  "lookaheadSets": 3,
+  "captureShare": 0.5,
+  "presenceShare": 0.25,
+  "priorities": {
+    "pointless": 100,
+    "herald": 90,
+    "objective": 70,
+    "recall": 60,
+    "convert": 55,
+    "joinGank": 52,
+    "lane": 50,
+    "gank": 45,
+    "laneAlt": 40,
+    "scuttle": 36,
+    "buff": 35,
+    "invade": 32,
+    "camp": 30,
+    "wait": 10
+  }
+}

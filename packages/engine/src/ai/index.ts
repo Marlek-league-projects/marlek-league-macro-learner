@@ -7,9 +7,6 @@ import { simulate, type SimPolicy } from './simulate';
 
 export { evaluate } from './evaluate';
 
-/** Candidate sets the look-ahead compares. */
-const LOOKAHEAD_SETS = 3;
-
 /**
  * Orders for `view.side`: per champion, rank-dependent mistakes switch heuristic rules, then the best
  * candidate set is kept, or with `profile.lookahead` rounds of look-ahead the best of the top sets by `evaluate`.
@@ -18,7 +15,7 @@ export function aiOrders(view: PlayerView, data: GameData, profile: AiProfile, r
   if (view.over) return [];
   const mistakes = rollMistakes(view, profile, rng);
   const ctx = makeContext(view, data);
-  const sets = candidateSets(planCandidates(ctx, mistakes, rng), profile.lookahead > 0 ? LOOKAHEAD_SETS : 1);
+  const sets = candidateSets(planCandidates(ctx, mistakes, rng), profile.lookahead > 0 ? data.aiTuning.lookaheadSets : 1);
   const finished = sets.map((set) => assignWards(ctx, set, mistakes));
   if (profile.lookahead === 0 || finished.length === 1) return finished[0]!;
 

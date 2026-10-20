@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { loadGameData, validateAiProfiles, validateRules, validateTeaching } from '@lml/data';
+import { loadGameData, validateAiProfiles, validateAiTuning, validateRules, validateTeaching } from '@lml/data';
 
 const data = loadGameData();
 
@@ -37,6 +37,19 @@ test('validateRules rejects non-divisible phase and bad PerStage', () => {
   const b = structuredClone(data.rules);
   b.fight.numbers = [1, 2, 3] as unknown as typeof b.fight.numbers;
   expect(() => validateRules(b)).toThrow(/fight\.numbers/);
+});
+
+test('validateAiTuning rejects bad tuning', () => {
+  expect(() => validateAiTuning(data.aiTuning)).not.toThrow();
+  const a = structuredClone(data.aiTuning);
+  delete (a.priorities as Partial<Record<string, number>>).lane;
+  expect(() => validateAiTuning(a)).toThrow(/aiTuning.*priorities\.lane/);
+  const b = structuredClone(data.aiTuning);
+  b.captureShare = 1.5;
+  expect(() => validateAiTuning(b)).toThrow(/aiTuning.*captureShare/);
+  const c = structuredClone(data.aiTuning);
+  c.lookaheadSets = 0;
+  expect(() => validateAiTuning(c)).toThrow(/aiTuning.*lookaheadSets/);
 });
 
 test('validateAiProfiles and validateTeaching reject bad data', () => {
