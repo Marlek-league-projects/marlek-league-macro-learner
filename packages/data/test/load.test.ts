@@ -56,6 +56,9 @@ test('validateAiTuning rejects bad tuning', () => {
   const e = structuredClone(data.aiTuning);
   e.waveSacrificeCost = -1;
   expect(() => validateAiTuning(e)).toThrow(/aiTuning.*waveSacrificeCost/);
+  const f = structuredClone(data.aiTuning);
+  delete (f as Partial<typeof f>).laningPhaseUntil;
+  expect(() => validateAiTuning(f)).toThrow(/aiTuning.*laningPhaseUntil/);
 });
 
 test('validateAiProfiles and validateTeaching reject bad data', () => {

@@ -141,6 +141,8 @@ export interface AiTuning {
   tradeMargin: number;
   /** Objective value over which a laner leaves its unpushed wave to rotate to the pit, if that gives the numbers. */
   waveSacrificeCost: number;
+  /** Game time (s): rounds starting before it are the laning phase, where laners only farm their wave, recall or take a paying rotation. */
+  laningPhaseUntil: number;
   /** Candidate priorities, higher first. */
   priorities: Record<AiPriority, number>;
 }

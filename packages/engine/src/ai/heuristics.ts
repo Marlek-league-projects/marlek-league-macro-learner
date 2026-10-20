@@ -194,9 +194,22 @@ function rotationPays(ctx: Ctx, c: ChampionState, pit: PitId, objective: Objecti
   return ours >= rule.minChampions && ours > theirs;
 }
 
+/** The view's round starts before `aiTuning.laningPhaseUntil`. */
+function inLaningPhase(ctx: Ctx): boolean {
+  return roundWindow(ctx.data.rules, ctx.view.round).start < ctx.data.aiTuning.laningPhaseUntil;
+}
+
+/** `pit` is on the laner's half of the map (mid, equally far from both pits, has both). */
+function ownHalf(ctx: Ctx, c: ChampionState, pit: PitId): boolean {
+  const h = c.role === 'jungle' ? null : half(ctx.data, laneMid(ctx.data, HOME_LANE[c.role]));
+  return h === null || h === pit;
+}
+
 /**
  * Objective setup: to the pit one round before spawn (or while up), for the objective's roles with lane priority
  * (`rotateWithoutPriority` drops that check), or for any laner whose rotation pays, wave sacrificed if needed.
+ * In the laning phase a laner only leaves its wave for a paying rotation to a pit on its half of the map, or with
+ * `rotateWithoutPriority`.
  */
 function objectives(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, o: Order, x?: Extra) => void): void {
   for (const pit of PITS) {
@@ -206,11 +219,12 @@ function objectives(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: numb
     const roles = PIT_ROLES[t.objective];
     const able = ctx.view.allies.filter((a) => a.status !== 'dead' && roles.includes(a.role)).length;
     const lane = c.role === 'jungle' ? PIT_LANE[pit] : HOME_LANE[c.role];
+    const held = c.role !== 'jungle' && inLaningPhase(ctx);
     const assigned =
       roles.includes(c.role) &&
       able >= ctx.data.rules.objectives[t.objective].minChampions &&
-      (ourWave(ctx.view, lane) >= 0 || m.has('rotateWithoutPriority'));
-    const pays = !assigned && rotationPays(ctx, c, pit, t.objective);
+      (m.has('rotateWithoutPriority') || (!held && ourWave(ctx.view, lane) >= 0));
+    const pays = !assigned && (!held || ownHalf(ctx, c, pit)) && rotationPays(ctx, c, pit, t.objective);
     if (!assigned && !pays) continue;
     add(ctx.data.aiTuning.priorities.objective, moveTo(c, step(ctx, c, pit)), pays ? { committed: true } : undefined);
   }
