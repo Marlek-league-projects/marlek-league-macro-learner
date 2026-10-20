@@ -1,6 +1,7 @@
 // French display helpers shared by the components.
 import type { GameData, Lane, ObjectiveId, Position, Role, Side } from '@lml/data/contracts';
 import type { Choice, ContactKind, GameEvent, PlayerView, WavePos } from '@lml/engine/contracts';
+import type { Screen } from '../store';
 
 const ASSETS = './assets/';
 
@@ -12,6 +13,14 @@ export const championImage = (data: GameData, id: string): string =>
 export const championName = (data: GameData, id: string): string => data.champions[id]?.name ?? id;
 
 export const positionLabel = (data: GameData, id: string): string => data.graph.positions[id]?.label ?? id;
+
+/**
+ * The round on screen for a view at `viewRound`: in review and once the game is over the view has
+ * already moved on, so it is the round just played.
+ */
+export function shownRound(screen: Screen, viewRound: number): number {
+  return screen === 'review' || screen === 'over' ? viewRound - 1 : viewRound;
+}
 
 /** `m:ss` from a time in seconds. */
 export function clock(seconds: number): string {

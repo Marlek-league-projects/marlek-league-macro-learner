@@ -1,10 +1,9 @@
 import type { Store } from '../store';
-import { clock } from './format';
+import { clock, shownRound as roundOn } from './format';
 
-/** The round on screen: in review the view has already moved on, so it is the round just played. */
+/** The round on screen (see format.shownRound). */
 export function shownRound(store: Store): number {
-  const view = store.view.value!;
-  return store.screen.value === 'review' ? view.round - 1 : view.round;
+  return roundOn(store.screen.value, store.view.value!.round);
 }
 
 /** "Round N/37 · m:ss → m:ss · phase", large, at the top of the page. */
