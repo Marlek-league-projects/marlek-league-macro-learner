@@ -34,8 +34,11 @@ export function spawnObjectives(state: GameState, data: GameData): void {
   const end = roundWindow(data.rules, state.round).end;
   for (const id of Object.keys(PIT_SEQUENCE) as PitId[]) {
     const pit = state.pits[id];
-    // Loop so that a state jumping several timers ahead settles on the current objective.
-    for (;;) {
+    // Loop so that a state jumping several timers ahead settles on the current objective. Each objective spawns
+    // and despawns at most once per call; more means the data never settles (last objective must not despawn).
+    const maxSteps = 2 * PIT_SEQUENCE[id].length;
+    for (let steps = 0; ; steps++) {
+      if (steps > maxSteps) throw new Error(`${id}: objective timers never settle (does the last objective despawn?)`);
       if (pit.objective === null && pit.nextSpawn !== null && pit.nextSpawn <= end) {
         pit.objective = objectiveAt(data, id, pit.nextSpawn);
         pit.nextSpawn = null;

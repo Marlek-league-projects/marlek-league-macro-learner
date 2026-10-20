@@ -260,6 +260,24 @@ describe('resolveRound', () => {
     expect(state.champions.find((c) => c.id === rt.id)!.bonusLead).toBe(lead0 + d.rules.economy.tradeLead);
   });
 
+  test("a 'to' ward is not placed when the champion fled off its destination", () => {
+    const s = setup(10, [
+      ['blue', 'top', 'top-t1-blue'],
+      ['red', 'top', 'top-t1-red'],
+      ['red', 'jungle', 'top-t1-red'],
+    ]);
+    const bt = get(s, 'blue', 'top').id;
+    const o = ordersWith(s, [
+      { kind: 'move', champion: bt, to: 'top-lane', ward: 'to' },
+      { kind: 'move', champion: get(s, 'red', 'top').id, to: 'top-lane' },
+      { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'top-lane' },
+    ]);
+    const { state, events } = resolveRound(s, d, o, {});
+    expect(events).toContainEqual({ type: 'fled', champion: bt, to: 'top-t1-blue' });
+    expect(state.wards.some((w) => w.side === 'blue')).toBe(false);
+    expect(events.some((e) => e.type === 'wardPlaced')).toBe(false);
+  });
+
   test('an unward removes an enemy ward before it gives vision', () => {
     const run = (unward: boolean): { state: GameState; events: ReturnType<typeof resolveRound>['events'] } => {
       const s = setup(4, [['blue', 'jungle', 'raptors-blue']]);

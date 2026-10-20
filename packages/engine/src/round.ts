@@ -122,6 +122,8 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   // 10. new wards
   for (const { c, o } of steps) {
     if (o.kind === 'spawn' || o.ward === undefined) continue;
+    // A champion who did not end on its destination (fled, tied fight) cannot ward it.
+    if (o.ward === 'to' && c.position !== o.to) continue;
     const position = typeof o.ward === 'object' ? o.ward.position : o.ward === 'from' ? c.previous : c.position;
     s.wards.push({ side: c.side, position, placedRound: s.round });
     events.push({ type: 'wardPlaced', side: c.side, position });

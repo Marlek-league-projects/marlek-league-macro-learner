@@ -126,6 +126,14 @@ describe('pit objectives', () => {
     expect(s.objectivesTaken.red.voidgrubs).toBe(1);
   });
 
+  test('a pit sequence whose last objective despawns throws instead of looping forever', () => {
+    const objectives = { ...d.rules.objectives, baron: { ...d.rules.objectives.baron, despawnAt: 1300 } };
+    const bad: GameData = { ...d, rules: { ...d.rules, objectives } };
+    const s = newGame(bad, 7);
+    s.round = 37;
+    expect(() => spawnObjectives(s, bad)).toThrow(/baron-pit/);
+  });
+
   test('at 840 s the voidgrubs are replaced by the Herald', () => {
     const s = fresh(25);
     expect(roundWindow(d.rules, 25).end).toBeLessThan(840);
