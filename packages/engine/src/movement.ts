@@ -120,26 +120,14 @@ export function validateOrders(state: GameState, data: GameData, side: Side, ord
   }
 }
 
-/** First entry of spawnPoints, derived from state alone (tower ids and camp ids encode side and tier). */
-function firstSpawn(state: GameState, c: ChampionState): string {
-  if (c.role === 'jungle') {
-    return Object.keys(state.camps).find((id) => id.endsWith(`-${c.side}`)) ?? c.position;
-  }
-  for (const lane of LANES) {
-    for (const tier of [1, 2, 3]) {
-      const id = `${lane}-t${tier}-${c.side}`;
-      if ((state.towers[id] ?? 0) > 0) return id;
-    }
-  }
-  return `base-${c.side}`;
-}
-
 /** Alive champions stay put; respawning ones take their first spawn point. Dead ones get none. */
-export function defaultOrders(state: GameState, side: Side): Order[] {
+export function defaultOrders(state: GameState, data: GameData, side: Side): Order[] {
   const out: Order[] = [];
   for (const c of state.champions.filter((x) => x.side === side)) {
     if (c.status === 'alive') out.push({ kind: 'move', champion: c.id, to: c.position });
-    else if (c.status === 'respawning') out.push({ kind: 'spawn', champion: c.id, to: firstSpawn(state, c) });
+    else if (c.status === 'respawning') {
+      out.push({ kind: 'spawn', champion: c.id, to: spawnPoints(state, data, c.id)[0]! });
+    }
   }
   return out;
 }

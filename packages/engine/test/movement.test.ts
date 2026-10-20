@@ -10,7 +10,7 @@ const get = (s: GameState, side: string, role: string): ChampionState =>
 
 /** Valid stay-put orders for blue, then overrides by champion id. */
 function orders(s: GameState, over: Order[] = []): Order[] {
-  const base = defaultOrders(s, 'blue');
+  const base = defaultOrders(s, d, 'blue');
   return base.map((o) => over.find((x) => x.champion === o.champion) ?? o);
 }
 
@@ -78,12 +78,12 @@ describe('validateOrders', () => {
     expect(() =>
       validateOrders(s, d, 'blue', orders(s, [{ kind: 'move', champion: top.id, to: top.position }])),
     ).toThrow(/spawn/);
-    expect(() => validateOrders(s, d, 'blue', defaultOrders(s, 'blue'))).not.toThrow();
+    expect(() => validateOrders(s, d, 'blue', defaultOrders(s, d, 'blue'))).not.toThrow();
     top.status = 'dead';
     expect(() =>
-      validateOrders(s, d, 'blue', [...defaultOrders(s, 'blue'), { kind: 'spawn', champion: top.id, to: 'top-t1-blue' }]),
+      validateOrders(s, d, 'blue', [...defaultOrders(s, d, 'blue'), { kind: 'spawn', champion: top.id, to: 'top-t1-blue' }]),
     ).toThrow(/dead/);
-    expect(() => validateOrders(s, d, 'blue', defaultOrders(s, 'blue'))).not.toThrow();
+    expect(() => validateOrders(s, d, 'blue', defaultOrders(s, d, 'blue'))).not.toThrow();
   });
   test('herald', () => {
     const s = fresh();
@@ -105,9 +105,36 @@ describe('spawnPoints', () => {
     expect(spawnPoints(s, d, top.id)).toEqual(['top-t1-blue', 'mid-t1-blue', 'bot-t1-blue']);
     s.towers['top-t1-blue'] = 0;
     expect(spawnPoints(s, d, top.id)[0]).toBe('top-t2-blue');
-    expect(defaultOrders(s, 'blue').find((o) => o.champion === top.id)).toEqual({
+    expect(defaultOrders(s, d, 'blue').find((o) => o.champion === top.id)).toEqual({
       kind: 'spawn', champion: top.id, to: 'top-t2-blue',
     });
     expect(spawnPoints(s, d, get(s, 'blue', 'jungle').id)).toHaveLength(6);
+  });
+});
+
+describe('defaultOrders and spawn validation', () => {
+  test('respawning laner and jungler spawn at the first spawn point', () => {
+    const s = fresh();
+    const top = get(s, 'blue', 'top');
+    const jg = get(s, 'blue', 'jungle');
+    top.status = 'respawning';
+    jg.status = 'respawning';
+    const o = defaultOrders(s, d, 'blue');
+    for (const c of [top, jg]) {
+      expect(o.find((x) => x.champion === c.id)).toEqual({
+        kind: 'spawn', champion: c.id, to: spawnPoints(s, d, c.id)[0]!,
+      });
+    }
+    expect(() => validateOrders(s, d, 'blue', o)).not.toThrow();
+  });
+  test('spawn order rejected for alive champion or bad point', () => {
+    const s = fresh();
+    const top = get(s, 'blue', 'top');
+    const sp: Order = { kind: 'spawn', champion: top.id, to: 'top-t1-blue' };
+    expect(() => validateOrders(s, d, 'blue', orders(s, [sp]))).toThrow(/spawn/);
+    top.status = 'respawning';
+    expect(() =>
+      validateOrders(s, d, 'blue', orders(s, [{ ...sp, to: 'top-t2-blue' }])),
+    ).toThrow(/spawn/);
   });
 });
