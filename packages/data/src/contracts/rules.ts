@@ -124,10 +124,6 @@ export interface AiTuning {
   recallGold: number;
   /** An enemy seen at most this many rounds ago counts as known (its position is current). */
   knownRounds: number;
-  /** Rounds an enemy laner seen in lane still counts as "was there" when converting a won fight. */
-  convertMemoryRounds: number;
-  /** A visible enemy within this distance of a pit blocks taking it. */
-  pitThreatDistance: number;
   /** Candidate order sets compared by the look-ahead. */
   lookaheadSets: number;
   /** Share of an objective's value the evaluation credits for our capture in progress (0..1). */

@@ -35,32 +35,45 @@ function stubRng(f: (n: number) => number): Rng {
 /** Fuzz seeds per rank; 30 in the brief, kept as long as the suite stays under its time budget. */
 const SEEDS = 30;
 
+/** A full AI vs AI game at `p` for both sides; checks every round's orders against the real state. */
+function playGame(p: AiProfile, seed: number): GameState {
+  let s = newGame(d, seed);
+  const rng = { blue: createRng(seed), red: createRng(seed + 1000) };
+  while (!s.over) {
+    const orders: Orders = {
+      blue: aiOrders(viewFor(s, d, 'blue'), d, p, rng.blue),
+      red: aiOrders(viewFor(s, d, 'red'), d, p, rng.red),
+    };
+    validateOrders(s, d, 'blue', orders.blue);
+    validateOrders(s, d, 'red', orders.red);
+    const choices: ContactChoices = {};
+    for (const c of detectContacts(s, d, orders)) {
+      choices[c.id] = {
+        blue: aiContactChoice(viewFor(s, d, 'blue'), d, c, p, rng.blue),
+        red: aiContactChoice(viewFor(s, d, 'red'), d, c, p, rng.red),
+      };
+    }
+    s = resolveRound(s, d, orders, choices).state;
+  }
+  return s;
+}
+
 describe('aiOrders fuzz', () => {
   for (const p of d.aiProfiles) {
     test(`${p.rank}: AI vs AI games give valid orders and end`, () => {
       for (let seed = 1; seed <= SEEDS; seed++) {
-        let s = newGame(d, seed);
-        const rng = { blue: createRng(seed), red: createRng(seed + 1000) };
-        while (!s.over) {
-          const orders: Orders = {
-            blue: aiOrders(viewFor(s, d, 'blue'), d, p, rng.blue),
-            red: aiOrders(viewFor(s, d, 'red'), d, p, rng.red),
-          };
-          validateOrders(s, d, 'blue', orders.blue);
-          validateOrders(s, d, 'red', orders.red);
-          const choices: ContactChoices = {};
-          for (const c of detectContacts(s, d, orders)) {
-            choices[c.id] = {
-              blue: aiContactChoice(viewFor(s, d, 'blue'), d, c, p, rng.blue),
-              red: aiContactChoice(viewFor(s, d, 'red'), d, c, p, rng.red),
-            };
-          }
-          s = resolveRound(s, d, orders, choices).state;
-        }
+        const s = playGame(p, seed);
         expect(s.over).toBe(true);
         expect(s.winner).not.toBeNull();
       }
     }, 20_000);
+
+    test(`${p.rank}: the same seed plays the same game`, () => {
+      const a = playGame(p, 11);
+      const b = playGame(p, 11);
+      expect(b.winner).toBe(a.winner);
+      expect(b).toEqual(a);
+    });
   }
 });
 
@@ -99,6 +112,42 @@ describe('aiOrders', () => {
     expect(dragonOrder(-1)).not.toMatchObject({ to: 'dragon-pit' });
   });
 
+  test('a live dragon without bot priority does not pull the challenger jungler', () => {
+    const s = newGame(d, 7);
+    s.round = 12; // dragon spawned in round 11
+    s.waves.bot = -1;
+    place(s, 'blue', 'jungle', 'raptors-blue');
+    const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
+    expect(orderOf(orders, get(s, 'blue', 'jungle').id)).not.toMatchObject({ to: 'dragon-pit' });
+  });
+
+  /** Blue top on its lane, the red top seen in lane at the start of round 9 and gone since. */
+  function vanishedLaner(wave: -1 | 0 | 1, bluePos: string): GameState {
+    const s = newGame(d, 7);
+    s.round = 10;
+    s.waves.top = wave;
+    place(s, 'blue', 'top', bluePos);
+    place(s, 'red', 'top', 'krugs-red');
+    s.lastSeen.blue[get(s, 'red', 'top').id] = { position: 'top-t1-red', round: 8 };
+    return s;
+  }
+
+  test('an enemy laner gone from lane is no reason to push with the wave at home or the jungler unknown', () => {
+    for (const wave of [-1, 0] as const) {
+      const s = vanishedLaner(wave, 'top-t1-blue');
+      const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
+      expect(orderOf(orders, get(s, 'blue', 'top').id)).toMatchObject({ kind: 'move', to: 'top-t1-blue' });
+    }
+  });
+
+  test('after the enemy laner vanished next to us, with the jungler seen far away, the challenger takes the tower', () => {
+    const s = vanishedLaner(0, 'top-lane');
+    s.lastSeen.blue[get(s, 'red', 'jungle').id] = { position: 'dragon-pit', round: 9 };
+    place(s, 'red', 'jungle', 'dragon-pit');
+    const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
+    expect(orderOf(orders, get(s, 'blue', 'top').id)).toMatchObject({ kind: 'move', to: 'top-t1-red' });
+  });
+
   function greedScenario(): GameState {
     const s = newGame(d, 7);
     s.round = 10;
@@ -122,6 +171,22 @@ describe('aiOrders', () => {
     const challenger = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
     validateOrders(s, d, 'blue', challenger);
     expect(orderOf(challenger, bt)).toMatchObject({ kind: 'move', to: 'top-lane' });
+  });
+
+  test('the look-ahead keeps a rolled mistake', () => {
+    // Blue top alone, wave crashing into its tower, gold to spend: badRecall recalls anyway.
+    const s = newGame(d, 7);
+    s.round = 10;
+    s.waves.top = -1;
+    for (const c of s.champions) if (c.side === 'blue' && c.role !== 'top') c.status = 'dead';
+    const top = get(s, 'blue', 'top');
+    top.gold = 1200;
+    const bad = MISTAKE_IDS.indexOf('badRecall');
+    const onlyBadRecall = stubRng((n) => (n % MISTAKE_IDS.length === bad ? 0 : 0.99));
+    const view = viewFor(s, d, 'blue');
+    // Master looks one round ahead, where staying to farm evaluates better than the recall.
+    expect(orderOf(aiOrders(view, d, profile('master'), onlyBadRecall), top.id)).toMatchObject({ kind: 'recall' });
+    expect(orderOf(aiOrders(view, d, profile('master'), stubRng(() => 0.99)), top.id)).toMatchObject({ kind: 'move' });
   });
 });
 

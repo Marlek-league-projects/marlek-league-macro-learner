@@ -1,8 +1,6 @@
 {
   "recallGold": 1100,
   "knownRounds": 1,
-  "convertMemoryRounds": 3,
-  "pitThreatDistance": 1,
   "lookaheadSets": 3,
   "captureShare": 0.5,
   "presenceShare": 0.25,

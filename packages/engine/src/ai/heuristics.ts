@@ -198,30 +198,38 @@ function recall(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, 
 }
 
 /**
- * After a won fight: in a lane whose enemy laners were just there and are gone, take the tower; next to an
- * objective that is up with no enemy in sight, take it. `noConversion` walks back instead.
+ * Pushing the enemy front tower of `lane` is safe: the enemy jungler is known (seen within
+ * `aiTuning.knownRounds`) and out of its range of that tower. `greed` skips the check.
+ */
+function pushSafe(ctx: Ctx, lane: Lane, m: Set<MistakeId>): boolean {
+  if (m.has('greed')) return true;
+  const target = front(ctx, ctx.enemy, lane);
+  const jg = ctx.jungler;
+  return target !== null && known(ctx, jg) && dist(ctx.data, jg.position, target) > ctx.data.rules.moves.jungler;
+}
+
+/**
+ * After a won fight, take the tower: the enemy laners of the champion's lane were seen in that lane at the
+ * start of the last round, within reach of an ally who was in the lane then and still is, and are gone now
+ * (dead, or recalled). Only with the wave even or pushed and `pushSafe`. `noConversion` walks back instead.
+ * Live objectives are taken by the objective rule, with its role and priority checks.
  */
 function conversion(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, o: Order) => void): void {
   const { view, data } = ctx;
   const lane = laneOf(data, c.position);
-  if (lane) {
-    const laners = view.enemies.filter((e) => e.role !== 'jungle' && HOME_LANE[e.role] === lane);
-    const gone = laners.every(
-      (e) =>
-        !e.visible && e.position !== null && e.lastSeenRound !== null &&
-        view.round - e.lastSeenRound <= data.aiTuning.convertMemoryRounds && laneOf(data, e.position) === lane,
-    );
-    const target = front(ctx, ctx.enemy, lane);
-    if (laners.length > 0 && gone && target) {
-      add(ctx.data.aiTuning.priorities.convert, m.has('noConversion') ? home(ctx, c) : moveTo(c, step(ctx, c, target)));
-    }
-  }
-  const r = reach(ctx, c);
-  for (const pit of PITS) {
-    if (r[pit] === undefined || !pitTiming(view, data, pit).live) continue;
-    if (view.enemies.some((e) => e.visible && e.position !== null && dist(data, e.position, pit) <= data.aiTuning.pitThreatDistance)) continue;
-    add(ctx.data.aiTuning.priorities.convert, m.has('noConversion') ? home(ctx, c) : moveTo(c, pit));
-  }
+  const target = lane ? front(ctx, ctx.enemy, lane) : null;
+  if (!lane || !target || (ourWave(view, lane) < 0 && !m.has('greed')) || !pushSafe(ctx, lane, m)) return;
+  const watchers = view.allies.filter(
+    (a) => a.status === 'alive' && laneOf(data, a.previous) === lane && laneOf(data, a.position) === lane,
+  );
+  const laners = view.enemies.filter((e) => e.role !== 'jungle' && HOME_LANE[e.role] === lane);
+  const fought = laners.every(
+    (e) =>
+      !e.visible && e.position !== null && e.lastSeenRound === view.round - 2 && laneOf(data, e.position) === lane &&
+      watchers.some((a) => dist(data, a.previous, e.position!) <= movesFor(a, data.rules)),
+  );
+  if (laners.length === 0 || !fought) return;
+  add(data.aiTuning.priorities.convert, m.has('noConversion') ? home(ctx, c) : moveTo(c, step(ctx, c, target)));
 }
 
 /** Laner: farm in lane, step onto the enemy front tower when the wave is there and the enemy jungler is known far. */
@@ -232,11 +240,9 @@ function laning(ctx: Ctx, c: ChampionState, lane: Lane, m: Set<MistakeId>, add: 
   const mid = laneMid(data, lane);
   const own = front(ctx, ctx.side, lane) ?? mid;
   const jg = ctx.jungler;
-  const jgMoves = data.rules.moves.jungler;
-  const safe = known(ctx, jg) && enemyFront !== null && dist(data, jg.position, enemyFront) > jgMoves;
-  const threatened = !m.has('ignoreJungler') && known(ctx, jg) && dist(data, jg.position, mid) <= jgMoves;
+  const threatened = !m.has('ignoreJungler') && known(ctx, jg) && dist(data, jg.position, mid) <= data.rules.moves.jungler;
   let spot: string;
-  if (wave === 1 && enemyFront && (safe || m.has('greed'))) spot = enemyFront;
+  if (wave === 1 && enemyFront && pushSafe(ctx, lane, m)) spot = enemyFront;
   else if (wave === 1 && !threatened) spot = mid;
   else spot = own;
   add(ctx.data.aiTuning.priorities.lane, moveTo(c, step(ctx, c, spot)));
@@ -327,6 +333,8 @@ export function planCandidates(ctx: Ctx, mistakes: Mistakes, rng: Rng): Candidat
     byId.set(c.id, cs);
     const best = cs[0]!;
     if (best.gank && best.order.kind === 'move') ctx.gank = { lane: best.gank, target: best.order.to };
+    // A champion who rolled a mistake keeps only its chosen order, so the look-ahead cannot undo the mistake.
+    if ((mistakes.get(c.id)?.size ?? 0) > 0) byId.set(c.id, [best]);
   }
   return active.map((c) => byId.get(c.id)!);
 }

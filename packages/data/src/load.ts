@@ -82,8 +82,6 @@ export function validateAiTuning(t: AiTuning): void {
   };
   num('recallGold', t.recallGold, 0);
   num('knownRounds', t.knownRounds, 0, Infinity, true);
-  num('convertMemoryRounds', t.convertMemoryRounds, 0, Infinity, true);
-  num('pitThreatDistance', t.pitThreatDistance, 0, Infinity, true);
   num('lookaheadSets', t.lookaheadSets, 1, Infinity, true);
   num('captureShare', t.captureShare, 0, 1);
   num('presenceShare', t.presenceShare, 0, 1);
