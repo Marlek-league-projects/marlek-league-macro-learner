@@ -176,7 +176,7 @@ The map positions form a graph, and a move is one step on it. Starting values:
 - **Recall** keeps the champion in place for the round, and it respawns at a base position the next round, so a recall costs 1 round.
 - **Bases** are two more positions (Base blue and Base red), which brings the total to 39. *(design call)* A champion who respawns after death or recall picks a starting point: a laner picks the frontmost standing tower of the lane they choose, and a jungler picks a camp on their own side.
 
-**Sacrificing a wave.** Leaving a lane while the wave crashes under your own tower costs the wave (gold, XP, possibly plates), but it can be the right play when it gives your team the numbers on a neutral objective. Teaching mode doesn't call this a mistake when the champion went to an objective that was up or taken that round. It explains the trade-off instead, and higher AI ranks make this sacrifice when the objective is worth more than the wave.
+**Sacrificing a wave.** Leaving a lane while the wave crashes under your own tower costs the wave (gold, XP, possibly plates), but it can be the right play when it gives your team the numbers on a neutral objective. Teaching mode doesn't call this a mistake when the champion went to an objective that was up, about to spawn, or taken that round. It explains the trade-off instead, and higher AI ranks make this sacrifice when the objective is worth more than the wave.
 
 These values live in data files and are a starting point, to be tuned through playtesting. That includes whether longer rounds give more moves.
 

@@ -93,6 +93,16 @@ describe('teaching', () => {
     expect(e.text).toBe(`${d.champions[get(s, 'blue', 'mid').id]!.name} a sacrifié sa vague pour jouer le Dragon : bon échange si ça donne le surnombre.`);
   });
 
+  test('stepping toward the Dragon the round before it spawns is the setup, not a mistake', () => {
+    // Round 10: the Dragon spawns at 300 s, in round 11.
+    const { s, state, events } = midLeaves(10, 'scuttle-bot');
+    expect(state.pits['dragon-pit'].objective).toBeNull();
+    const out = explainRound(s, state, events, d, 'blue');
+    expect(ids(out)).toContain('wave-sacrifice-for-objective');
+    expect(ids(out)).not.toContain('left-lane-without-priority');
+    expect(out.find((x) => x.ruleId === 'wave-sacrifice-for-objective')!.text).toContain('le Dragon');
+  });
+
   test('leaving an unpushed lane for a camp is still a mistake', () => {
     const { s, state, events } = midLeaves(12, 'raptors-blue');
     const out = explainRound(s, state, events, d, 'blue');
@@ -101,8 +111,8 @@ describe('teaching', () => {
   });
 
   test('leaving for a scuttle with nothing up there or next to it is still a mistake', () => {
-    // Round 10: the Dragon is not up yet; the bot scuttle is down until much later.
-    const s = setup(10, [['blue', 'mid', 'mid-t1-blue']]);
+    // Round 7: the Dragon is two rounds or more away; the bot scuttle is down until much later.
+    const s = setup(7, [['blue', 'mid', 'mid-t1-blue']]);
     s.waves.mid = -1;
     s.scuttles['scuttle-bot'] = 10_000;
     s.scuttlesSeen.blue['scuttle-bot'] = 10_000;
@@ -118,7 +128,7 @@ describe('teaching', () => {
     const { s, state, events } = midLeaves(12, 'scuttle-bot');
     expect(ids(explainRound(s, state, events, d, 'red'))).not.toContain('wave-sacrifice-for-objective');
     // Blue believes the bot scuttle is down; red takes it while the blue mid, chased off, is back on its tower.
-    const b = setup(10, [['blue', 'mid', 'mid-t1-blue']]);
+    const b = setup(7, [['blue', 'mid', 'mid-t1-blue']]);
     b.waves.mid = -1;
     b.scuttlesSeen.blue['scuttle-bot'] = 10_000;
     const bm = get(b, 'blue', 'mid').id;

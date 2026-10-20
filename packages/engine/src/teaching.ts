@@ -1,7 +1,8 @@
 import type { GameData, Lane, ObjectiveId, Role, Side } from '@lml/data/contracts';
 import type { Explanation, GameEvent, GameState } from './contracts';
-import { roundWindow } from './time';
+import { roundWindow, totalRounds } from './time';
 import { eventsFor } from './vision';
+import { objectiveAt, type PitId } from './objectives';
 
 type Placeholder = 'champion' | 'position' | 'n' | 'm' | 'objective';
 type Bindings = Partial<Record<Placeholder, string>>;
@@ -47,13 +48,16 @@ const leftUnpushedLane = (ctx: Context): Moved[] =>
   });
 
 /**
- * Objective the move went to play: one up or taken this round on its destination, a pit or a scuttle, or on a
- * pit next to that scuttle (the step toward the pit). Scuttles are judged from what `side` had seen of them.
+ * Objective the move went to play: one up, spawning by the end of next round (the setup move), or taken this round
+ * on its destination, a pit or a scuttle, or on a pit next to that scuttle (the step toward the pit). Scuttles are
+ * judged from what `side` had seen of them.
  */
 function objectivePlayed(ctx: Context, e: Moved): ObjectiveId | null {
   const kind = ctx.data.graph.positions[e.to]?.kind;
   if (kind !== 'pit' && kind !== 'scuttle') return null;
-  const end = roundWindow(ctx.data.rules, ctx.before.round).end;
+  const { rules } = ctx.data;
+  const round = ctx.before.round;
+  const by = roundWindow(rules, round < totalRounds(rules) ? round + 1 : round).end;
   const isPit = (p: string): boolean => ctx.data.graph.positions[p]?.kind === 'pit';
   const nextPits = kind === 'scuttle' ? (ctx.data.graph.adj[e.to] ?? []).filter(isPit) : [];
   for (const pos of [e.to, ...nextPits]) {
@@ -61,10 +65,13 @@ function objectivePlayed(ctx: Context, e: Moved): ObjectiveId | null {
     if (taken?.type === 'objectiveTaken') return taken.objective;
     if (!isPit(pos)) {
       const seen = ctx.before.scuttlesSeen[ctx.side][pos as keyof GameState['scuttles']];
-      if (seen <= end) return 'scuttle';
+      if (seen <= by) return 'scuttle';
     } else {
-      const up = ctx.after.pits[pos as keyof GameState['pits']]?.objective;
+      const id = pos as PitId;
+      const pit = ctx.before.pits[id];
+      const up = ctx.after.pits[id].objective ?? pit.objective;
       if (up) return up;
+      if (pit.nextSpawn !== null && pit.nextSpawn <= by) return objectiveAt(ctx.data, id, pit.nextSpawn);
     }
   }
   return null;
