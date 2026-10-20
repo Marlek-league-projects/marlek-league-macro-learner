@@ -56,6 +56,18 @@ describe('resolveFight', () => {
     expect(resolveFight(s, d, pos, [b.id], [r.id], stage).scores.red).toBeCloseTo(noT, 9);
   });
 
+  test('tower strength is added once regardless of defender count', () => {
+    const s = fresh();
+    const pos = 'top-t1-red';
+    const ids = ['top', 'jungle'].map((r) => get(s, 'red', r).id);
+    const att = [get(s, 'blue', 'top').id];
+    s.towers[pos] = 1;
+    const up = resolveFight(s, d, pos, att, ids, 1).scores.red;
+    s.towers[pos] = 0;
+    const down = resolveFight(s, d, pos, att, ids, 1).scores.red;
+    expect(up - down).toBeCloseTo(W.towerNumbersFactor * W.numbers[1] + (W.strength * W.towerStrength) / 10, 9);
+  });
+
   test('4v3 uses teamfight ratings, 3v3 skirmish', () => {
     const s = fresh();
     const bl = ['top', 'jungle', 'mid', 'adc'].map((r) => get(s, 'blue', r));

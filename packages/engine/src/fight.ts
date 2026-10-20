@@ -32,13 +32,13 @@ export function fightScore(
   const teamfight = ids.length + enemyIds.length >= W.teamfightMinTotal;
   let leadSum = 0;
   let matchupSum = 0;
-  let strengthSum = 0;
+  let strengthSum = hasTower ? W.towerStrength / 10 : 0; // the tower counts once, as one extra weak champion
   for (const id of ids) {
     const c = byId(id);
     leadSum += lead(c, data.rules) / 1000;
     const ratings = data.champions[c.id];
     const base = (teamfight ? ratings?.teamfight : ratings?.skirmish)?.[stage] ?? 0;
-    strengthSum += (base + (hasTower ? W.towerStrength : 0)) / 10;
+    strengthSum += base / 10;
     const advs: number[] = [];
     for (const e of enemyIds) {
       const a = matchupAdvantage(data, c.id, byId(e).id, stage);
