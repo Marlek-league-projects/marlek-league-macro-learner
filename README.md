@@ -60,7 +60,7 @@ Teaching mode calls out tempo directly, for example: *"You lost 2 rounds: your m
 The longer a round, the farther a token can move during it. Objective timers change between patches, so they live in data files.
 
 - **Verdict.** There is no nexus to destroy for now. At the end of the game, the winner is the team with the bigger accumulated advantage: gold, objectives and towers.
-- **Starting state.** Every token starts in lane, and you know which camp the enemy jungler starts on.
+- **Starting state.** Every laner starts in lane. Each jungler has already done its first buff when round 1 starts: it stands on that buff camp, the camp is cleared, and it has the buff's gold and XP. You know which camp the enemy jungler started on.
 - **Death and recall.** A token that dies or recalls comes back next turn at a base position on its own half of the map. On that turn it can't invade or take an objective. In late game, a death also costs one extra turn.
 
 ## Fights
@@ -72,7 +72,8 @@ When a contact happens, resolution pauses and each player involved chooses to **
 | Situation | Default choice |
 |---|---|
 | Even numbers in lane (1v1, 2v2) | **Farm** (play the lane normally). See *Lane contacts* below. |
-| Ganked (the enemy arrives outnumbering you) | **Flee** |
+| Ganked (an enemy **arrives** in your lane this round from elsewhere and outnumbers you) | **Flee** |
+| Outnumbered without a gank (e.g. the enemy support roamed away, so it is 2v1) | No prompt: **lane pressure** (see below) |
 | The ganker | Asked to choose: commit to the fight or not |
 | Neutral objective with an enemy already there | Asked to choose: fight or flee |
 
@@ -81,7 +82,15 @@ When a contact happens, resolution pauses and each player involved chooses to **
 - If both sides flee, nobody takes the objective and it stays up for the next round. If one side flees and the other fights, the fighting side takes it without a fight.
 - *(design call)* In lane, if one side flees and the other trades or fights, the side that stayed wins the trade (wave and lead).
 
-**Lane contacts.** With even numbers in lane, each side picks one of four choices:
+**Lane pressure without a gank.** When a lane is uneven only because someone left it (nobody arrived from elsewhere), nothing is asked. The bigger side pushes the wave and hits the tower (plates). The lone laner farms under its tower and loses gold and XP. It only dies if the bigger side's posture is All-in and it has enough advantage.
+
+**Lane stance.** Each laner has a persistent **stance**, set once in its actions and kept until changed: **Farm** (default), **Trade** or **All-in**. Even lane contacts resolve automatically from both stances, with no prompt each round. The game only asks for a choice on real events: a gank, a contested objective, an invade.
+
+**Laners follow their wave.** A laner with no order follows its lane's wave automatically: it stands where the wave is (in front of its tower, in the middle, or in front of the enemy tower) and farms.
+
+**Lane pressure is computed.** Each lane's pressure comes from the matchup, the levels and the lead of the laners present. It pushes the wave and is shown on the map.
+
+**Lane contacts.** With even numbers in lane, each side's stance (or choice) is one of:
 
 - **Farm** (default): play the lane normally, with no trade. The wave moves by matchup and lead, as when the laners don't meet.
 - **Trade**: exchange spells without going for the kill. Nobody dies. The trade winner (fight score) gains lead and pushes the wave.
@@ -169,6 +178,8 @@ The map positions form a graph, and a move is one step on it. Starting values:
 
 - **Laners**: 1 move per round. Going from a lane to another lane, or to a Scuttle, counts as 1 move.
 - **Junglers**: 2 moves per round. For example, Raptors → Krugs, Raptors → mid lane, or Raptors → enemy Blue Buff.
+- **Lane to Scuttle**: from the T1s or the middle of a lane, the nearest Scuttle is 1 move away (top → top Scuttle, bot → bottom Scuttle, mid → both).
+- **River to jungle**: from a river position (both Scuttles and both pits), any jungle camp on either side is 1 move away.
 - **Ganks from the outer camps**: an outer camp is 1 move from its nearby lane (Gromp and Blue Buff → top lane, Krugs and Red Buff → bot lane on the blue side, and the mirror on the red side), so a jungler can gank from there in one round.
 - **Neutral objectives** *(jungler rule, not map links)*: a jungler standing on any jungle camp can reach both Scuttles, the Dragon pit and the Baron pit in one round. Laners get no such shortcut. Data flag `rules.moves.junglerObjectiveReach`.
 
@@ -206,14 +217,15 @@ Vision is revealed when the round resolves, so you use what you saw this round t
 ## Game screen
 
 - **Round banner** (very top, large): round N/37, game time window of the round and phase.
-- **Top**: your team's status. Team lead (gold and XP), Dragons, Voidgrubs, towers taken, wards used this round (x/3). One card per champion with role icon, name, level, XP bar, lead bar and unspent gold.
+- **Scoreboard** (top centre, like League): kills blue – red, towers, Dragons and Barons per team, and the team **gold advantage** ("+1.2k" or "−800"). Kills, towers and objectives are public, as in the real game. The gold advantage is a learning aid and uses the enemy's real gold.
+- **Teams on the sides, like League**: your team in a column left of the map, the enemy team in a column right of the map. One card per champion with role icon, name, level, XP bar, lead bar and unspent gold (own team), or last seen position (enemy).
+- **Strength bar**: above every visible token, a small bar shows its strength (level and lead), so you can compare yourself with a visible enemy.
 - **Center**: a flat map showing every playable position, with a tooltip on hover. One token per champion, with the official League role icon above it (from CommunityDragon) and its name below. Fog of war covers what you can't see. The map takes the full available height, and every position and token has a click target larger than its drawing.
   - Each neutral objective and jungle camp shows, on its own position, the time left before it spawns, or that it is up. A cleared camp is greyed out with its respawn timer.
   - Each lane shows its **wave** marker (near the blue tower, in the middle or near the red tower), so you can read lane priority.
-- **Left panel, actions**: the selected token's options. Place a ward or clear one, each on the starting or arrival position. Recall.
-- **Right panel, round summary**: current phase, round and game time, next objective spawn, the list of this round's orders, the **Confirm round** button, the fight or flee prompts when a contact happens during resolution, and teaching-mode explanations after the round resolves.
+- **Actions** (a small panel next to the selected token): the selected token's options, including a laner's stance. Place a ward or clear one, each on the starting or arrival position. Recall.
+- **Round summary** (below the map): current phase, round and game time, next objective spawn, the list of this round's orders, the **Confirm round** button, the fight or flee prompts when a contact happens during resolution, and teaching-mode explanations after the round resolves.
 - **Round replay**: after a round resolves, a short animation (about 2 s, with replay and skip buttons) plays it on the map: visible tokens slide to their destination, fights flash, deaths and taken objectives appear. Only what you saw is shown. The text log stays below.
-- **Bottom**: the enemy team, with the same layout, showing only what has been seen: where each champion was last seen and on which round, plus estimated gold and lead.
 - **Giving orders**: click a token, and only the positions it can reach this round light up. Then click its next position. A dashed arrow shows the move. A token with no order stays where it is.
 
 The clickable mockup [`docs/game-screen-mockup.html`](docs/game-screen-mockup.html) is the reference for this layout. It also holds the first draft of the position coordinates and the movement graph.
@@ -246,6 +258,8 @@ Each level is a data profile with a frequency per mistake (for example, Iron gre
 | **Poor vision** | Few wards, wards in useless spots, never clears wards | very often | often | sometimes | rarely | very rarely |
 | **No conversion** | Wins a fight, then walks away without taking a tower or objective | often | sometimes | sometimes | rarely | very rarely |
 | **Ignoring the enemy jungler** | Plays the same way whether or not the jungler was last seen nearby | very often | often | sometimes | rarely | very rarely |
+
+**Laning phase.** Until 14:00 (plates), AI laners stay in their lane and follow their wave. Only the jungler roams, plus rotations to an objective (Emerald+ wave sacrifice) and recalls.
 
 Master, Grandmaster and Challenger keep a small mistake rate that goes down with each rank, and they also differ in how many rounds ahead they plan.
 
