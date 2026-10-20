@@ -21,11 +21,14 @@ export function reachable(state: GameState, data: GameData, championId: string):
   return reachableFrom(data, c.position, movesFor(c, data.rules), c.side, c.role);
 }
 
-/** Positions a jungler standing on a camp reaches in 2 moves whatever the graph says. */
+/** Positions a jungler standing on a camp reaches within its whole move budget whatever the graph says. */
 const OBJECTIVE_POSITIONS = ['scuttle-top', 'scuttle-bot', 'baron-pit', 'dragon-pit'];
-const OBJECTIVE_REACH = 2;
 
-/** Position to distance within `moves` steps of `position` for a `side` champion (the enemy base is off limits). */
+/**
+ * Position to distance within `moves` steps of `position` for a `side` champion (the enemy base is off limits).
+ * A jungler on a camp (`moves.junglerObjectiveReach`) also reaches every objective position, at distance
+ * `moves` at most: the bonus costs the whole budget.
+ */
 export function reachableFrom(
   data: GameData,
   position: string,
@@ -47,7 +50,7 @@ export function reachableFrom(
   }
   if (role === 'jungle' && data.rules.moves.junglerObjectiveReach && data.graph.positions[position]?.kind === 'camp') {
     for (const o of OBJECTIVE_POSITIONS) {
-      if (dist[o] === undefined || dist[o]! > OBJECTIVE_REACH) dist[o] = OBJECTIVE_REACH;
+      if (dist[o] === undefined || dist[o]! > moves) dist[o] = moves;
     }
   }
   return dist;

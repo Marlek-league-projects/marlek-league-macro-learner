@@ -174,6 +174,15 @@ describe('jungler objective reach', () => {
     expect(r['baron-pit']).toBeUndefined();
     expect(r['dragon-pit']).toBeUndefined();
   });
+  test('the bonus distance is the move budget', () => {
+    const s = fresh();
+    const j = get(s, 'blue', 'jungle');
+    j.position = 'gromp-blue';
+    const one = { ...d, rules: { ...d.rules, moves: { ...d.rules.moves, jungler: 1 } } };
+    const r = reachable(s, one, j.id);
+    for (const o of OBJECTIVES) expect(r[o]).toBe(1);
+    expect(Math.max(...Object.values(r))).toBe(1);
+  });
   test('the flag turns the bonus off', () => {
     const s = fresh();
     const j = get(s, 'blue', 'jungle');
