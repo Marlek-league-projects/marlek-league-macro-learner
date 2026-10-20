@@ -15,7 +15,14 @@ export interface Candidate {
   score: number;
   /** Lane a jungler gank targets, for the laners to join. */
   gank?: Lane;
+  /**
+   * A laner's paying rotation: kept over the look-ahead, which cannot value the numbers it brings (simulated
+   * enemies stand still).
+   */
+  committed?: boolean;
 }
+
+type Extra = Pick<Candidate, 'gank' | 'committed'>;
 
 interface Ctx {
   view: PlayerView;
@@ -168,19 +175,41 @@ function herald(ctx: Ctx, c: ChampionState): Order {
   return moveTo(c, nearest ? step(ctx, c, nearest) : c.position);
 }
 
-/** Objective setup: to the pit one round before spawn (or while up), with lane priority. */
-function objectives(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, o: Order) => void): void {
+/**
+ * A laner leaving its lane for `pit` pays: the objective is worth more than `aiTuning.waveSacrificeCost` (the wave
+ * it gives up) and the champion's arrival gives its side the numbers there. Allies count, and known enemies (seen
+ * within `aiTuning.knownRounds`) count against, when within a jungler's move of the pit; the laner must be too.
+ */
+function rotationPays(ctx: Ctx, c: ChampionState, pit: PitId, objective: ObjectiveId): boolean {
+  const { data } = ctx;
+  const rule = data.rules.objectives[objective];
+  if (c.role === 'jungle' || rule.value <= data.aiTuning.waveSacrificeCost) return false;
+  const near = (pos: string): boolean => dist(data, pos, pit) <= data.rules.moves.jungler;
+  if (!near(c.position)) return false;
+  const ours = ctx.view.allies.filter((a) => a.status === 'alive' && near(a.position)).length;
+  const theirs = ctx.view.enemies.filter((e) => known(ctx, e) && near(e.position)).length;
+  return ours >= rule.minChampions && ours > theirs;
+}
+
+/**
+ * Objective setup: to the pit one round before spawn (or while up), for the objective's roles with lane priority
+ * (`rotateWithoutPriority` drops that check), or for any laner whose rotation pays, wave sacrificed if needed.
+ */
+function objectives(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, o: Order, x?: Extra) => void): void {
   for (const pit of PITS) {
     const t = pitTiming(ctx.view, ctx.data, pit);
     if (!t.objective || (!t.live && !t.soon)) continue;
-    const roles = PIT_ROLES[t.objective];
-    if (!roles.includes(c.role)) continue;
-    const able = ctx.view.allies.filter((a) => a.status !== 'dead' && roles.includes(a.role)).length;
-    if (able < ctx.data.rules.objectives[t.objective].minChampions) continue;
     if (t.soon && m.has('objectiveTiming')) continue;
+    const roles = PIT_ROLES[t.objective];
+    const able = ctx.view.allies.filter((a) => a.status !== 'dead' && roles.includes(a.role)).length;
     const lane = c.role === 'jungle' ? PIT_LANE[pit] : HOME_LANE[c.role];
-    if (ourWave(ctx.view, lane) < 0 && !m.has('rotateWithoutPriority')) continue;
-    add(ctx.data.aiTuning.priorities.objective, moveTo(c, step(ctx, c, pit)));
+    const assigned =
+      roles.includes(c.role) &&
+      able >= ctx.data.rules.objectives[t.objective].minChampions &&
+      (ourWave(ctx.view, lane) >= 0 || m.has('rotateWithoutPriority'));
+    const pays = !assigned && rotationPays(ctx, c, pit, t.objective);
+    if (!assigned && !pays) continue;
+    add(ctx.data.aiTuning.priorities.objective, moveTo(c, step(ctx, c, pit)), pays ? { committed: true } : undefined);
   }
 }
 
@@ -253,7 +282,7 @@ function laning(ctx: Ctx, c: ChampionState, lane: Lane, m: Set<MistakeId>, add: 
 }
 
 /** Jungler: gank an overextended laner (away from the enemy jungler), take scuttles, clear or invade camps. */
-function jungling(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, o: Order, gank?: Lane) => void): void {
+function jungling(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, o: Order, x?: Extra) => void): void {
   const { view, data } = ctx;
   const r = reach(ctx, c);
   const jg = ctx.jungler;
@@ -273,7 +302,7 @@ function jungling(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number
       const overextended = p.kind === 'laneMid' || (p.kind === 'tower' && p.side === ctx.side);
       return overextended && r[e.position!] !== undefined;
     });
-    if (target && allies.length + 1 > enemies.length) add(ctx.data.aiTuning.priorities.gank, moveTo(c, target.position!), lane);
+    if (target && allies.length + 1 > enemies.length) add(ctx.data.aiTuning.priorities.gank, moveTo(c, target.position!), { gank: lane });
   }
 
   for (const id of SCUTTLES) {
@@ -302,8 +331,8 @@ function jungling(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number
 function candidatesFor(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, rng: Rng): Candidate[] {
   if (c.status === 'respawning') return [{ order: spawnOrder(ctx, c), score: 0 }];
   const out: Candidate[] = [];
-  const add = (score: number, order: Order, gank?: Lane): void => {
-    out.push(gank ? { score, order, gank } : { score, order });
+  const add = (score: number, order: Order, extra?: Extra): void => {
+    out.push({ score, order, ...extra });
   };
   if (m.has('pointlessPlay')) add(ctx.data.aiTuning.priorities.pointless, pointless(ctx, c, rng));
   if (c.hasHerald) add(ctx.data.aiTuning.priorities.herald, herald(ctx, c));
@@ -333,8 +362,9 @@ export function planCandidates(ctx: Ctx, mistakes: Mistakes, rng: Rng): Candidat
     byId.set(c.id, cs);
     const best = cs[0]!;
     if (best.gank && best.order.kind === 'move') ctx.gank = { lane: best.gank, target: best.order.to };
-    // A champion who rolled a mistake keeps only its chosen order, so the look-ahead cannot undo the mistake.
-    if ((mistakes.get(c.id)?.size ?? 0) > 0) byId.set(c.id, [best]);
+    // A champion who rolled a mistake keeps only its chosen order, so the look-ahead cannot undo the mistake;
+    // a committed order is kept the same way.
+    if ((mistakes.get(c.id)?.size ?? 0) > 0 || best.committed) byId.set(c.id, [best]);
   }
   return active.map((c) => byId.get(c.id)!);
 }

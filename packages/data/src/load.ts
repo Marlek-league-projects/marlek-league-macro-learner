@@ -91,6 +91,7 @@ export function validateAiTuning(t: AiTuning): void {
   num('presenceShare', t.presenceShare, 0, 1);
   num('allInMargin', t.allInMargin, 0);
   num('tradeMargin', t.tradeMargin, 0);
+  num('waveSacrificeCost', t.waveSacrificeCost, 0);
   for (const id of AI_PRIORITIES) num(`priorities.${id}`, t.priorities?.[id], -Infinity);
 }
 

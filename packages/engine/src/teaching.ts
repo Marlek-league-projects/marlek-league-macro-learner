@@ -1,4 +1,4 @@
-import type { GameData, Lane, Role, Side } from '@lml/data/contracts';
+import type { GameData, Lane, ObjectiveId, Role, Side } from '@lml/data/contracts';
 import type { Explanation, GameEvent, GameState } from './contracts';
 import { roundWindow } from './time';
 import { eventsFor } from './vision';
@@ -34,6 +34,42 @@ const ownDeaths = (ctx: Context): Array<Extract<GameEvent, { type: 'death' }>> =
   ctx.events.filter((e): e is Extract<GameEvent, { type: 'death' }> =>
     e.type === 'death' && champ(ctx, e.champion)?.side === ctx.side);
 
+type Moved = Extract<GameEvent, { type: 'moved' }>;
+
+/** Own laners' moves out of their lane while its wave was not pushed (not at the opponent's tower). */
+const leftUnpushedLane = (ctx: Context): Moved[] =>
+  ctx.events.filter((e): e is Moved => {
+    if (e.type !== 'moved' || champ(ctx, e.champion)?.side !== ctx.side) return false;
+    const lane = laneOf(ctx, e.champion);
+    if (!lane) return false;
+    const inLane = new Set(ctx.data.graph.lanePositions(lane));
+    return inLane.has(e.from) && !inLane.has(e.to) && ctx.before.waves[lane] * ownTower(ctx.side) >= 0;
+  });
+
+/**
+ * Objective the move went to play: one up or taken this round on its destination, a pit or a scuttle, or on a
+ * pit next to that scuttle (the step toward the pit). Scuttles are judged from what `side` had seen of them.
+ */
+function objectivePlayed(ctx: Context, e: Moved): ObjectiveId | null {
+  const kind = ctx.data.graph.positions[e.to]?.kind;
+  if (kind !== 'pit' && kind !== 'scuttle') return null;
+  const end = roundWindow(ctx.data.rules, ctx.before.round).end;
+  const isPit = (p: string): boolean => ctx.data.graph.positions[p]?.kind === 'pit';
+  const nextPits = kind === 'scuttle' ? (ctx.data.graph.adj[e.to] ?? []).filter(isPit) : [];
+  for (const pos of [e.to, ...nextPits]) {
+    const taken = ctx.events.find((x) => x.type === 'objectiveTaken' && x.position === pos);
+    if (taken?.type === 'objectiveTaken') return taken.objective;
+    if (!isPit(pos)) {
+      const seen = ctx.before.scuttlesSeen[ctx.side][pos as keyof GameState['scuttles']];
+      if (seen <= end) return 'scuttle';
+    } else {
+      const up = ctx.after.pits[pos as keyof GameState['pits']]?.objective;
+      if (up) return up;
+    }
+  }
+  return null;
+}
+
 const PREDICATES: Record<string, Predicate> = {
   'recall-wave-under-tower': (ctx) =>
     ctx.events.flatMap((e) => {
@@ -43,15 +79,12 @@ const PREDICATES: Record<string, Predicate> = {
     }),
 
   'left-lane-without-priority': (ctx) =>
-    ctx.events.flatMap((e) => {
-      if (e.type !== 'moved' || champ(ctx, e.champion)?.side !== ctx.side) return [];
-      const lane = laneOf(ctx, e.champion);
-      if (!lane) return [];
-      const inLane = new Set(ctx.data.graph.lanePositions(lane));
-      if (!inLane.has(e.from) || inLane.has(e.to)) return [];
-      // Not pushed: the wave is not at the opponent's tower.
-      const unpushed = ctx.before.waves[lane] * ownTower(ctx.side) >= 0;
-      return unpushed ? [{ champion: name(ctx, e.champion) }] : [];
+    leftUnpushedLane(ctx).flatMap((e) => (objectivePlayed(ctx, e) ? [] : [{ champion: name(ctx, e.champion) }])),
+
+  'wave-sacrifice-for-objective': (ctx) =>
+    leftUnpushedLane(ctx).flatMap((e) => {
+      const objective = objectivePlayed(ctx, e);
+      return objective ? [{ champion: name(ctx, e.champion), objective: ctx.data.objectiveNames[objective] }] : [];
     }),
 
   'outnumbered-death': (ctx) =>

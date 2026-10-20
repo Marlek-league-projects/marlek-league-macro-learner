@@ -134,6 +134,8 @@ export interface AiTuning {
   allInMargin: number;
   /** Fight-score margin over which an even lane contact is traded instead of farmed. */
   tradeMargin: number;
+  /** Objective value over which a laner leaves its unpushed wave to rotate to the pit, if that gives the numbers. */
+  waveSacrificeCost: number;
   /** Candidate priorities, higher first. */
   priorities: Record<AiPriority, number>;
 }

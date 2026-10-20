@@ -21,7 +21,7 @@ test('ai profiles: 10 ranks with scaled rates', () => {
 
 test('graph is built and teaching loaded', () => {
   expect(Object.keys(data.graph.positions)).toHaveLength(39);
-  expect(data.teaching).toHaveLength(6);
+  expect(data.teaching).toHaveLength(7);
 });
 
 test('validateRules rejects a phase gap', () => {
@@ -50,6 +50,9 @@ test('validateAiTuning rejects bad tuning', () => {
   const c = structuredClone(data.aiTuning);
   c.lookaheadSets = 0;
   expect(() => validateAiTuning(c)).toThrow(/aiTuning.*lookaheadSets/);
+  const e = structuredClone(data.aiTuning);
+  e.waveSacrificeCost = -1;
+  expect(() => validateAiTuning(e)).toThrow(/aiTuning.*waveSacrificeCost/);
 });
 
 test('validateAiProfiles and validateTeaching reject bad data', () => {

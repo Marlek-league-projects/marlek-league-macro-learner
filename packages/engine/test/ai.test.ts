@@ -121,6 +121,50 @@ describe('aiOrders', () => {
     expect(orderOf(orders, get(s, 'blue', 'jungle').id)).not.toMatchObject({ to: 'dragon-pit' });
   });
 
+  /**
+   * Round 10, Dragon spawning next round, blue mid on its T1 with its wave crashing in. Blue jungler and adc are
+   * near the pit (the support is dead): 2 against the red bot duo just seen in bot lane, 3 with the mid. The red
+   * jungler was not seen for ages.
+   */
+  function sacrificeScenario(): GameState {
+    const s = newGame(d, 7);
+    s.round = 10;
+    s.waves.mid = -1;
+    place(s, 'blue', 'mid', 'mid-t1-blue');
+    place(s, 'blue', 'jungle', 'raptors-blue');
+    place(s, 'blue', 'adc', 'bot-t1-blue');
+    get(s, 'blue', 'support').status = 'dead';
+    for (const role of ['adc', 'support']) {
+      place(s, 'red', role, 'bot-t1-red');
+      s.lastSeen.blue[get(s, 'red', role).id] = { position: 'bot-t1-red', round: 9 };
+    }
+    return s;
+  }
+  const midOrder = (s: GameState): Order => {
+    const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
+    validateOrders(s, d, 'blue', orders);
+    return orderOf(orders, get(s, 'blue', 'mid').id);
+  };
+
+  test('challenger mid sacrifices its wave to rotate to a dragon where its side has the numbers', () => {
+    expect(d.rules.objectives.dragon.value).toBeGreaterThan(d.aiTuning.waveSacrificeCost);
+    expect(midOrder(sacrificeScenario())).toMatchObject({ kind: 'move', to: 'scuttle-bot' });
+  });
+
+  test('challenger mid stays in lane with no objective up', () => {
+    const s = sacrificeScenario();
+    s.round = 7; // no pit objective up or spawning next round
+    expect(midOrder(s)).toMatchObject({ kind: 'move', to: 'mid-t1-blue' });
+  });
+
+  test('challenger mid stays in lane when the rotation would not give the numbers', () => {
+    const s = sacrificeScenario();
+    for (const role of ['adc', 'jungle']) get(s, 'blue', role).status = 'dead';
+    place(s, 'red', 'jungle', 'dragon-pit');
+    s.lastSeen.blue[get(s, 'red', 'jungle').id] = { position: 'dragon-pit', round: 9 };
+    expect(midOrder(s)).toMatchObject({ kind: 'move', to: 'mid-t1-blue' });
+  });
+
   /** Blue top on its lane, the red top seen in lane at the start of round 9 and gone since. */
   function vanishedLaner(wave: -1 | 0 | 1, bluePos: string): GameState {
     const s = newGame(d, 7);

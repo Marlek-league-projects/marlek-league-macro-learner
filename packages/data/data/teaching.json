@@ -2,6 +2,7 @@
   "rules": [
     {"id": "recall-wave-under-tower", "roundsLost": 2, "text": "{champion} a recall avec sa vague qui arrive sous sa tour : tu perds la vague et des plaques."},
     {"id": "left-lane-without-priority", "roundsLost": 1, "text": "{champion} a quitté sa lane sans avoir poussé sa vague : son vis-à-vis prend l'avance."},
+    {"id": "wave-sacrifice-for-objective", "roundsLost": 0, "text": "{champion} a sacrifié sa vague pour jouer {objective} : bon échange si ça donne le surnombre."},
     {"id": "outnumbered-death", "roundsLost": 1, "text": "{champion} est mort à {position} en {n}v{m} : l'adversaire est arrivé en surnombre."},
     {"id": "enemy-rotated-with-priority", "roundsLost": 0, "text": "L'adversaire avait la priorité en lane et a décalé à {position} en premier."},
     {"id": "objective-uncontested", "roundsLost": 0, "text": "L'adversaire a pris {objective} sans opposition."},
