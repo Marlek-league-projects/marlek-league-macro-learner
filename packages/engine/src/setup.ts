@@ -1,12 +1,10 @@
 import type { GameData, Role, Side } from '@lml/data/contracts';
-import type { ChampionState, GameState, PitState, Rng } from './contracts';
+import type { ChampionState, Draft, GameState, PitState, Rng } from './contracts';
 import { createRng } from './rng';
 
 const SIDES: Side[] = ['blue', 'red'];
 const ROLES: Role[] = ['top', 'jungle', 'mid', 'adc', 'support'];
 const JUNGLE_START_CAMPS = ['bluebuff', 'redbuff'];
-
-type Draft = Record<Side, Record<Role, string>>;
 
 /** Draws 10 distinct roster champions, one per side and role. */
 export function randomDraft(data: GameData, rng: Rng): Draft {
@@ -73,6 +71,10 @@ export function newGame(data: GameData, seed: number, draft?: Draft): GameState 
     waves: { top: 0, mid: 0, bot: 0 },
     camps,
     scuttles: { 'scuttle-top': scuttleSpawn, 'scuttle-bot': scuttleSpawn },
+    scuttlesSeen: {
+      blue: { 'scuttle-top': scuttleSpawn, 'scuttle-bot': scuttleSpawn },
+      red: { 'scuttle-top': scuttleSpawn, 'scuttle-bot': scuttleSpawn },
+    },
     pits: {
       'baron-pit': pit(rules.objectives.voidgrubs.firstSpawn),
       'dragon-pit': pit(rules.objectives.dragon.firstSpawn),

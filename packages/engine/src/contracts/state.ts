@@ -55,6 +55,8 @@ export interface GameState {
   /** Camp id to time (s) at which it is alive. */
   camps: Record<string, number>;
   scuttles: Record<'scuttle-top' | 'scuttle-bot', number>;
+  /** Per side, the scuttle timers as that side last saw them (its view never shows an unseen take). */
+  scuttlesSeen: Record<Side, Record<'scuttle-top' | 'scuttle-bot', number>>;
   pits: { 'baron-pit': PitState; 'dragon-pit': PitState };
   wards: Ward[];
   grubs: Record<Side, boolean>;

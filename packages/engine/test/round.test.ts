@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
-import { defaultOrders, newGame, resolveRound } from '@lml/engine';
+import { defaultOrders, newGame, resolveFight, resolveRound, roundWindow } from '@lml/engine';
 import type { ChampionState, ContactChoices, GameState, Order, Orders } from '@lml/engine/contracts';
 
 const d = loadGameData();
@@ -138,5 +138,46 @@ describe('resolveRound', () => {
     expect(dead.respawnRound).toBe(r1.state.round);
     expect(dead.status).toBe('respawning');
     expect(defaultOrders(r1.state, d, 'blue').find((x) => x.champion === bj)!.kind).toBe('spawn');
+  });
+
+  test('a tied fight sends both sides back, kills nobody and cancels a recall', () => {
+    const s = setup(7, [
+      ['blue', 'jungle', 'raptors-blue'],
+      ['red', 'jungle', 'scuttle-bot'],
+    ]);
+    const bj = get(s, 'blue', 'jungle');
+    const rj = get(s, 'red', 'jungle');
+    const stage = roundWindow(d.rules, 7).stage;
+    const { scores } = resolveFight(s, d, 'scuttle-bot', [bj.id], [rj.id], stage);
+    const weaker = scores.blue < scores.red ? bj : rj;
+    weaker.bonusLead += (Math.abs(scores.blue - scores.red) * 1000) / d.rules.fight.lead;
+    expect(resolveFight(s, d, 'scuttle-bot', [bj.id], [rj.id], stage).winner).toBeNull();
+
+    const o = ordersWith(s, [
+      { kind: 'move', champion: bj.id, to: 'scuttle-bot' },
+      { kind: 'recall', champion: rj.id },
+    ]);
+    const { state, events } = resolveRound(s, d, o, {});
+    expect(events.find((e) => e.type === 'fight')).toMatchObject({ position: 'scuttle-bot', winner: null });
+    expect(events.some((e) => e.type === 'death' || e.type === 'recall')).toBe(false);
+    const after = (id: string): ChampionState => state.champions.find((c) => c.id === id)!;
+    expect([after(bj.id).position, after(bj.id).status]).toEqual(['raptors-blue', 'alive']);
+    expect([after(rj.id).position, after(rj.id).status]).toEqual(['scuttle-bot', 'alive']);
+  });
+
+  test('an unward removes an enemy ward before it gives vision', () => {
+    const run = (unward: boolean): { state: GameState; events: ReturnType<typeof resolveRound>['events'] } => {
+      const s = setup(4, [['blue', 'jungle', 'raptors-blue']]);
+      s.wards.push({ side: 'red', position: 'raptors-blue', placedRound: 3 });
+      const bj = get(s, 'blue', 'jungle').id;
+      const o = ordersWith(s, unward ? [{ kind: 'move', champion: bj, to: 'raptors-blue', unward: 'to' }] : []);
+      return resolveRound(s, d, o, {});
+    };
+    const bjId = (st: GameState): string => get(st, 'blue', 'jungle').id;
+    const control = run(false);
+    expect(control.state.lastSeen.red[bjId(control.state)]).toEqual({ position: 'raptors-blue', round: 4 });
+    const cleared = run(true);
+    expect(cleared.events).toContainEqual({ type: 'wardCleared', side: 'red', position: 'raptors-blue' });
+    expect(cleared.state.lastSeen.red[bjId(cleared.state)]?.round ?? null).not.toBe(4);
   });
 });

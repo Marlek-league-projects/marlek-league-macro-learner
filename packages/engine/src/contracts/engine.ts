@@ -22,6 +22,7 @@ export interface GameEngine {
   detectContacts(state: GameState, data: GameData, orders: Orders): Contact[];
   resolveRound(state: GameState, data: GameData, orders: Orders, choices: ContactChoices): RoundResult;
   viewFor(state: GameState, data: GameData, side: Side): PlayerView;
+  eventsFor(events: GameEvent[], after: GameState, data: GameData, side: Side): GameEvent[];
   /** Added by Task 12. */
   aiOrders?: unknown;
   /** Added by Task 12. */
