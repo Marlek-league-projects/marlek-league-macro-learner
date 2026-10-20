@@ -1,7 +1,8 @@
 import { useState } from 'preact/hooks';
-import type { Position, Role, Side } from '@lml/data/contracts';
+import type { Lane, Position, Role, Side } from '@lml/data/contracts';
 import type { PlayerView } from '@lml/engine/contracts';
 import type { Store } from '../store';
+import { dotRadius, hitRadius, spawnCountdown, wavePoint } from './map-marks';
 import { pawnClick } from './pawn-click';
 import {
   championImage,
@@ -156,53 +157,68 @@ export function MapView({ store }: { store: Store }) {
     return parts.join(' · ');
   };
 
+  const countdown = (id: string) => spawnCountdown(view, data, id, now);
+
   const nodes = Object.values(positions).map((p) => {
     const ok = !reach || reach[p.id] !== undefined;
     const destroyed = p.kind === 'tower' && (view.towers[p.id] ?? 0) <= 0;
-    const cls = `node${reach ? (ok ? ' reach' : ' off') : ''}${destroyed ? ' down' : ''}`;
-    const events = {
-      onMouseMove: (e: MouseEvent) => setTip({ text: tipText(p), x: e.clientX, y: e.clientY }),
-      onMouseLeave: () => setTip(null),
-      onClick: (e: MouseEvent) => {
-        e.stopPropagation();
-        if (reach && ok) order(p.id);
-      },
-    };
-    if (p.kind === 'base') {
-      return <circle key={p.id} class={cls} cx={p.x} cy={p.y} r={18} fill="transparent" {...events} />;
-    }
-    return (
+    const cleared = p.kind === 'camp' && typeof countdown(p.id) === 'number';
+    const cls = `node${reach ? (ok ? ' reach' : ' off') : ''}${destroyed ? ' down' : ''}${cleared ? ' cleared' : ''}`;
+    // Unreachable positions get no click circle while a pawn is selected.
+    const hit = ok && (
       <circle
-        key={p.id}
+        class="hit"
+        cx={p.x}
+        cy={p.y}
+        r={hitRadius(p)}
+        fill="transparent"
+        onMouseMove={(e: MouseEvent) => setTip({ text: tipText(p), x: e.clientX, y: e.clientY })}
+        onMouseLeave={() => setTip(null)}
+        onClick={(e: MouseEvent) => {
+          e.stopPropagation();
+          if (reach) order(p.id);
+        }}
+      />
+    );
+    const dot = p.kind !== 'base' && (
+      <circle
         class={cls}
         cx={p.x}
         cy={p.y}
-        r={p.kind === 'pit' ? 12 : 8}
-        fill={destroyed ? '#4b5563' : nodeColor(p)}
+        r={dotRadius(p)}
+        fill={destroyed || cleared ? '#4b5563' : nodeColor(p)}
         stroke="#111"
         stroke-width={1.5}
-        {...events}
+        pointer-events={ok ? 'none' : undefined}
+        onMouseMove={(e: MouseEvent) => setTip({ text: tipText(p), x: e.clientX, y: e.clientY })}
+        onMouseLeave={() => setTip(null)}
       />
+    );
+    return <g key={p.id} class={`mpos${reach && ok ? ' act' : ''}`}>{dot}{hit}</g>;
+  });
+
+  // Countdown before each pit, scuttle and own camp spawns, or that it is up.
+  const timers = Object.values(positions).map((p) => {
+    const left = countdown(p.id);
+    if (left === null) return null;
+    const pit = p.kind === 'pit' ? view.pits[p.id as 'baron-pit' | 'dragon-pit'] : null;
+    const text = left !== 'up' ? clock(left) : pit?.objective ? OBJECTIVE_LABEL[pit.objective] : 'en vie';
+    return (
+      <text key={p.id} class={`timer${left === 'up' ? ' live' : ''}`} x={p.x + dotRadius(p) + 4} y={p.y + 4} text-anchor="start">
+        {text}
+      </text>
     );
   });
 
-  const timers = [
-    ...(['baron-pit', 'dragon-pit'] as const).map((id) => {
-      const pit = view.pits[id];
-      const text = pit.objective ? OBJECTIVE_LABEL[pit.objective] : pit.nextSpawn !== null ? clock(pit.nextSpawn) : null;
-      return { id, text, live: !!pit.objective };
-    }),
-    ...(['scuttle-top', 'scuttle-bot'] as const).map((id) => {
-      const t = view.scuttles[id];
-      return { id, text: t > now ? clock(t) : null, live: false };
-    }),
-  ].map(({ id, text, live }) => {
-    const p = positions[id];
-    if (!p || !text) return null;
+  // One diamond per lane where its wave is, in the colour of the side pushing it (grey in the middle).
+  const waves = (['top', 'mid', 'bot'] as Lane[]).map((lane) => {
+    const { x, y } = wavePoint(view, data, lane);
+    const w = view.waves[lane];
+    const fill = w === 0 ? '#e5e7eb' : w < 0 ? '#ef4444' : '#3b82f6';
     return (
-      <text key={id} class={`timer${live ? ' live' : ''}`} x={p.x + 16} y={p.y + 4} text-anchor="start">
-        {text}
-      </text>
+      <g key={lane} class="wave" transform={`translate(${x} ${y})`}>
+        <polygon points="0,-8 7,0 0,8 -7,0" fill={fill} stroke="#111" stroke-width="1.5" />
+      </g>
     );
   });
 
@@ -245,6 +261,7 @@ export function MapView({ store }: { store: Store }) {
           setTip({ text: `${name}${pawn.away ? ' · en base' : ''}`, x: e.clientX, y: e.clientY })}
         onMouseLeave={() => setTip(null)}
       >
+        <rect class="hit" x={x - 20} y={y - 34} width={40} height={64} fill="transparent" />
         <clipPath id={clip}><circle cx={x} cy={y} r={12} /></clipPath>
         <circle class="body" cx={x} cy={y} r={13} fill={pawn.side === 'blue' ? '#1d4ed8' : '#b91c1c'} stroke={pawn.side === 'blue' ? '#93c5fd' : '#fca5a5'} stroke-width={2} />
         <image href={championImage(data, pawn.id)} x={x - 12} y={y - 12} width={24} height={24} clip-path={`url(#${clip})`} />
@@ -267,6 +284,7 @@ export function MapView({ store }: { store: Store }) {
         {base('red') && <Nexus p={base('red')!} side="red" />}
         <g>{nodes}</g>
         <g pointer-events="none">{timers}</g>
+        <g pointer-events="none">{waves}</g>
         <g>
           {view.wards.map((w, i) => {
             const p = positions[w.position];
