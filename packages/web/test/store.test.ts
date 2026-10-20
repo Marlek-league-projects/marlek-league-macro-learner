@@ -63,6 +63,27 @@ describe('store', () => {
     expect(data.graph.distance(top.position, via) + data.graph.distance(via, two)).toBe(2);
   });
 
+  test('a fast clearer routes via an own camp that is up by the end of the round, like the engine', () => {
+    const store = started(5); // Kindred (fast clearer) starts on redbuff-blue
+    const play = (): void => {
+      store.confirmRound();
+      store.confirmContacts();
+      store.next();
+    };
+    const j = blue(store, 'jungle');
+    expect([j.position, (data.champions[j.id]?.clearSpeed ?? 0) >= data.rules.camps.fastClearAt]).toEqual(['redbuff-blue', true]);
+    play(); // round 1 clears redbuff, back at 110 + buffRespawn = 410
+    store.setMove(j.id, 'raptors-blue');
+    play();
+    while (store.view.value!.round < 15) play();
+    expect(blue(store, 'jungle').position).toBe('raptors-blue');
+    const w = store.roundWindow();
+    const back = store.view.value!.camps['redbuff-blue']!;
+    expect(back > w.start && back <= w.end).toBe(true);
+    store.setMove(j.id, 'bot-t1-blue'); // via mid-t1-blue or redbuff-blue
+    expect(store.pending.value[j.id]).toMatchObject({ kind: 'move', to: 'bot-t1-blue', via: 'redbuff-blue' });
+  });
+
   test('fourth ward throws /wards/', () => {
     const store = started();
     const ids = store.view.value!.allies.map((c) => c.id);

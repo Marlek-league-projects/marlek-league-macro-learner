@@ -119,9 +119,10 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     return c;
   };
 
+  /** Up by the end of the round, as the engine clears camps. */
   const campAlive = (id: string): boolean => {
     const s = current();
-    return (s.camps[id] ?? 0) <= engine.roundWindow(data.rules, s.round).start;
+    return (s.camps[id] ?? 0) <= engine.roundWindow(data.rules, s.round).end;
   };
 
   /** First intermediate step of a shortest path to a 2-step target; fast clearers prefer an alive own camp. */
