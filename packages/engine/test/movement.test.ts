@@ -1,0 +1,113 @@
+import { describe, expect, test } from 'bun:test';
+import { loadGameData } from '@lml/data';
+import { defaultOrders, newGame, reachable, spawnPoints, validateOrders } from '@lml/engine';
+import type { ChampionState, GameState, Order } from '@lml/engine/contracts';
+
+const d = loadGameData();
+const fresh = (): GameState => newGame(d, 7);
+const get = (s: GameState, side: string, role: string): ChampionState =>
+  s.champions.find((c) => c.side === side && c.role === role)!;
+
+/** Valid stay-put orders for blue, then overrides by champion id. */
+function orders(s: GameState, over: Order[] = []): Order[] {
+  const base = defaultOrders(s, 'blue');
+  return base.map((o) => over.find((x) => x.champion === o.champion) ?? o);
+}
+
+describe('reachable', () => {
+  test('laner reaches adjacent tower only', () => {
+    const s = fresh();
+    const mid = get(s, 'blue', 'mid');
+    mid.position = 'mid-t1-blue';
+    const r = reachable(s, d, mid.id);
+    expect(r['mid-t1-blue']).toBe(0);
+    expect(r['top-t1-blue']).toBe(1);
+    expect(r['top-lane']).toBeUndefined();
+    expect(r['base-red']).toBeUndefined();
+  });
+  test('jungler reaches two steps', () => {
+    const s = fresh();
+    const j = get(s, 'blue', 'jungle');
+    j.position = 'raptors-blue';
+    const r = reachable(s, d, j.id);
+    expect(r['krugs-blue']).toBeDefined();
+    expect(r['bluebuff-red']).toBeDefined();
+  });
+});
+
+describe('validateOrders', () => {
+  test('via', () => {
+    const s = fresh();
+    const j = get(s, 'blue', 'jungle');
+    j.position = 'raptors-blue';
+    const mv = (via: string): Order => ({ kind: 'move', champion: j.id, to: 'krugs-blue', via });
+    expect(() => validateOrders(s, d, 'blue', orders(s, [mv('redbuff-blue')]))).not.toThrow();
+    expect(() => validateOrders(s, d, 'blue', orders(s, [mv('mid-lane')]))).toThrow(/via/);
+  });
+  test('one order each', () => {
+    const s = fresh();
+    const o = orders(s);
+    expect(() => validateOrders(s, d, 'blue', o)).not.toThrow();
+    expect(() => validateOrders(s, d, 'blue', o.slice(1))).toThrow(/missing/);
+    expect(() => validateOrders(s, d, 'blue', [...o, o[0]!])).toThrow(/duplicate/);
+  });
+  test('ward and unward limits', () => {
+    const s = fresh();
+    const w = (c: ChampionState): Order => ({ kind: 'move', champion: c.id, to: c.position, ward: 'to' });
+    const blue = s.champions.filter((c) => c.side === 'blue');
+    expect(() => validateOrders(s, d, 'blue', orders(s, blue.slice(0, 4).map(w)))).toThrow(/wards/);
+    const u = (c: ChampionState): Order => ({ kind: 'move', champion: c.id, to: c.position, unward: 'to' });
+    const jg = get(s, 'blue', 'jungle');
+    const sup = get(s, 'blue', 'support');
+    expect(() => validateOrders(s, d, 'blue', orders(s, [u(jg)]))).not.toThrow();
+    expect(() => validateOrders(s, d, 'blue', orders(s, [u(jg), u(sup)]))).toThrow(/unward/);
+    expect(() => validateOrders(s, d, 'blue', orders(s, [u(get(s, 'blue', 'top'))]))).toThrow(/unward/);
+  });
+  test('position ward only round 1 for jungler', () => {
+    const s = fresh();
+    const j = get(s, 'blue', 'jungle');
+    const o: Order = { kind: 'move', champion: j.id, to: j.position, ward: { position: 'raptors-red' } };
+    expect(() => validateOrders(s, d, 'blue', orders(s, [o]))).not.toThrow();
+    s.round = 2;
+    expect(() => validateOrders(s, d, 'blue', orders(s, [o]))).toThrow(/ward/);
+  });
+  test('respawning and dead', () => {
+    const s = fresh();
+    const top = get(s, 'blue', 'top');
+    top.status = 'respawning';
+    expect(() =>
+      validateOrders(s, d, 'blue', orders(s, [{ kind: 'move', champion: top.id, to: top.position }])),
+    ).toThrow(/spawn/);
+    expect(() => validateOrders(s, d, 'blue', defaultOrders(s, 'blue'))).not.toThrow();
+    top.status = 'dead';
+    expect(() =>
+      validateOrders(s, d, 'blue', [...defaultOrders(s, 'blue'), { kind: 'spawn', champion: top.id, to: 'top-t1-blue' }]),
+    ).toThrow(/dead/);
+    expect(() => validateOrders(s, d, 'blue', defaultOrders(s, 'blue'))).not.toThrow();
+  });
+  test('herald', () => {
+    const s = fresh();
+    const top = get(s, 'blue', 'top');
+    top.position = 'top-lane';
+    const h = (to: string): Order => ({ kind: 'move', champion: top.id, to, launchHerald: true });
+    expect(() => validateOrders(s, d, 'blue', orders(s, [h('top-t1-red')]))).toThrow(/herald/);
+    top.hasHerald = true;
+    expect(() => validateOrders(s, d, 'blue', orders(s, [h('top-t1-red')]))).not.toThrow();
+    expect(() => validateOrders(s, d, 'blue', orders(s, [h('top-t1-blue')]))).toThrow(/herald/);
+  });
+});
+
+describe('spawnPoints', () => {
+  test('laner and jungler', () => {
+    const s = fresh();
+    const top = get(s, 'blue', 'top');
+    top.status = 'respawning';
+    expect(spawnPoints(s, d, top.id)).toEqual(['top-t1-blue', 'mid-t1-blue', 'bot-t1-blue']);
+    s.towers['top-t1-blue'] = 0;
+    expect(spawnPoints(s, d, top.id)[0]).toBe('top-t2-blue');
+    expect(defaultOrders(s, 'blue').find((o) => o.champion === top.id)).toEqual({
+      kind: 'spawn', champion: top.id, to: 'top-t2-blue',
+    });
+    expect(spawnPoints(s, d, get(s, 'blue', 'jungle').id)).toHaveLength(6);
+  });
+});
