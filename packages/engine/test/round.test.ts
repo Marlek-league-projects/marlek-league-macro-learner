@@ -165,6 +165,24 @@ describe('resolveRound', () => {
     expect([after(rj.id).position, after(rj.id).status]).toEqual(['scuttle-bot', 'alive']);
   });
 
+  test('a Herald carrier who recalls keeps the Herald and can launch it after respawning', () => {
+    const s = setup(26, [['blue', 'top', 'top-t1-blue']]);
+    const bt = get(s, 'blue', 'top');
+    bt.hasHerald = true;
+    const r1 = resolveRound(s, d, ordersWith(s, [{ kind: 'recall', champion: bt.id }]), {});
+    const after1 = r1.state.champions.find((c) => c.id === bt.id)!;
+    expect(after1.status).toBe('respawning');
+    expect(after1.hasHerald).toBe(true);
+    const r2 = resolveRound(r1.state, d, ordersWith(r1.state, [{ kind: 'spawn', champion: bt.id, to: 'top-t1-blue' }]), {});
+    expect(r2.state.champions.find((c) => c.id === bt.id)!.hasHerald).toBe(true);
+    const s3 = r2.state;
+    const c3 = s3.champions.find((c) => c.id === bt.id)!;
+    c3.position = c3.previous = 'top-lane';
+    const r3 = resolveRound(s3, d, ordersWith(s3, [{ kind: 'move', champion: bt.id, to: 'top-t1-red', launchHerald: true }]), {});
+    expect(r3.events).toContainEqual({ type: 'heraldLaunched', tower: 'top-t1-red', side: 'red' });
+    expect(r3.state.champions.find((c) => c.id === bt.id)!.hasHerald).toBe(false);
+  });
+
   test('an unward removes an enemy ward before it gives vision', () => {
     const run = (unward: boolean): { state: GameState; events: ReturnType<typeof resolveRound>['events'] } => {
       const s = setup(4, [['blue', 'jungle', 'raptors-blue']]);

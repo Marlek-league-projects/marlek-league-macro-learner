@@ -185,10 +185,11 @@ export function clearCamps(
 
 /**
  * Herald launches after contacts: an alive carrier ordered to launch on a standing enemy tower
- * deals `heraldDamage` like any tower damage (plates, kill, gold) but without multiplier. Carriers who are not alive lose the Herald.
+ * deals `heraldDamage` like any tower damage (plates, kill, gold) but without multiplier. Dead carriers lose the Herald;
+ * a recalling (respawning) carrier keeps it.
  */
 export function launchHeralds(state: GameState, data: GameData, orders: Orders, events: GameEvent[]): void {
-  for (const c of state.champions) if (c.status !== 'alive') c.hasHerald = false;
+  for (const c of state.champions) if (c.status === 'dead') c.hasHerald = false;
 
   for (const side of SIDES) {
     for (const order of orders[side]) {
