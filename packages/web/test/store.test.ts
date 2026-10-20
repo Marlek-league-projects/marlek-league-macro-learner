@@ -53,7 +53,7 @@ describe('store', () => {
 
   test('a 2-step move gets a via on a shortest path', () => {
     const store = started();
-    const top = blue(store, 'top');
+    const top = blue(store, 'jungle');
     store.select(top.id);
     const two = Object.entries(store.reachableForSelected()).find(([, d]) => d === 2)![0];
     store.setMove(top.id, two);
