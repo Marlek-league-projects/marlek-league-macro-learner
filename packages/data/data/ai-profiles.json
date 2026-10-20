@@ -1,0 +1,162 @@
+[
+  {
+    "rank": "iron",
+    "label": "Fer",
+    "mistakes": {
+      "greed": 0.6,
+      "objectiveTiming": 0.6,
+      "pointlessPlay": 0.6,
+      "chasingKills": 0.6,
+      "rotateWithoutPriority": 0.48,
+      "badRecall": 0.48,
+      "poorVision": 0.6,
+      "noConversion": 0.48,
+      "ignoreJungler": 0.6
+    },
+    "lookahead": 0
+  },
+  {
+    "rank": "bronze",
+    "label": "Bronze",
+    "mistakes": {
+      "greed": 0.5,
+      "objectiveTiming": 0.5,
+      "pointlessPlay": 0.5,
+      "chasingKills": 0.5,
+      "rotateWithoutPriority": 0.4,
+      "badRecall": 0.4,
+      "poorVision": 0.5,
+      "noConversion": 0.4,
+      "ignoreJungler": 0.5
+    },
+    "lookahead": 0
+  },
+  {
+    "rank": "silver",
+    "label": "Argent",
+    "mistakes": {
+      "greed": 0.4,
+      "objectiveTiming": 0.4,
+      "pointlessPlay": 0.4,
+      "chasingKills": 0.4,
+      "rotateWithoutPriority": 0.32,
+      "badRecall": 0.32,
+      "poorVision": 0.4,
+      "noConversion": 0.32,
+      "ignoreJungler": 0.4
+    },
+    "lookahead": 0
+  },
+  {
+    "rank": "gold",
+    "label": "Or",
+    "mistakes": {
+      "greed": 0.32,
+      "objectiveTiming": 0.32,
+      "pointlessPlay": 0.32,
+      "chasingKills": 0.32,
+      "rotateWithoutPriority": 0.256,
+      "badRecall": 0.256,
+      "poorVision": 0.32,
+      "noConversion": 0.256,
+      "ignoreJungler": 0.32
+    },
+    "lookahead": 0
+  },
+  {
+    "rank": "platinum",
+    "label": "Platine",
+    "mistakes": {
+      "greed": 0.22,
+      "objectiveTiming": 0.22,
+      "pointlessPlay": 0.22,
+      "chasingKills": 0.22,
+      "rotateWithoutPriority": 0.176,
+      "badRecall": 0.176,
+      "poorVision": 0.22,
+      "noConversion": 0.176,
+      "ignoreJungler": 0.22
+    },
+    "lookahead": 0
+  },
+  {
+    "rank": "emerald",
+    "label": "Émeraude",
+    "mistakes": {
+      "greed": 0.16,
+      "objectiveTiming": 0.16,
+      "pointlessPlay": 0.16,
+      "chasingKills": 0.16,
+      "rotateWithoutPriority": 0.128,
+      "badRecall": 0.128,
+      "poorVision": 0.16,
+      "noConversion": 0.128,
+      "ignoreJungler": 0.16
+    },
+    "lookahead": 0
+  },
+  {
+    "rank": "diamond",
+    "label": "Diamant",
+    "mistakes": {
+      "greed": 0.08,
+      "objectiveTiming": 0.08,
+      "pointlessPlay": 0.08,
+      "chasingKills": 0.08,
+      "rotateWithoutPriority": 0.064,
+      "badRecall": 0.064,
+      "poorVision": 0.08,
+      "noConversion": 0.064,
+      "ignoreJungler": 0.08
+    },
+    "lookahead": 0
+  },
+  {
+    "rank": "master",
+    "label": "Maître",
+    "mistakes": {
+      "greed": 0.03,
+      "objectiveTiming": 0.03,
+      "pointlessPlay": 0.03,
+      "chasingKills": 0.03,
+      "rotateWithoutPriority": 0.024,
+      "badRecall": 0.024,
+      "poorVision": 0.03,
+      "noConversion": 0.024,
+      "ignoreJungler": 0.03
+    },
+    "lookahead": 1
+  },
+  {
+    "rank": "grandmaster",
+    "label": "Grand maître",
+    "mistakes": {
+      "greed": 0.02,
+      "objectiveTiming": 0.02,
+      "pointlessPlay": 0.02,
+      "chasingKills": 0.02,
+      "rotateWithoutPriority": 0.016,
+      "badRecall": 0.016,
+      "poorVision": 0.02,
+      "noConversion": 0.016,
+      "ignoreJungler": 0.02
+    },
+    "lookahead": 1
+  },
+  {
+    "rank": "challenger",
+    "label": "Challenger",
+    "mistakes": {
+      "greed": 0.01,
+      "objectiveTiming": 0.01,
+      "pointlessPlay": 0.01,
+      "chasingKills": 0.01,
+      "rotateWithoutPriority": 0.008,
+      "badRecall": 0.008,
+      "poorVision": 0.01,
+      "noConversion": 0.008,
+      "ignoreJungler": 0.01
+    },
+    "lookahead": 2
+  }
+]
