@@ -196,6 +196,15 @@ function runScuttle(ward: boolean): ReturnType<typeof resolveRound> {
 }
 
 describe('eventsFor', () => {
+  /** Every alive champion stays put (no wave following), then overrides by champion id. */
+  const stayWith = (s: GameState, over: Order[]): Orders => {
+    const f = (side: 'blue' | 'red'): Order[] =>
+      s.champions
+        .filter((c) => c.side === side && c.status === 'alive')
+        .map((c) => over.find((x) => x.champion === c.id) ?? { kind: 'move', champion: c.id, to: c.position });
+    return { blue: f('blue'), red: f('red') };
+  };
+
   test('keeps enemy moves only when the enemy was seen', () => {
     const s = newGame(d, 5);
     s.round = 4;
@@ -205,7 +214,7 @@ describe('eventsFor', () => {
     const bm = get(s, 'blue', 'mid').id;
     const { state, events } = resolveRound(
       s, d,
-      ordersWith(s, [
+      stayWith(s, [
         { kind: 'move', champion: rj, to: 'bluebuff-red' },
         { kind: 'move', champion: rm, to: 'mid-lane' },
         { kind: 'move', champion: bm, to: 'wolves-blue' },
@@ -247,5 +256,20 @@ describe('scoreboard', () => {
         goldEarned: { blue: sum('blue'), red: sum('red') },
       });
     }
+  });
+});
+
+describe('lane pressure in the view', () => {
+  test('computed from the champions the side sees; null when the enemy laner is not seen', () => {
+    const s = newGame(d, 7);
+    s.round = 5;
+    place(s, 'blue', 'top', 'top-lane');
+    place(s, 'red', 'top', 'top-lane');
+    const rt = get(s, 'red', 'top');
+    rt.bonusLead = 100_000;
+    s.lastSeen.blue[rt.id] = { position: 'top-lane', round: 4 };
+    expect(viewFor(s, d, 'blue').pressure.top).toBe('red');
+    s.lastSeen.blue[rt.id] = { position: 'top-lane', round: 3 };
+    expect(viewFor(s, d, 'blue').pressure.top).toBeNull();
   });
 });

@@ -263,7 +263,7 @@ describe('aiContactChoice', () => {
     s.round = 10;
     place(s, 'blue', 'top', 'top-t1-blue');
     place(s, 'red', 'top', 'top-t1-red');
-    place(s, 'red', 'jungle', 'top-t2-red');
+    place(s, 'red', 'jungle', 'scuttle-top');
     const ids = { bt: get(s, 'blue', 'top').id, rt: get(s, 'red', 'top').id, rj: get(s, 'red', 'jungle').id };
     const over = (side: 'blue' | 'red', o: Order[]): Order[] =>
       defaultOrders(s, d, side).map((x) => o.find((y) => y.champion === x.champion) ?? x);
@@ -283,45 +283,49 @@ describe('aiContactChoice', () => {
   });
 });
 
-describe('aiContactChoice on an even lane contact', () => {
-  /** Blue and red tops meet on top-lane; blue's lead is shifted by `bonus`. */
-  function laneContact(bonus: number): { view: ReturnType<typeof viewFor>; contact: ReturnType<typeof detectContacts>[number] } {
+describe('AI lane stances', () => {
+  /** Red top on top-lane, blue top seen there; red's lead is shifted by `bonus`. */
+  function stanceOf(bonus: number, before: 'farm' | 'trade' | 'allin' = 'farm', tuning = d): Order {
     const s = newGame(d, 7);
     s.round = 10;
-    place(s, 'blue', 'top', 'top-t1-blue');
-    place(s, 'red', 'top', 'top-t1-red');
-    get(s, 'blue', 'top').bonusLead += bonus;
-    const ids = { bt: get(s, 'blue', 'top').id, rt: get(s, 'red', 'top').id };
-    const over = (side: 'blue' | 'red', o: Order[]): Order[] =>
-      defaultOrders(s, d, side).map((x) => o.find((y) => y.champion === x.champion) ?? x);
-    const orders: Orders = {
-      blue: over('blue', [{ kind: 'move', champion: ids.bt, to: 'top-lane' }]),
-      red: over('red', [{ kind: 'move', champion: ids.rt, to: 'top-lane' }]),
-    };
-    const contact = detectContacts(s, d, orders).find((c) => c.position === 'top-lane')!;
-    expect(contact.kind).toBe('trade');
-    return { view: viewFor(s, d, 'blue'), contact };
+    s.waves.top = 0;
+    s.pits['dragon-pit'].nextSpawn = 600;
+    place(s, 'blue', 'top', 'top-lane');
+    place(s, 'red', 'top', 'top-lane');
+    const rt = get(s, 'red', 'top');
+    rt.bonusLead += bonus;
+    rt.stance = before;
+    s.lastSeen.red[get(s, 'blue', 'top').id] = { position: 'top-lane', round: 9 };
+    const orders = aiOrders(viewFor(s, tuning, 'red'), tuning, profile('iron'), stubRng(() => 0.99));
+    validateOrders(s, tuning, 'red', orders);
+    return orderOf(orders, rt.id);
   }
-  const never = stubRng(() => 0.99);
-
   const tuned = (allInMargin: number, tradeMargin: number) => ({ ...d, aiTuning: { ...d.aiTuning, allInMargin, tradeMargin } });
 
-  test('a margin above allInMargin goes all-in', () => {
-    const { view, contact } = laneContact(100_000);
-    expect(aiContactChoice(view, d, contact, profile('challenger'), never)).toBe('fight');
+  test('a margin above allInMargin sets All-in', () => {
+    expect(stanceOf(100_000)).toMatchObject({ kind: 'move', stance: 'allin' });
   });
-  test('a predicted loss beyond allInMargin flees', () => {
-    const { view, contact } = laneContact(-100_000);
-    expect(aiContactChoice(view, d, contact, profile('challenger'), never)).toBe('flee');
+  test('a margin between tradeMargin and allInMargin sets Trade', () => {
+    expect(stanceOf(100_000, 'farm', tuned(1_000_000, 0))).toMatchObject({ stance: 'trade' });
   });
-  test('a margin between tradeMargin and allInMargin trades', () => {
-    const { view, contact } = laneContact(100_000);
-    expect(aiContactChoice(view, tuned(1_000_000, 0), contact, profile('challenger'), never)).toBe('trade');
+  test('a small margin or a predicted loss goes back to Farm; an unchanged stance is not repeated', () => {
+    expect(stanceOf(-100_000, 'allin')).toMatchObject({ stance: 'farm' });
+    expect(stanceOf(100_000, 'trade', tuned(1_000_000, 1_000_000))).toMatchObject({ stance: 'farm' });
+    expect(stanceOf(-100_000, 'farm').stance).toBeUndefined();
   });
-  test('a margin within tradeMargin farms', () => {
-    const { view, contact } = laneContact(100_000);
-    expect(aiContactChoice(view, tuned(1_000_000, 1_000_000), contact, profile('challenger'), never)).toBe('farm');
-    const loss = laneContact(-100_000);
-    expect(aiContactChoice(loss.view, tuned(1_000_000, 0), loss.contact, profile('challenger'), never)).toBe('farm');
+});
+
+describe('AI recall', () => {
+  test('a laner on the lane middle steps back under its tower, then recalls', () => {
+    const s = newGame(d, 7);
+    s.round = 10;
+    s.waves.top = 1;
+    s.pits['dragon-pit'].nextSpawn = 600;
+    place(s, 'blue', 'top', 'top-lane');
+    const top = get(s, 'blue', 'top');
+    top.gold = d.aiTuning.recallGold + 100;
+    const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('iron'), stubRng(() => 0.99));
+    validateOrders(s, d, 'blue', orders);
+    expect(orderOf(orders, top.id)).toEqual({ kind: 'recall', champion: top.id, to: 'top-t1-blue' });
   });
 });

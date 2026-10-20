@@ -18,7 +18,7 @@ export { randomDraft, newGame } from './setup';
 export { movesFor, reachable, reachableFrom, spawnPoints, spawnPointsFor, validateOrders, defaultOrders } from './movement';
 export { arrivalPositions, detectContacts, resolveChoice } from './contacts';
 export { lead, fightScore, resolveFight } from './fight';
-export { damageTower, frontTower, towerMultiplier, updateLanes } from './lanes';
+export { damageTower, frontTower, lanePressure, towerMultiplier, updateLanes } from './lanes';
 export { spawnObjectives, clearCamps, captureObjectives, launchHeralds } from './objectives';
 export { level, applyKill, completeRecall, advanceRespawns, teamScore, finishIfOver } from './economy';
 export { visibleEnemies, viewFor, eventsFor } from './vision';

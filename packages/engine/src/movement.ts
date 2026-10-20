@@ -1,7 +1,10 @@
 import type { GameData, Lane, Role, Rules, Side } from '@lml/data/contracts';
-import type { ChampionState, GameState, Order, PlayerView } from './contracts';
+import type { ChampionState, GameState, Order, PlayerView, Stance } from './contracts';
+import { frontTower } from './lanes';
 
 const LANES: Lane[] = ['top', 'mid', 'bot'];
+const HOME_LANE: Record<Exclude<Role, 'jungle'>, Lane> = { top: 'top', mid: 'mid', adc: 'bot', support: 'bot' };
+const STANCES: Stance[] = ['farm', 'trade', 'allin'];
 
 export function movesFor(c: ChampionState, rules: Rules): number {
   return c.role === 'jungle' ? rules.moves.jungler : rules.moves.laner;
@@ -105,6 +108,7 @@ function fail(champion: string, reason: string): never {
 function validateOne(state: GameState, data: GameData, c: ChampionState, o: Order, ctx: { wards: number; unwards: number }): void {
   const { graph, rules } = data;
   if (c.status === 'dead') fail(c.id, 'dead champion takes no order');
+  if (o.stance !== undefined && !STANCES.includes(o.stance)) fail(c.id, `unknown stance ${String(o.stance)}`);
   if (c.status === 'respawning') {
     if (o.kind !== 'spawn') fail(c.id, 'respawning champion can only spawn');
     if (!spawnPoints(state, data, c.id).includes(o.to)) fail(c.id, `invalid spawn point ${o.to}`);
@@ -114,6 +118,10 @@ function validateOne(state: GameState, data: GameData, c: ChampionState, o: Orde
 
   if (o.kind === 'recall') {
     if (o.ward) ctx.wards++;
+    // The step before a recall is 1 move for everyone, never into the enemy base.
+    if (o.to !== undefined && reachableFrom(data, c.position, 1, c.side)[o.to] === undefined) {
+      fail(c.id, `recall step to ${o.to} is out of range`);
+    }
     return;
   }
 
@@ -167,11 +175,39 @@ export function validateOrders(state: GameState, data: GameData, side: Side, ord
   }
 }
 
-/** Alive champions stay put; respawning ones take their first spawn point. Dead ones get none. */
+/**
+ * Where a laner follows its wave in `lane`: wave -1 the blue front tower, 0 the lane middle, +1 the red front tower
+ * (a side with no standing tower left in the lane: its last tower position).
+ */
+function wavePosition(state: GameState, data: GameData, lane: Lane): string {
+  const wave = state.waves[lane];
+  if (wave === 0) return data.graph.lanePositions(lane).find((id) => data.graph.positions[id]!.kind === 'laneMid')!;
+  const side: Side = wave === -1 ? 'blue' : 'red';
+  return frontTower(state, data, side, lane) ?? data.graph.towers(side, lane).at(-1)!;
+}
+
+/**
+ * A laner standing in its own lane follows the wave: to the wave position when reachable this round, else one
+ * step along the lane toward it. Anywhere else (and for the jungler) the champion stays put.
+ */
+function followWave(state: GameState, data: GameData, c: ChampionState): string {
+  if (c.role === 'jungle') return c.position;
+  const lane = HOME_LANE[c.role];
+  if (data.graph.positions[c.position]?.lane !== lane) return c.position;
+  const target = wavePosition(state, data, lane);
+  const reach = reachable(state, data, c.id);
+  if (reach[target] !== undefined) return target;
+  const inLane = Object.keys(reach).filter((p) => data.graph.positions[p]?.lane === lane);
+  return inLane.sort(
+    (a, b) => data.graph.distance(a, target) - data.graph.distance(b, target) || a.localeCompare(b),
+  )[0]!;
+}
+
+/** Alive laners follow their wave, other alive champions stay put; respawning ones take their first spawn point. */
 export function defaultOrders(state: GameState, data: GameData, side: Side): Order[] {
   const out: Order[] = [];
   for (const c of state.champions.filter((x) => x.side === side)) {
-    if (c.status === 'alive') out.push({ kind: 'move', champion: c.id, to: c.position });
+    if (c.status === 'alive') out.push({ kind: 'move', champion: c.id, to: followWave(state, data, c) });
     else if (c.status === 'respawning') {
       out.push({ kind: 'spawn', champion: c.id, to: spawnPoints(state, data, c.id)[0]! });
     }

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData, matchupAdvantage } from '@lml/data';
 import type { Lane, Side } from '@lml/data/contracts';
-import { frontTower, level, newGame, roundWindow, totalRounds, updateLanes } from '@lml/engine';
+import { frontTower, lanePressure, level, newGame, roundWindow, totalRounds, updateLanes } from '@lml/engine';
 import type { ChampionState, GameEvent, GameState } from '@lml/engine/contracts';
 
 const d = loadGameData();
@@ -146,6 +146,18 @@ describe('farming', () => {
     expect(get(s, 'blue', 'adc').xp).toBeCloseTo(duoXp, 6);
     expect(get(s, 'blue', 'support').xp).toBeCloseTo(duoXp, 6);
   });
+  test('a support alone in lane gets the support share of a solo laner, not the duo share', () => {
+    const s = fresh();
+    get(s, 'blue', 'support').position = 'bot-lane';
+    get(s, 'red', 'support').position = 'top-lane';
+    get(s, 'red', 'top').position = 'top-lane';
+    run(s);
+    const soloXp = (d.rules.economy.farmXpPerMin * 20) / 60;
+    expect(get(s, 'blue', 'support').xp).toBeCloseTo(soloXp * d.rules.economy.supportShare, 6);
+    // With a non-bot carry, the support and the carry farm as if no duo.
+    expect(get(s, 'red', 'support').xp).toBeCloseTo(soloXp * d.rules.economy.supportShare, 6);
+    expect(get(s, 'red', 'top').xp).toBeCloseTo(soloXp, 6);
+  });
   test('a solo laner who only farms hits level 6 by round 15, 11 by round 26 and 15 by the end', () => {
     const s = fresh();
     const top = get(s, 'blue', 'top');
@@ -172,5 +184,33 @@ describe('absent laner chip', () => {
     const adv = matchupAdvantage(d, a.id, r.id, roundWindow(d.rules, 1).stage);
     run(s);
     expect(s.towers['top-t1-red']).toBe(adv !== null && adv > 0 ? 5 - d.rules.towers.absentLanerChip : 5);
+  });
+});
+
+describe('lanePressure', () => {
+  test('the side whose laners score higher in a fight on the lane middle, null on a tie or an empty side', () => {
+    const s = fresh(10);
+    const bt = get(s, 'blue', 'top'), rt = get(s, 'red', 'top');
+    bt.position = 'top-t1-blue';
+    rt.position = 'top-t1-red';
+    expect(lanePressure(s, d, 'mid')).toBeNull();
+    bt.bonusLead = 100_000;
+    expect(lanePressure(s, d, 'top')).toBe('blue');
+    bt.bonusLead = 0;
+    rt.bonusLead = 100_000;
+    expect(lanePressure(s, d, 'top')).toBe('red');
+    rt.position = 'raptors-red';
+    expect(lanePressure(s, d, 'top')).toBeNull();
+  });
+
+  test('equal counts push the wave away from the pressure side', () => {
+    const s = fresh(10);
+    get(s, 'blue', 'top').position = 'top-lane';
+    get(s, 'red', 'top').position = 'top-lane';
+    get(s, 'red', 'top').bonusLead = 100_000;
+    s.waves.top = 0;
+    expect(lanePressure(s, d, 'top')).toBe('red');
+    run(s);
+    expect(s.waves.top as number).toBe(-1);
   });
 });

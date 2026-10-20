@@ -1,6 +1,7 @@
 import type { GameData, Lane, Side } from '@lml/data/contracts';
 import type { ChampionState, EnemyInfo, GameEvent, GameState, PlayerView, Scoreboard } from './contracts';
 import { level } from './economy';
+import { lanePressure } from './lanes';
 
 type ScuttleId = keyof GameState['scuttles'];
 
@@ -117,7 +118,16 @@ export function viewFor(state: GameState, data: GameData, side: Side): PlayerVie
     platesTaken: s.platesTaken,
     towersDestroyed: s.towersDestroyed,
     scoreboard: scoreboard(s),
+    pressure: pressureSeen(s, data, side, visible),
   };
+}
+
+/** Lane pressure among `side`'s champions and the enemies it sees (`visible`); an unseen side gives null. */
+function pressureSeen(s: GameState, data: GameData, side: Side, visible: Map<string, string>): Record<Lane, Side | null> {
+  const seen = { ...s, champions: s.champions.filter((c) => c.side === side || visible.has(c.id)) };
+  const out = {} as Record<Lane, Side | null>;
+  for (const lane of LANES) out[lane] = lanePressure(seen, data, lane);
+  return out;
 }
 
 function scoreboard(s: GameState): Scoreboard {

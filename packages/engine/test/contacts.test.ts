@@ -24,14 +24,16 @@ describe('detectContacts', () => {
     const cs = detectContacts(s, d, stay(s)).filter((c) => c.position === 'top-lane');
     expect(cs).toHaveLength(1);
     expect(cs[0]!.kind).toBe('trade');
+    expect(cs[0]!.auto).toBe(true);
     expect(cs[0]!.defaults).toEqual({ blue: 'farm', red: 'farm' });
-    expect(cs[0]!.options.blue).toEqual(['farm', 'trade', 'fight', 'flee']);
+    expect(cs[0]!.options).toEqual({ blue: ['farm'], red: ['farm'] });
   });
 
   test('outnumbering arrival is a gank', () => {
     const s = setup([
-      ['blue', 'top', 'top-t1-blue'], ['red', 'top', 'top-t1-blue'], ['red', 'jungle', 'top-lane'],
+      ['blue', 'top', 'top-t1-blue'], ['red', 'top', 'top-t1-blue'], ['red', 'jungle', 'gromp-blue'],
     ]);
+    s.waves.top = -1; // both tops follow the wave onto the blue T1
     const rj = get(s, 'red', 'jungle');
     const o = stay(s, [{ kind: 'move', champion: rj.id, to: 'top-t1-blue' }]);
     const c = detectContacts(s, d, o).find((x) => x.position === 'top-t1-blue')!;

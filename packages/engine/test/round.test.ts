@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
 import { defaultOrders, newGame, resolveFight, resolveRound, roundWindow } from '@lml/engine';
-import type { Choice, ChampionState, ContactChoices, GameState, Order, Orders } from '@lml/engine/contracts';
+import type { ChampionState, ContactChoices, GameState, Order, Orders, Stance } from '@lml/engine/contracts';
 
 const d = loadGameData();
 const get = (s: GameState, side: string, role: string): ChampionState =>
@@ -94,7 +94,7 @@ describe('resolveRound', () => {
     const s = setup(10, [
       ['blue', 'top', 'top-t1-blue'],
       ['red', 'top', 'top-lane'],
-      ['red', 'support', 'top-t1-red'],
+      ['red', 'support', 'scuttle-top'],
       ['red', 'jungle', 'bluebuff-blue'],
     ]);
     const bt = get(s, 'blue', 'top').id;
@@ -187,7 +187,7 @@ describe('resolveRound', () => {
     const s = setup(10, [
       ['blue', 'top', 'top-t1-blue'],
       ['red', 'top', 'top-lane'],
-      ['red', 'mid', 'top-lane'],
+      ['red', 'mid', 'scuttle-top'],
     ]);
     s.waves.top = -1;
     const bt = get(s, 'blue', 'top').id;
@@ -206,15 +206,16 @@ describe('resolveRound', () => {
     const s = setup(10, [
       ['blue', 'top', 'top-t3-blue'],
       ['red', 'top', 'top-t2-blue'],
-      ['red', 'mid', 'top-t2-blue'],
+      ['red', 'jungle', 'gromp-blue'],
       ['blue', 'jungle', 'raptors-blue'],
-      ['red', 'jungle', 'scuttle-bot'],
+      ['red', 'mid', 'scuttle-bot'],
       ['red', 'support', 'scuttle-bot'],
     ]);
     const o = ordersWith(s, [
+      { kind: 'move', champion: get(s, 'blue', 'top').id, to: 'top-t3-blue' },
       { kind: 'move', champion: get(s, 'red', 'top').id, to: 'top-t3-blue' },
-      { kind: 'move', champion: get(s, 'red', 'mid').id, to: 'top-t3-blue' },
-      { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'raptors-blue' },
+      { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'top-t3-blue', via: 'top-t2-blue' },
+      { kind: 'move', champion: get(s, 'red', 'mid').id, to: 'raptors-blue' },
       { kind: 'move', champion: get(s, 'red', 'support').id, to: 'raptors-blue' },
     ]);
     const { state } = resolveRound(s, d, o, {});
@@ -226,7 +227,7 @@ describe('resolveRound', () => {
   test('a spawning champion who flees retreats one tower back', () => {
     const s = setup(10, [
       ['red', 'top', 'top-lane'],
-      ['red', 'mid', 'top-lane'],
+      ['red', 'mid', 'scuttle-top'],
     ]);
     const bt = get(s, 'blue', 'top');
     bt.status = 'respawning';
@@ -241,10 +242,11 @@ describe('resolveRound', () => {
     expect([after.position, after.status]).toEqual(['top-t2-blue', 'alive']);
   });
 
-  test('a lane contact where one side flees is won by the side that stayed: wave and trade lead', () => {
+  test('a gank in lane where one side flees is won by the side that stayed: wave and trade lead', () => {
     const s = setup(10, [
       ['blue', 'top', 'top-t1-blue'],
       ['red', 'top', 'top-t1-red'],
+      ['red', 'jungle', 'scuttle-top'],
     ]);
     const bt = get(s, 'blue', 'top');
     const rt = get(s, 'red', 'top');
@@ -252,6 +254,7 @@ describe('resolveRound', () => {
     const o = ordersWith(s, [
       { kind: 'move', champion: bt.id, to: 'top-lane' },
       { kind: 'move', champion: rt.id, to: 'top-lane' },
+      { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'top-lane' },
     ]);
     const { state, events } = resolveRound(s, d, o, { 'top-lane': { blue: 'flee' } });
     expect(events).toContainEqual({ type: 'fled', champion: bt.id, to: 'top-t1-blue' });
@@ -260,8 +263,8 @@ describe('resolveRound', () => {
     expect(state.champions.find((c) => c.id === rt.id)!.bonusLead).toBe(lead0 + d.rules.economy.tradeLead);
   });
 
-  describe('even lane contact choices', () => {
-    function laneRound(choices: { blue: Choice; red: Choice }) {
+  describe('even lane contacts resolve from the stances', () => {
+    function laneRound(stances: { blue: Stance; red: Stance }) {
       const s = setup(10, [
         ['blue', 'top', 'top-t1-blue'],
         ['red', 'top', 'top-t1-red'],
@@ -270,10 +273,10 @@ describe('resolveRound', () => {
       const rt = get(s, 'red', 'top');
       bt.bonusLead += 100_000;
       const o = ordersWith(s, [
-        { kind: 'move', champion: bt.id, to: 'top-lane' },
-        { kind: 'move', champion: rt.id, to: 'top-lane' },
+        { kind: 'move', champion: bt.id, to: 'top-lane', stance: stances.blue },
+        { kind: 'move', champion: rt.id, to: 'top-lane', stance: stances.red },
       ]);
-      const r = resolveRound(s, d, o, { 'top-lane': choices });
+      const r = resolveRound(s, d, o, {});
       return { ...r, bt, rt };
     }
     const alive = (st: GameState, id: string) => st.champions.find((c) => c.id === id)!.status === 'alive';
@@ -294,15 +297,11 @@ describe('resolveRound', () => {
       const { events } = laneRound({ blue: 'trade', red: 'trade' });
       expect(events).toContainEqual({ type: 'trade', position: 'top-lane', lane: 'top', winner: 'blue' });
     });
-    test.each<Choice>(['farm', 'trade'])('all-in vs %s is a fight and the loser dies', (other) => {
-      const { state, events, bt, rt } = laneRound({ blue: 'fight', red: other });
+    test.each<Stance>(['farm', 'trade'])('all-in vs %s is a fight and the loser dies', (other) => {
+      const { state, events, bt, rt } = laneRound({ blue: 'allin', red: other });
       expect(events.some((e) => e.type === 'fight' && e.winner === 'blue')).toBe(true);
       expect(alive(state, bt.id)).toBe(true);
       expect(alive(state, rt.id)).toBe(false);
-    });
-    test('farm vs flee concedes the trade to the side that stayed', () => {
-      const { events } = laneRound({ blue: 'flee', red: 'farm' });
-      expect(events).toContainEqual({ type: 'trade', position: 'top-lane', lane: 'top', winner: 'red' });
     });
   });
 
@@ -310,7 +309,7 @@ describe('resolveRound', () => {
     const s = setup(10, [
       ['blue', 'top', 'top-t1-blue'],
       ['red', 'top', 'top-t1-red'],
-      ['red', 'jungle', 'top-t1-red'],
+      ['red', 'jungle', 'scuttle-top'],
     ]);
     const bt = get(s, 'blue', 'top').id;
     const o = ordersWith(s, [

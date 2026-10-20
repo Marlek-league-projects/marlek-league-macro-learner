@@ -1,6 +1,6 @@
 import { MISTAKE_IDS } from '@lml/data';
 import type { AiProfile, GameData, Lane, MistakeId, ObjectiveId, Role, Side } from '@lml/data/contracts';
-import type { ChampionState, Choice, Contact, EnemyInfo, Order, PlayerView, Rng } from '../contracts';
+import type { ChampionState, Choice, Contact, EnemyInfo, Order, PlayerView, Rng, Stance } from '../contracts';
 import { resolveFight } from '../fight';
 import { movesFor, reachableFrom, spawnPointsFor } from '../movement';
 import type { PitId } from '../objectives';
@@ -226,7 +226,17 @@ function recall(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, 
           return t.live || t.soon;
         })
       : ourWave(ctx.view, HOME_LANE[c.role]) >= 0;
-  if (good !== m.has('badRecall')) add(ctx.data.aiTuning.priorities.recall, { kind: 'recall', champion: c.id });
+  if (good === m.has('badRecall')) return;
+  const order: Order = { kind: 'recall', champion: c.id };
+  // A laner off its tower steps back under it first, unless a known enemy stands there.
+  if (c.role !== 'jungle') {
+    const lane = HOME_LANE[c.role];
+    const own = front(ctx, ctx.side, lane);
+    const guarded = ctx.view.enemies.some((e) => known(ctx, e) && e.position === own);
+    const oneStep = own !== null && laneOf(ctx.data, c.position) === lane && dist(ctx.data, c.position, own) === 1;
+    if (oneStep && !guarded) order.to = own;
+  }
+  add(ctx.data.aiTuning.priorities.recall, order);
 }
 
 /**
@@ -412,17 +422,48 @@ export function assignWards(ctx: Ctx, orders: Order[], mistakes: Mistakes): Orde
   });
 }
 
+/**
+ * Lane stances from the predicted fight on each laner's destination, with what `view.side` knows: its laners
+ * heading into that lane against the known enemies there. All-in above `aiTuning.allInMargin`, Trade above
+ * `tradeMargin`, otherwise (or with no known enemy there) Farm. Set on the order only when it changes.
+ */
+export function assignStances(ctx: Ctx, orders: Order[]): Order[] {
+  const { view, data } = ctx;
+  const state = stateFromView(view, data);
+  const stage = roundWindow(data.rules, view.round).stage;
+  const { allInMargin, tradeMargin } = data.aiTuning;
+  return orders.map((o) => {
+    const c = view.allies.find((a) => a.id === o.champion)!;
+    if (o.kind !== 'move' || c.role === 'jungle') return o;
+    const lane = HOME_LANE[c.role];
+    if (laneOf(data, o.to) !== lane) return o;
+    const allies = orders.flatMap((x) => {
+      const a = view.allies.find((y) => y.id === x.champion)!;
+      const laner = a.role !== 'jungle' && HOME_LANE[a.role] === lane;
+      return x.kind === 'move' && laner && laneOf(data, x.to) === lane ? [a.id] : [];
+    });
+    const enemies = view.enemies.filter((e) => known(ctx, e) && laneOf(data, e.position) === lane).map((e) => e.id);
+    let stance: Stance = 'farm';
+    if (enemies.length > 0) {
+      const [blue, red] = ctx.side === 'blue' ? [allies, enemies] : [enemies, allies];
+      const { scores } = resolveFight(state, data, o.to, blue, red, stage);
+      const margin = scores[ctx.side] - scores[ctx.enemy];
+      stance = margin > allInMargin ? 'allin' : margin > tradeMargin ? 'trade' : 'farm';
+    }
+    return stance === c.stance ? o : { ...o, stance };
+  });
+}
+
 /** The mistake-free plan (with the profile's `waveSacrifice`), used for the rounds the look-ahead plays after the first. */
 export function bestOrders(view: PlayerView, data: GameData, rng: Rng, waveSacrifice: boolean): Order[] {
   const ctx = makeContext(view, data, waveSacrifice);
   const none: Mistakes = new Map(view.allies.map((a) => [a.id, new Set<MistakeId>()]));
-  return assignWards(ctx, candidateSets(planCandidates(ctx, none, rng), 1)[0]!, none);
+  return assignStances(ctx, assignWards(ctx, candidateSets(planCandidates(ctx, none, rng), 1)[0]!, none));
 }
 
 /**
- * Even lane contact (trade offered): fight when the predicted score margin, with what `view.side` knows, exceeds
- * `aiTuning.allInMargin`, trade when it exceeds `tradeMargin`, flee when it is below `-allInMargin`, otherwise farm. Other contacts: fight when the fight
- * is won, otherwise flee, unless `chase` and outnumbered.
+ * Contact choice for a prompted contact: fight when the fight is won with what `view.side` knows, otherwise flee,
+ * unless `chase` and outnumbered. A contact with a single option (lane contacts resolved from stances) takes it.
  */
 export function contactChoice(view: PlayerView, data: GameData, contact: Contact, chase: boolean): Choice {
   const side = view.side;
@@ -430,15 +471,8 @@ export function contactChoice(view: PlayerView, data: GameData, contact: Contact
   if (options.length === 1) return options[0]!;
   const state = stateFromView(view, data);
   const stage = roundWindow(data.rules, view.round).stage;
-  const { winner, scores } = resolveFight(state, data, contact.position, contact.blue, contact.red, stage);
+  const { winner } = resolveFight(state, data, contact.position, contact.blue, contact.red, stage);
   const outnumbered = contact[side].length < contact[other(side)].length;
-  let choice: Choice;
-  if (options.includes('trade') && !outnumbered) {
-    const margin = scores[side] - scores[other(side)];
-    const { allInMargin, tradeMargin } = data.aiTuning;
-    choice =
-      margin > allInMargin ? 'fight' : margin < -allInMargin ? 'flee' : margin > tradeMargin ? 'trade' : 'farm';
-  } else if (winner === side || (chase && outnumbered)) choice = 'fight';
-  else choice = 'flee';
+  const choice: Choice = winner === side || (chase && outnumbered) ? 'fight' : 'flee';
   return options.includes(choice) ? choice : contact.defaults[side];
 }

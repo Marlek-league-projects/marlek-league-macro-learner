@@ -1,8 +1,8 @@
 import { matchupAdvantage } from '@lml/data';
-import type { GameData, Lane, Role, Side, Stage } from '@lml/data/contracts';
+import type { GameData, Lane, Role, Side } from '@lml/data/contracts';
 import type { ChampionState, GameEvent, GameState, WavePos } from './contracts';
 import { resolveFight } from './fight';
-import { roundWindow } from './time';
+import { roundWindow, totalRounds } from './time';
 
 const LANES: Lane[] = ['top', 'mid', 'bot'];
 const LANE_ROLES: Record<Lane, Role[]> = { top: ['top'], mid: ['mid'], bot: ['adc', 'support'] };
@@ -63,16 +63,25 @@ export function damageTower(
   events.push({ type: 'towerDamage', tower, side: defender, damage, hp: after, destroyed });
 }
 
-/** Side whose champions present in `lane` score higher in a fight on the lane middle (no tower), null on a tie. */
-function laneScoreWinner(
-  state: GameState,
-  data: GameData,
-  lane: Lane,
-  present: Record<Side, ChampionState[]>,
-  stage: Stage,
-): Side | null {
+/** Alive champions of each side standing on a position of `lane`. */
+function presentIn(state: GameState, data: GameData, lane: Lane): Record<Side, ChampionState[]> {
+  const positions = new Set(data.graph.lanePositions(lane));
+  const inLane = (side: Side): ChampionState[] =>
+    state.champions.filter((c) => c.side === side && c.status === 'alive' && positions.has(c.position));
+  return { blue: inLane('blue'), red: inLane('red') };
+}
+
+/**
+ * Side with lane pressure in `lane`: its champions present there score higher in a fight on the lane middle (no
+ * tower: matchup, level and lead). Null on a tie or when a side has nobody in the lane.
+ */
+export function lanePressure(state: GameState, data: GameData, lane: Lane): Side | null {
+  const present = presentIn(state, data, lane);
+  if (present.blue.length === 0 || present.red.length === 0) return null;
   const mid = data.graph.lanePositions(lane).find((id) => data.graph.positions[id]!.kind === 'laneMid')!;
   const ids = (side: Side): string[] => present[side].map((c) => c.id);
+  const total = totalRounds(data.rules);
+  const stage = roundWindow(data.rules, Math.min(state.round, total)).stage;
   return resolveFight(state, data, mid, ids('blue'), ids('red'), stage).winner;
 }
 
@@ -91,10 +100,7 @@ export function updateLanes(
   const alive = (c: ChampionState): boolean => c.status === 'alive';
 
   for (const lane of LANES) {
-    const positions = new Set(data.graph.lanePositions(lane));
-    const inLane = (side: Side): ChampionState[] =>
-      state.champions.filter((c) => c.side === side && alive(c) && positions.has(c.position));
-    const present = { blue: inLane('blue'), red: inLane('red') };
+    const present = presentIn(state, data, lane);
 
     // 2. wave movement
     const from = state.waves[lane];
@@ -104,7 +110,7 @@ export function updateLanes(
     if (nb !== nr) step = waveToward(nb < nr ? 'blue' : 'red');
     else if (nb > 0) {
       // No trade this round: the laners' fight scores (matchup, lead, strength) decide, nobody dies.
-      const pusher = lane in tradeWinners ? winner : laneScoreWinner(state, data, lane, present, win.stage);
+      const pusher = lane in tradeWinners ? winner : lanePressure(state, data, lane);
       step = pusher ? waveToward(other(pusher)) : 0;
     } else step = -from;
     const to = Math.max(-1, Math.min(1, from + sign(step))) as WavePos;
@@ -142,13 +148,15 @@ export function updateLanes(
     for (const side of ['blue', 'red'] as Side[]) {
       const here = present[side];
       const carries = here.filter((c) => c.role !== 'support');
-      const supported = carries.length < here.length;
       const gold = (rules.economy.farmGoldPerMin * win.seconds) / 60;
       const soloXp = (rules.economy.farmXpPerMin * win.seconds) / 60;
-      // With the support in lane, each duo laner gets `duoXpShare` of a solo laner's xp.
+      // A real adc + support duo: each gets `duoXpShare` of a solo laner's xp. Otherwise a support takes
+      // `supportShare` of it, as of the gold.
+      const duo = here.some((c) => c.role === 'adc') && here.some((c) => c.role === 'support');
       const duoXp = soloXp * rules.economy.duoXpShare;
-      for (const c of carries) grant(c, gold / carries.length, (supported ? duoXp : soloXp) / carries.length);
-      for (const c of here) if (c.role === 'support') grant(c, gold * rules.economy.supportShare, duoXp);
+      for (const c of carries) grant(c, gold / carries.length, (duo ? duoXp : soloXp) / carries.length);
+      const supportXp = duo ? duoXp : soloXp * rules.economy.supportShare;
+      for (const c of here) if (c.role === 'support') grant(c, gold * rules.economy.supportShare, supportXp);
       // 6. trade winner lead
       if (winner === side) for (const c of here) c.bonusLead += rules.economy.tradeLead;
     }

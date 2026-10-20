@@ -60,6 +60,7 @@ export const kindLabel = (p: Position): string => KIND_LABEL[p.kind];
 
 export const CONTACT_LABEL: Record<ContactKind, string> = {
   trade: 'Échange en lane',
+  pressure: 'Pression en lane',
   gank: 'Gank',
   objective: 'Objectif',
   invade: 'Invade',

@@ -47,13 +47,14 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   const contacts = detectContacts(state, data, orders);
   for (const c of s.champions) if (c.status !== 'respawning') c.previous = c.position;
   for (const { c, o } of steps) {
+    if (o.stance !== undefined) c.stance = o.stance;
     if (o.kind === 'spawn') {
       c.position = o.to;
       c.previous = o.to;
       c.status = 'alive';
       c.respawnRound = null;
       events.push({ type: 'moved', champion: c.id, from: `base-${c.side}`, to: o.to });
-    } else if (o.kind === 'move' && o.to !== c.position) {
+    } else if (o.to !== undefined && o.to !== c.position) {
       events.push({ type: 'moved', champion: c.id, from: c.position, to: o.to });
       c.position = o.to;
     }
@@ -86,6 +87,17 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
         tradeWinners[lane] = winner;
         events.push({ type: 'trade', position: contact.position, lane, winner });
       }
+      continue;
+    }
+    if (contact.kind === 'pressure') {
+      // The lone side only farms: it dies only to an All-in won by more than `aiTuning.allInMargin`.
+      const bigger: Side = contact.blue.length > contact.red.length ? 'blue' : 'red';
+      if (choice[bigger] !== 'fight') continue;
+      const { winner, scores } = resolveFight(s, data, contact.position, contact.blue, contact.red, stage);
+      if (winner !== bigger || scores[bigger] - scores[other(bigger)] <= data.aiTuning.allInMargin) continue;
+      events.push({ type: 'fight', position: contact.position, blue: contact.blue, red: contact.red, winner, scores });
+      for (const id of [...contact.blue, ...contact.red]) fighters.add(id);
+      applyKill(s, data, ids[other(winner)], ids[winner], events);
       continue;
     }
     const allIn = SIDES.some((side) => choice[side] === 'fight');

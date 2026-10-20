@@ -196,3 +196,52 @@ describe('jungler objective reach', () => {
     expect(reachable(s, off, j.id)['dragon-pit']).toBeUndefined();
   });
 });
+
+describe('laners follow their wave', () => {
+  const target = (s: GameState, side: string, role: string): string => {
+    const c = get(s, side, role);
+    const o = defaultOrders(s, d, side as 'blue' | 'red').find((x) => x.champion === c.id)!;
+    expect(o.kind).toBe('move');
+    return (o as Extract<Order, { kind: 'move' }>).to;
+  };
+  /** Blue and red mids on the lane middle, the wave at `wave`. */
+  const atMid = (wave: -1 | 0 | 1): GameState => {
+    const s = fresh();
+    get(s, 'blue', 'mid').position = 'mid-lane';
+    get(s, 'red', 'mid').position = 'mid-lane';
+    s.waves.mid = wave;
+    return s;
+  };
+
+  test.each([
+    [-1, 'mid-t1-blue'],
+    [0, 'mid-lane'],
+    [1, 'mid-t1-red'],
+  ] as const)('wave %d: blue and red laners go to %s', (wave, spot) => {
+    const s = atMid(wave);
+    expect(target(s, 'blue', 'mid')).toBe(spot);
+    expect(target(s, 'red', 'mid')).toBe(spot);
+    expect(() => validateOrders(s, d, 'blue', defaultOrders(s, d, 'blue'))).not.toThrow();
+    expect(() => validateOrders(s, d, 'red', defaultOrders(s, d, 'red'))).not.toThrow();
+  });
+
+  test('a wave out of reach is approached one step; a destroyed front tower moves the spot back', () => {
+    const s = fresh();
+    get(s, 'blue', 'top').position = 'top-t2-blue';
+    get(s, 'red', 'top').position = 'top-t2-red';
+    s.waves.top = 1;
+    expect(target(s, 'blue', 'top')).toBe('top-t1-blue');
+    expect(target(s, 'red', 'top')).toBe('top-t1-red');
+    s.towers['top-t1-red'] = 0;
+    s.waves.top = 1;
+    expect(target(s, 'red', 'top')).toBe('top-t2-red');
+  });
+
+  test('a laner away from its lane and a jungler stay put', () => {
+    const s = fresh();
+    get(s, 'blue', 'mid').position = 'scuttle-top';
+    s.waves.mid = 1;
+    expect(target(s, 'blue', 'mid')).toBe('scuttle-top');
+    expect(target(s, 'blue', 'jungle')).toBe(get(s, 'blue', 'jungle').position);
+  });
+});

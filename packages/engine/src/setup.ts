@@ -40,6 +40,7 @@ export function newGame(data: GameData, seed: number, draft?: Draft): GameState 
       champions.push({
         id: picks[side][role], side, role, position, previous: position,
         status: 'alive', respawnRound: null, xp: 0, gold: 0, items: 0, bonusLead: 0, goldEarned: 0, hasHerald: false,
+        stance: 'farm',
       });
     }
   }

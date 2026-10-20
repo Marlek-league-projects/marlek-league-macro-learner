@@ -13,6 +13,7 @@ import type {
   PlayerView,
   Rng,
   RoundWindow,
+  Stance,
   WardSpot,
 } from '@lml/engine/contracts';
 
@@ -45,6 +46,7 @@ export interface Store {
   replayRun: Signal<number>;
   selected: Signal<string | null>;
   pending: Signal<Record<string, Order>>;
+  /** Contacts the player answers; lane contacts resolved from stances (`auto`) are left out. */
   contacts: Signal<Contact[]>;
   choices: Signal<ContactChoices>;
   lastEvents: Signal<GameEvent[]>;
@@ -61,6 +63,8 @@ export interface Store {
   setWard(champion: string, spot: WardSpot | null): void;
   setUnward(champion: string, spot: 'from' | 'to' | null): void;
   setRecall(champion: string): void;
+  /** Sets the champion's lane stance on its order (the pending one, else its default order). */
+  setStance(champion: string, stance: Stance): void;
   setSpawn(champion: string, to: string): void;
   clearOrder(champion: string): void;
   confirmRound(): void;
@@ -267,6 +271,8 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       if (prev?.ward !== undefined) order.ward = prev.ward;
       if (prev?.unward !== undefined) order.unward = prev.unward;
       if (prev?.launchHerald) order.launchHerald = true;
+      const stance = pending.value[id]?.stance;
+      if (stance !== undefined) order.stance = stance;
       place(order);
     },
 
@@ -298,11 +304,20 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       const prev = pending.value[id];
       const order: Order = { kind: 'recall', champion: id };
       if (prev?.kind === 'move' && prev.ward === 'from') order.ward = 'from';
+      if (prev?.stance !== undefined) order.stance = prev.stance;
       place(order);
     },
 
+    setStance(id, stance) {
+      champion(id);
+      const prev = pending.value[id] ?? engine.defaultOrders(current(), data, PLAYER).find((o) => o.champion === id);
+      if (!prev) throw new Error(`${id}: takes no order this round`);
+      place({ ...prev, stance });
+    },
+
     setSpawn(id, to) {
-      place({ kind: 'spawn', champion: id, to });
+      const stance = pending.value[id]?.stance;
+      place(stance === undefined ? { kind: 'spawn', champion: id, to } : { kind: 'spawn', champion: id, to, stance });
     },
 
     clearOrder(id) {
@@ -317,7 +332,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       engine.validateOrders(s, data, PLAYER, blue);
       const red = engine.aiOrders(engine.viewFor(s, data, ENEMY), data, profile!, aiRng!);
       roundOrders = { blue, red };
-      const involving = engine.detectContacts(s, data, roundOrders).filter((c) => c.blue.length > 0);
+      const involving = engine.detectContacts(s, data, roundOrders).filter((c) => c.blue.length > 0 && !c.auto);
       const redView = engine.viewFor(s, data, ENEMY);
       redChoices = {};
       for (const c of involving) {

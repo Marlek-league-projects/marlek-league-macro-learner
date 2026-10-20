@@ -2,7 +2,7 @@ import type { AiProfile, GameData } from '@lml/data/contracts';
 import type { Choice, Contact, Order, PlayerView, Rng } from '../contracts';
 import { createRng } from '../rng';
 import { evaluate } from './evaluate';
-import { assignWards, bestOrders, candidateSets, contactChoice, makeContext, planCandidates, rollMistakes } from './heuristics';
+import { assignStances, assignWards, bestOrders, candidateSets, contactChoice, makeContext, planCandidates, rollMistakes } from './heuristics';
 import { simulate, type SimPolicy } from './simulate';
 
 export { evaluate } from './evaluate';
@@ -16,7 +16,7 @@ export function aiOrders(view: PlayerView, data: GameData, profile: AiProfile, r
   const mistakes = rollMistakes(view, profile, rng);
   const ctx = makeContext(view, data, profile.waveSacrifice);
   const sets = candidateSets(planCandidates(ctx, mistakes, rng), profile.lookahead > 0 ? data.aiTuning.lookaheadSets : 1);
-  const finished = sets.map((set) => assignWards(ctx, set, mistakes));
+  const finished = sets.map((set) => assignStances(ctx, assignWards(ctx, set, mistakes)));
   if (profile.lookahead === 0 || finished.length === 1) return finished[0]!;
 
   // The look-ahead plays mistake-free, so the policy never draws from an rng.

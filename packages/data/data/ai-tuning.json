@@ -4,7 +4,7 @@
   "lookaheadSets": 3,
   "captureShare": 0.5,
   "presenceShare": 0.25,
-  "allInMargin": 4,
+  "allInMargin": 3,
   "tradeMargin": 0.5,
   "waveSacrificeCost": 2000,
   "priorities": {

@@ -245,4 +245,41 @@ describe('store', () => {
     store.replay();
     expect(store.replaying.value).toBe(false);
   });
+
+  test('setStance writes the stance on the order, kept by a later move; it persists after the round', () => {
+    const store = started();
+    const top = blue(store, 'top');
+    store.setStance(top.id, 'allin');
+    const def = engine.defaultOrders(engine.newGame(data, 1), data, 'blue').find((o) => o.champion === top.id)!;
+    expect(store.pending.value[top.id]).toEqual({ ...def, stance: 'allin' });
+    store.setMove(top.id, top.position);
+    expect(store.pending.value[top.id]).toMatchObject({ kind: 'move', to: top.position, stance: 'allin' });
+    store.setRecall(top.id);
+    expect(store.pending.value[top.id]).toEqual({ kind: 'recall', champion: top.id, stance: 'allin' });
+    store.setMove(top.id, top.position);
+    store.confirmRound();
+    store.confirmContacts();
+    expect(blue(store, 'top').stance).toBe('allin');
+  });
+
+  test('lane contacts resolved from stances are never prompted', () => {
+    let auto = 0;
+    const spy = {
+      ...engine,
+      detectContacts: (...args: Parameters<typeof engine.detectContacts>) => {
+        const cs = engine.detectContacts(...args);
+        auto += cs.filter((c) => c.auto).length;
+        return cs;
+      },
+    };
+    const store = createStore(data, spy);
+    store.start({ rank: 'gold', teaching: false, seed: 2 });
+    while (store.screen.value !== 'over') {
+      store.confirmRound();
+      expect(store.contacts.value.every((c) => !c.auto)).toBe(true);
+      store.confirmContacts();
+      store.next();
+    }
+    expect(auto).toBeGreaterThan(0);
+  });
 });

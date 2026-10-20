@@ -12,6 +12,9 @@ export interface Rng {
 /** -1 near blue frontmost tower, 1 near red frontmost tower. */
 export type WavePos = -1 | 0 | 1;
 
+/** A laner's persistent posture in even lane contacts and lane pressure. */
+export type Stance = 'farm' | 'trade' | 'allin';
+
 export interface ChampionState {
   id: string;
   side: Side;
@@ -27,6 +30,8 @@ export interface ChampionState {
   bonusLead: number;
   goldEarned: number;
   hasHerald: boolean;
+  /** Kept until an order changes it. */
+  stance: Stance;
 }
 
 export interface Ward {
