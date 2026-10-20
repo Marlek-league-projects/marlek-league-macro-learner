@@ -1,15 +1,30 @@
 import { useState } from 'preact/hooks';
 import type { ChampionState, Order } from '@lml/engine/contracts';
+import type { GameData } from '@lml/data/contracts';
 import type { Store } from '../store';
 import { championName, errorText, plural, positionLabel, roleIcon } from './format';
+import { deepWardSpots } from './ward-spots';
 
 type Spot = 'from' | 'to';
 
-function SpotChoice({ value, onPick, onlyFrom }: { value: Spot; onPick: (s: Spot) => void; onlyFrom?: boolean }) {
+function SpotChoice({ value, onPick, onlyFrom }: { value: Spot | null; onPick: (s: Spot) => void; onlyFrom?: boolean }) {
   return (
     <div class="seg indent">
       <button class={value === 'from' ? 'on' : ''} onClick={() => onPick('from')}>Départ</button>
       <button class={value === 'to' ? 'on' : ''} disabled={onlyFrom} onClick={() => onPick('to')}>Arrivée</button>
+    </div>
+  );
+}
+
+/** Round-1 deep ward spots (enemy Blue Buff, Raptors) for the jungler. */
+function DeepWardChoice(
+  { data, spots, value, onPick }: { data: GameData; spots: string[]; value: string | null; onPick: (p: string) => void },
+) {
+  return (
+    <div class="seg indent">
+      {spots.map((p) => (
+        <button key={p} class={value === p ? 'on' : ''} onClick={() => onPick(p)}>{positionLabel(data, p)}</button>
+      ))}
     </div>
   );
 }
@@ -86,7 +101,8 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
   const move = order?.kind === 'move' ? order : null;
   const recall = order?.kind === 'recall' ? order : null;
   const ward = move?.ward ?? recall?.ward;
-  const wardSpot: Spot = ward === 'to' ? 'to' : 'from';
+  const wardSpot: Spot | null = ward === 'to' ? 'to' : ward === 'from' ? 'from' : null;
+  const deepSpots = recall ? [] : deepWardSpots(data, c, store.view.value?.round ?? 0);
   const canUnward = data.rules.wards.unwardRoles.includes(c.role);
   const target = data.graph.positions[move?.to ?? c.position];
   const heraldTarget = c.hasHerald && target?.kind === 'tower' && target.side !== c.side;
@@ -106,8 +122,16 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
           />{' '}
           Poser une ward
         </label>
-        {ward !== undefined && typeof ward !== 'object' && (
+        {ward !== undefined && (
           <SpotChoice value={wardSpot} onlyFrom={!!recall} onPick={(s) => run(() => store.setWard(c.id, s))} />
+        )}
+        {ward !== undefined && deepSpots.length > 0 && (
+          <DeepWardChoice
+            data={data}
+            spots={deepSpots}
+            value={typeof ward === 'object' ? ward.position : null}
+            onPick={(position) => run(() => store.setWard(c.id, { position }))}
+          />
         )}
         {canUnward && (
           <>
