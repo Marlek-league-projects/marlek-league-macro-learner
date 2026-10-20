@@ -108,4 +108,43 @@ describe('store', () => {
     expect(store.screen.value).toBe('over');
     expect(store.view.value!.winner).not.toBeNull();
   });
+
+  test('finalScores is null during the game, and matches engine.teamScore at the end', () => {
+    const store = started(7);
+    expect(store.finalScores()).toBeNull();
+    for (let i = 0; i < 37; i++) {
+      store.confirmRound();
+      store.confirmContacts();
+      store.next();
+    }
+    const scores = store.finalScores()!;
+    for (const side of ['blue', 'red'] as const) {
+      const s = scores[side];
+      expect(s.gold + s.objectives + s.plates + s.towers).toBe(s.total);
+    }
+    const winner = store.view.value!.winner;
+    if (winner === 'draw') expect(scores.blue.total).toBe(scores.red.total);
+    else expect(scores[winner!].total).toBeGreaterThan(scores[winner === 'blue' ? 'red' : 'blue'].total);
+  });
+
+  test('roundWindow and level follow the engine', () => {
+    const store = started();
+    expect(store.roundWindow()).toEqual(engine.roundWindow(data.rules, 1));
+    expect(store.totalRounds()).toBe(37);
+    expect(store.level(data.rules.economy.levelXp[2]!)).toBe(3);
+  });
+
+  test('spawnPointsFor lists the engine spawn points of a blue champion', () => {
+    const store = started();
+    const top = blue(store, 'top');
+    expect(store.spawnPointsFor(top.id)).toContain('top-t1-blue');
+  });
+
+  test('setLaunchHerald needs the herald and keeps the move', () => {
+    const store = started();
+    const top = blue(store, 'top');
+    expect(() => store.setLaunchHerald(top.id, true)).toThrow(/herald/);
+    store.setLaunchHerald(top.id, false);
+    expect(store.pending.value[top.id]).toEqual({ kind: 'move', champion: top.id, to: top.position });
+  });
 });

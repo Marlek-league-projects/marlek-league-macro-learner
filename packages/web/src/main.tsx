@@ -1,8 +1,11 @@
 import { render } from 'preact';
+import { jsonGameDataSource } from '@lml/data';
+import { createEngine } from '@lml/engine';
+import { App } from './app';
+import { createStore } from './store';
 
-function App() {
-  return <h1>League Macro Learner</h1>;
-}
+// Composition root: the only module that picks the data source and engine implementations.
+const store = createStore(jsonGameDataSource.load(), createEngine());
 
 const root = document.getElementById('app');
-if (root) render(<App />, root);
+if (root) render(<App store={store} />, root);

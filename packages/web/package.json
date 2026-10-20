@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --hot ./index.html",
-    "build": "bun build ./index.html --outdir dist --minify"
+    "dev": "bun --hot ./dev.ts",
+    "build": "rm -rf dist && bun build ./index.html --outdir dist --minify && cp -R public/assets dist/assets"
   },
   "dependencies": {
     "@lml/data": "workspace:*",

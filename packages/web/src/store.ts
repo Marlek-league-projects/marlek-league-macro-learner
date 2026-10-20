@@ -12,6 +12,7 @@ import type {
   Orders,
   PlayerView,
   Rng,
+  RoundWindow,
   WardSpot,
 } from '@lml/engine/contracts';
 
@@ -23,7 +24,17 @@ export interface Settings {
   seed: number;
 }
 
+/** A side's final score, split as engine.teamScore adds it up. */
+export interface ScoreBreakdown {
+  gold: number;
+  objectives: number;
+  plates: number;
+  towers: number;
+  total: number;
+}
+
 export interface Store {
+  data: GameData;
   screen: Signal<Screen>;
   view: Signal<PlayerView | null>;
   selected: Signal<string | null>;
@@ -46,6 +57,14 @@ export interface Store {
   choose(contactId: string, choice: Choice): void;
   confirmContacts(): void;
   next(): void;
+  /** Time window of `round` (default: the current round, capped at the last one). */
+  roundWindow(round?: number): RoundWindow;
+  totalRounds(): number;
+  level(xp: number): number;
+  spawnPointsFor(champion: string): string[];
+  setLaunchHerald(champion: string, on: boolean): void;
+  /** Both sides' scores once the game is over, otherwise null. */
+  finalScores(): Record<Side, ScoreBreakdown> | null;
 }
 
 const PLAYER: Side = 'blue';
@@ -141,8 +160,18 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     screen.value = result.state.over ? 'over' : 'review';
   };
 
+  const breakdown = (s: GameState, side: Side): ScoreBreakdown => {
+    const { objectives: rules, verdict } = data.rules;
+    const gold = s.champions.filter((c) => c.side === side).reduce((sum, c) => sum + c.goldEarned, 0);
+    const objectives = Object.entries(s.objectivesTaken[side])
+      .reduce((sum, [id, n]) => sum + (n ?? 0) * rules[id as keyof typeof rules].value, 0);
+    const plates = s.platesTaken[side] * verdict.plateValue;
+    const towers = s.towersDestroyed[side] * verdict.towerValue;
+    return { gold, objectives, plates, towers, total: engine.teamScore(s, data, side) };
+  };
+
   return {
-    screen, view, selected, pending, contacts, choices, lastEvents, explanations, settings,
+    data, screen, view, selected, pending, contacts, choices, lastEvents, explanations, settings,
 
     start(s) {
       settings.value = s;
@@ -262,6 +291,39 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       contacts.value = [];
       choices.value = {};
       screen.value = 'orders';
+    },
+
+    roundWindow(round) {
+      const total = engine.totalRounds(data.rules);
+      return engine.roundWindow(data.rules, Math.min(round ?? current().round, total));
+    },
+
+    totalRounds() {
+      return engine.totalRounds(data.rules);
+    },
+
+    level(xp) {
+      return engine.level(xp, data.rules);
+    },
+
+    spawnPointsFor(id) {
+      champion(id);
+      return engine.spawnPoints(current(), data, id);
+    },
+
+    setLaunchHerald(id, on) {
+      const prev = pending.value[id];
+      const base: Extract<Order, { kind: 'move' }> =
+        prev?.kind === 'move' ? { ...prev } : { kind: 'move', champion: id, to: champion(id).position };
+      delete base.launchHerald;
+      if (on) base.launchHerald = true;
+      place(base);
+    },
+
+    finalScores() {
+      const s = state;
+      if (!s?.over) return null;
+      return { blue: breakdown(s, PLAYER), red: breakdown(s, ENEMY) };
     },
   };
 }
