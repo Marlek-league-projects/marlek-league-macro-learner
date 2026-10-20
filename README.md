@@ -2,9 +2,25 @@
 
 A lightweight, turn-based web game for practicing **macro decision-making in League of Legends**: lane priority, rotations, objective control and map awareness.
 
-> Status: early game design. The rules below are a first sketch and will be refined.
+> Status: playable vs-AI prototype. The rules below are still a draft and will be tuned through playtesting.
 
-![Game screen mockup](docs/screen.png)
+![Game screen](docs/screen.png)
+
+## Getting started
+
+Requires [Bun](https://bun.com/).
+
+```sh
+bun install          # install the workspaces
+bun run fetch-data   # optional: refresh champions and images from Data Dragon (outputs are committed)
+bun run dev          # dev server, prints the URL to open
+bun test             # engine, data and web tests
+bun run typecheck    # TypeScript strict, all packages
+bun run check-deps   # enforces the module boundaries (see Architecture)
+bun run build        # static site in packages/web/dist
+```
+
+CI runs typecheck, check-deps, tests and build. For screenshots, the dev server accepts `?autostart=1&rank=gold&seed=42` to skip the start screen and launch a game directly.
 
 ## The idea
 
@@ -279,6 +295,10 @@ packages/
 - **`web`**: Preact + SVG. It displays the state and collects orders, and contains no game rules.
 
 Dependencies only go one way: `web` → `engine` → `data`. This keeps the engine reusable, for example on a server for the online 1v1 mode later. A sandbox scenario is just a hand-built starting state.
+
+**Contracts.** Each module exposes its shared types in `src/contracts/` (imported as `@lml/<pkg>/contracts`). Other modules import only these contracts, never internals. `packages/web/src/main.tsx` is the single composition root: it is the only place that picks the data source and engine implementations and wires them together. `scripts/check-deps.ts` enforces these rules and runs in CI.
+
+**No database.** Game data is static JSON shipped with the site, and the game state lives in memory in the browser.
 
 ## Tech constraints
 
