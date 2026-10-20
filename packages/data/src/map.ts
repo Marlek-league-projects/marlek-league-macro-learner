@@ -1,4 +1,4 @@
-import type { CampType, Lane, MapData, MapGraph, Position, Side } from './types';
+import type { CampType, Lane, MapData, MapGraph, Position, Side } from './contracts';
 
 const swapSide = (s: string): string => s.replace(/\b(blue|red)$/, (m) => (m === 'blue' ? 'red' : 'blue'));
 

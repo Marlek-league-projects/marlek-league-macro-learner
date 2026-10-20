@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
-import { buildGraph, mirrorId, type MapData } from '@lml/data';
+import { buildGraph, mirrorId } from '@lml/data';
+import type { MapData } from '../src/contracts';
 import mapJson from '../data/map.json';
 
 const g = buildGraph(mapJson as MapData);

@@ -2,7 +2,7 @@
 // Run with `bun run fetch-data`. Outputs are committed; the game never calls these sources at runtime.
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { ChampionBase } from '../src/types';
+import type { ChampionBase } from '../src/contracts';
 
 const DDRAGON = 'https://ddragon.leagueoflegends.com';
 const CDRAGON = 'https://raw.communitydragon.org/latest';

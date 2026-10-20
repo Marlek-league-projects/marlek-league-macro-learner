@@ -19,7 +19,7 @@ import type {
   Rules,
   Stage,
   TeachingRule,
-} from './types';
+} from './contracts';
 
 const MISTAKE_IDS: MistakeId[] = [
   'greed',

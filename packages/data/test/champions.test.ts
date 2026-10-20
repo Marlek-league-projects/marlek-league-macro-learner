@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { loadGameData, matchupAdvantage, validateChampions, validateMatchups } from '@lml/data';
-import type { Matchup, RosterEntry, Stage } from '@lml/data';
+import type { Matchup, RosterEntry, Stage } from '../src/contracts';
 
 const data = loadGameData();
 const STAGES: Stage[] = [0, 1, 2, 3, 4];

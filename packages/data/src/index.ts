@@ -1,5 +1,4 @@
 export const DATA_PACKAGE = '@lml/data';
-export * from './types';
 export { buildGraph, mirrorId } from './map';
 export {
   loadGameData,
@@ -10,3 +9,4 @@ export {
   validateChampions,
   validateMatchups,
 } from './load';
+export { jsonGameDataSource } from './json-source';
