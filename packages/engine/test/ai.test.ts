@@ -9,6 +9,7 @@ import {
   detectContacts,
   newGame,
   resolveRound,
+  roundWindow,
   validateOrders,
   viewFor,
 } from '@lml/engine';
@@ -95,18 +96,20 @@ describe('aiOrders', () => {
     }
   });
 
-  function dragonOrder(botWave: -1 | 0 | 1): Order {
+  function dragonOrder(botWave: -1 | 0 | 1, rank: Rank = 'challenger'): Order {
     const s = newGame(d, 7);
     s.round = 10; // dragon spawns at 300 s, in round 11
     s.waves.bot = botWave;
     place(s, 'blue', 'jungle', 'raptors-blue');
-    const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
+    const orders = aiOrders(viewFor(s, d, 'blue'), d, profile(rank), stubRng(() => 0.99));
     validateOrders(s, d, 'blue', orders);
     return orderOf(orders, get(s, 'blue', 'jungle').id);
   }
 
-  test('challenger jungler moves to dragon one round before it spawns when bot has priority', () => {
-    expect(dragonOrder(1)).toMatchObject({ kind: 'move', to: 'dragon-pit', ward: 'to', unward: 'to' });
+  // Laning phase: mid and the bot duo already commit to this Dragon as a wave sacrifice, so Challenger's two-round
+  // look-ahead sends its jungler to the scuttle instead; Grandmaster (one round) keeps the jungler's objective rule.
+  test('grandmaster jungler moves to dragon one round before it spawns when bot has priority', () => {
+    expect(dragonOrder(1, 'grandmaster')).toMatchObject({ kind: 'move', to: 'dragon-pit', ward: 'to', unward: 'to' });
   });
 
   test('without bot priority the challenger jungler does not set up dragon', () => {
@@ -255,6 +258,136 @@ describe('aiOrders', () => {
     // Master looks one round ahead, where staying to farm evaluates better than the recall.
     expect(orderOf(aiOrders(view, d, profile('master'), onlyBadRecall), top.id)).toMatchObject({ kind: 'recall' });
     expect(orderOf(aiOrders(view, d, profile('master'), stubRng(() => 0.99)), top.id)).toMatchObject({ kind: 'move' });
+  });
+});
+
+describe('laning phase', () => {
+  const lastLaningRound = 26; // 810–850 s; round 27 starts at 850 s, past laningPhaseUntil
+  /** No mistake rolled, and every random pick takes the first option. */
+  const onlyMistake = (id?: (typeof MISTAKE_IDS)[number]): Rng =>
+    stubRng((n) => (n < 5 * MISTAKE_IDS.length ? (id && n % MISTAKE_IDS.length === MISTAKE_IDS.indexOf(id) ? 0 : 0.99) : 0));
+
+  test('laningPhaseUntil is 14:00 and covers rounds 1 to 26', () => {
+    expect(d.aiTuning.laningPhaseUntil).toBe(840);
+  });
+
+
+  /**
+   * Why a laner may move off its lane in the laning phase: toward (or onto) a pit whose objective is up or spawns next round
+   * (the Emerald+ wave sacrifice), or back toward its farming spots (lane middle or own T1) from off the lane; null when it is a roam.
+   */
+  function offLaneReason(s: GameState, from: string, to: string): 'sacrifice' | 'return' | null {
+    const next = roundWindow(d.rules, s.round + 1).end;
+    for (const pit of ['dragon-pit', 'baron-pit'] as const) {
+      const p = s.pits[pit];
+      const up = p.objective !== null || (p.nextSpawn !== null && p.nextSpawn <= next);
+      if (up && (to === pit || d.graph.distance(to, pit) < d.graph.distance(from, pit))) return 'sacrifice';
+    }
+    const back = ['top-lane', 'top-t1-blue'].some((t) => d.graph.distance(to, t) < d.graph.distance(from, t));
+    return d.graph.positions[from]!.lane !== 'top' && back ? 'return' : null;
+  }
+
+  test('a challenger top laner stays on top lane positions in rounds 1 to 26, except to recall, respawn or sacrifice its wave', () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      let s = newGame(d, seed);
+      const top = get(s, 'blue', 'top').id;
+      const red = createRng(seed + 1000);
+      const trail: string[] = [];
+      while (s.round <= lastLaningRound) {
+        const orders: Orders = {
+          blue: aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99)),
+          red: aiOrders(viewFor(s, d, 'red'), d, profile('challenger'), red),
+        };
+        const o = orderOf(orders.blue, top);
+        const from = get(s, 'blue', 'top').position;
+        trail.push(`${s.round}:${o.kind === 'move' ? `${from}->${o.to}` : o.kind}`);
+        if (o.kind === 'move') {
+          const pos = d.graph.positions[o.to]!;
+          const inLane = pos.lane === 'top' || pos.kind === 'base';
+          const ok = inLane || offLaneReason(s, from, o.to) !== null;
+          expect(ok ? 'ok' : `seed ${seed}: ${trail.join(' ')}`).toBe('ok');
+        }
+        const choices: ContactChoices = {};
+        for (const c of detectContacts(s, d, orders)) {
+          choices[c.id] = {
+            blue: aiContactChoice(viewFor(s, d, 'blue'), d, c, profile('challenger'), stubRng(() => 0.99)),
+            red: aiContactChoice(viewFor(s, d, 'red'), d, c, profile('challenger'), red),
+          };
+        }
+        s = resolveRound(s, d, orders, choices).state;
+      }
+    }
+  });
+
+  /**
+   * Round 10, Dragon spawning next round, blue bot lane on its pushed wave at the red T1 (priority). The other
+   * blue champions are dead and the red jungler and bot duo were just seen at the pit: no rotation gives the numbers.
+   */
+  function dragonWithPriority(): GameState {
+    const s = newGame(d, 7);
+    s.round = 10;
+    s.waves.bot = 1;
+    for (const role of ['jungle', 'top', 'mid']) get(s, 'blue', role).status = 'dead';
+    for (const role of ['adc', 'support']) place(s, 'blue', role, 'bot-t1-red');
+    for (const role of ['jungle', 'adc', 'support']) {
+      place(s, 'red', role, 'dragon-pit');
+      s.lastSeen.blue[get(s, 'red', role).id] = { position: 'dragon-pit', round: 9 };
+    }
+    return s;
+  }
+  const adcOrder = (s: GameState, rank: Rank, rng: Rng): Order => {
+    const orders = aiOrders(viewFor(s, d, 'blue'), d, profile(rank), rng);
+    validateOrders(s, d, 'blue', orders);
+    return orderOf(orders, get(s, 'blue', 'adc').id);
+  };
+  /** Off the lane, a move closer to the Dragon pit than `from` (bot-t1-red is two moves from it, bot-lane one). */
+  const towardDragon = (o: Order, from = 'bot-t1-red'): boolean =>
+    o.kind === 'move' &&
+    d.graph.positions[o.to]!.lane === undefined &&
+    d.graph.distance(o.to, 'dragon-pit') < d.graph.distance(from, 'dragon-pit');
+
+  test('a rotation to a Dragon with priority is rejected during the laning phase, taken after it', () => {
+    // Diamond: wave sacrifice on, no look-ahead to second-guess the objective rule.
+    for (const rank of ['diamond', 'challenger'] as Rank[]) {
+      const o = adcOrder(dragonWithPriority(), rank, onlyMistake());
+      expect(towardDragon(o)).toBe(false);
+      expect(o.kind === 'move' && d.graph.positions[o.to]!.lane).toBe('bot');
+    }
+
+    const late = dragonWithPriority();
+    late.round = 28; // 910–970 s
+    late.pits['dragon-pit'].nextSpawn = 1000; // spawns next round
+    for (const role of ['jungle', 'adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 27;
+    expect(towardDragon(adcOrder(late, 'diamond', onlyMistake()))).toBe(true);
+  });
+
+  test('a paying wave sacrifice is kept to the laner\'s half of the map: top stays, mid rotates to the Dragon', () => {
+    const s = newGame(d, 7);
+    s.round = 10; // Dragon spawns next round; no enemy seen, the rotation gives the numbers
+    place(s, 'blue', 'jungle', 'raptors-blue');
+    expect(d.graph.distance('top-t1-blue', 'dragon-pit')).toBeLessThanOrEqual(d.rules.moves.jungler);
+    const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('diamond'), onlyMistake());
+    validateOrders(s, d, 'blue', orders);
+    const top = orderOf(orders, get(s, 'blue', 'top').id);
+    expect(top.kind === 'move' && d.graph.positions[top.to]!.lane).toBe('top');
+    expect(towardDragon(orderOf(orders, get(s, 'blue', 'mid').id), 'mid-t1-blue')).toBe(true);
+  });
+
+  test('rotateWithoutPriority still breaks the laning-phase rule', () => {
+    const s = dragonWithPriority();
+    s.waves.bot = -1;
+    expect(towardDragon(adcOrder(s, 'iron', onlyMistake('rotateWithoutPriority')))).toBe(true);
+  });
+
+  test('an iron laner with a forced pointlessPlay roll may roam', () => {
+    const s = newGame(d, 7);
+    s.round = 10;
+    place(s, 'blue', 'top', 'top-t1-blue');
+    const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('iron'), onlyMistake('pointlessPlay'));
+    validateOrders(s, d, 'blue', orders);
+    const o = orderOf(orders, get(s, 'blue', 'top').id);
+    expect(o.kind).toBe('move');
+    expect(d.graph.positions[(o as Extract<Order, { kind: 'move' }>).to]!.lane).toBeUndefined();
   });
 });
 
