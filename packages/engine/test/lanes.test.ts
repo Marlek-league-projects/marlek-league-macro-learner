@@ -53,6 +53,38 @@ describe('waves', () => {
   });
 });
 
+describe('laners staying in lane without a trade', () => {
+  /** Matchup alone decides: strength off, leads zeroed by `fresh`. */
+  const matchupOnly = { ...d, rules: { ...d.rules, fight: { ...d.rules.fight, strength: 0 } } };
+  const onT1s = (): GameState => {
+    const s = fresh();
+    get(s, 'blue', 'top').position = 'top-t1-blue';
+    get(s, 'red', 'top').position = 'top-t1-red';
+    return s;
+  };
+  test('the positive-matchup laner pushes the wave toward the weaker side', () => {
+    const s = onT1s();
+    const adv = matchupAdvantage(d, get(s, 'blue', 'top').id, get(s, 'red', 'top').id, roundWindow(d.rules, 1).stage)!;
+    expect(adv).toBeGreaterThan(0);
+    const ev: GameEvent[] = [];
+    updateLanes(s, matchupOnly, {}, ev);
+    expect(s.waves.top).toBe(1);
+    expect(ev).toContainEqual({ type: 'wave', lane: 'top', from: 0, to: 1 });
+    expect(get(s, 'blue', 'top').bonusLead).toBe(0);
+  });
+  test('an exact tie leaves the wave', () => {
+    const s = onT1s();
+    const neutral = { ...matchupOnly, matchups: [] };
+    updateLanes(s, neutral, {}, []);
+    expect(s.waves.top).toBe(0);
+  });
+  test('a tied trade this round leaves the wave even if the scores differ', () => {
+    const s = onT1s();
+    updateLanes(s, matchupOnly, { top: null }, []);
+    expect(s.waves.top).toBe(0);
+  });
+});
+
 describe('towers', () => {
   test('3 attackers remove pushDamage[2]; grubs and baron multiply', () => {
     const s = push3();

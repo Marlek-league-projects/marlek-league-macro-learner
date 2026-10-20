@@ -1,6 +1,7 @@
 import { matchupAdvantage } from '@lml/data';
-import type { GameData, Lane, Role, Side } from '@lml/data/contracts';
+import type { GameData, Lane, Role, Side, Stage } from '@lml/data/contracts';
 import type { ChampionState, GameEvent, GameState, WavePos } from './contracts';
+import { resolveFight } from './fight';
 import { roundWindow } from './time';
 
 const LANES: Lane[] = ['top', 'mid', 'bot'];
@@ -62,7 +63,23 @@ export function damageTower(
   events.push({ type: 'towerDamage', tower, side: defender, damage, hp: after, destroyed });
 }
 
-/** Mutates `state`: waves, tower hp, gold, xp and trade lead for one round. */
+/** Side whose champions present in `lane` score higher in a fight on the lane middle (no tower), null on a tie. */
+function laneScoreWinner(
+  state: GameState,
+  data: GameData,
+  lane: Lane,
+  present: Record<Side, ChampionState[]>,
+  stage: Stage,
+): Side | null {
+  const mid = data.graph.lanePositions(lane).find((id) => data.graph.positions[id]!.kind === 'laneMid')!;
+  const ids = (side: Side): string[] => present[side].map((c) => c.id);
+  return resolveFight(state, data, mid, ids('blue'), ids('red'), stage).winner;
+}
+
+/**
+ * Mutates `state`: waves, tower hp, gold, xp and trade lead for one round. A lane in `tradeWinners` had a trade
+ * contact this round (null: tied); otherwise even laners push by fight score.
+ */
 export function updateLanes(
   state: GameState,
   data: GameData,
@@ -85,8 +102,11 @@ export function updateLanes(
     const winner = tradeWinners[lane] ?? null;
     let step: number;
     if (nb !== nr) step = waveToward(nb < nr ? 'blue' : 'red');
-    else if (nb > 0) step = winner ? waveToward(other(winner)) : 0;
-    else step = -from;
+    else if (nb > 0) {
+      // No trade this round: the laners' fight scores (matchup, lead, strength) decide, nobody dies.
+      const pusher = lane in tradeWinners ? winner : laneScoreWinner(state, data, lane, present, win.stage);
+      step = pusher ? waveToward(other(pusher)) : 0;
+    } else step = -from;
     const to = Math.max(-1, Math.min(1, from + sign(step))) as WavePos;
     state.waves[lane] = to;
     if (to !== from) events.push({ type: 'wave', lane, from, to });
