@@ -4,6 +4,7 @@ import { detectContacts } from './contacts';
 import { defaultOrders, reachable, spawnPoints, validateOrders } from './movement';
 import { resolveRound } from './round';
 import { newGame } from './setup';
+import { explainRound } from './teaching';
 import { eventsFor, viewFor } from './vision';
 
 export const ENGINE_PACKAGE = '@lml/engine';
@@ -19,11 +20,12 @@ export { spawnObjectives, clearCamps, captureObjectives, launchHeralds } from '.
 export { level, applyKill, completeRecall, advanceRespawns, teamScore, finishIfOver } from './economy';
 export { visibleEnemies, viewFor, eventsFor } from './vision';
 export { resolveRound } from './round';
+export { explainRound } from './teaching';
 export { aiOrders, aiContactChoice, evaluate } from './ai';
 
 export function createEngine(): GameEngine {
   return {
     newGame, defaultOrders, reachable, spawnPoints, validateOrders, detectContacts, resolveRound, viewFor, eventsFor,
-    aiOrders, aiContactChoice,
+    aiOrders, aiContactChoice, explainRound,
   };
 }

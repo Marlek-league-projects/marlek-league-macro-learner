@@ -1,8 +1,17 @@
-[
-  { "id": "recall-wave-under-tower", "roundsLost": 2, "text": "{champion} a recall avec sa vague qui arrive sous sa tour : tu perds la vague et des plaques." },
-  { "id": "left-lane-without-priority", "roundsLost": 1, "text": "{champion} a quitté sa lane sans avoir poussé sa vague : son vis-à-vis prend l'avance." },
-  { "id": "outnumbered-death", "roundsLost": 1, "text": "{champion} est mort à {position} en {n}v{m} : l'adversaire est arrivé en surnombre." },
-  { "id": "enemy-rotated-with-priority", "roundsLost": 0, "text": "L'adversaire avait la priorité en lane et a décalé à {position} en premier." },
-  { "id": "objective-uncontested", "roundsLost": 0, "text": "L'adversaire a pris {objective} sans opposition." },
-  { "id": "late-death", "roundsLost": 1, "text": "Mort en late game : {champion} rate un round de plus." }
-]
+{
+  "rules": [
+    {"id": "recall-wave-under-tower", "roundsLost": 2, "text": "{champion} a recall avec sa vague qui arrive sous sa tour : tu perds la vague et des plaques."},
+    {"id": "left-lane-without-priority", "roundsLost": 1, "text": "{champion} a quitté sa lane sans avoir poussé sa vague : son vis-à-vis prend l'avance."},
+    {"id": "outnumbered-death", "roundsLost": 1, "text": "{champion} est mort à {position} en {n}v{m} : l'adversaire est arrivé en surnombre."},
+    {"id": "enemy-rotated-with-priority", "roundsLost": 0, "text": "L'adversaire avait la priorité en lane et a décalé à {position} en premier."},
+    {"id": "objective-uncontested", "roundsLost": 0, "text": "L'adversaire a pris {objective} sans opposition."},
+    {"id": "late-death", "roundsLost": 1, "text": "Mort en late game : {champion} rate un round de plus."}
+  ],
+  "objectiveNames": {
+    "dragon": "le Dragon",
+    "voidgrubs": "les Larves",
+    "herald": "le Herald",
+    "baron": "le Nashor",
+    "scuttle": "le Carapateur"
+  }
+}

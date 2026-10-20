@@ -3,6 +3,7 @@ import type { Choice, Contact, ContactChoices } from './contacts';
 import type { GameEvent } from './events';
 import type { Order, Orders } from './orders';
 import type { GameState, Rng } from './state';
+import type { Explanation } from './teaching';
 import type { PlayerView } from './view';
 
 export type Draft = Record<Side, Record<Role, string>>;
@@ -26,6 +27,6 @@ export interface GameEngine {
   /** AI orders from what its side sees (a view, never the state). */
   aiOrders(view: PlayerView, data: GameData, profile: AiProfile, rng: Rng): Order[];
   aiContactChoice(view: PlayerView, data: GameData, contact: Contact, profile: AiProfile, rng: Rng): Choice;
-  /** Added by Task 13. */
-  explainRound?: unknown;
+  /** Tempo lessons for `side` from the round `before` → `after`, using only what `side` saw. */
+  explainRound(before: GameState, after: GameState, events: GameEvent[], data: GameData, side: Side): Explanation[];
 }

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { loadGameData, validateAiProfiles, validateAiTuning, validateRules, validateTeaching } from '@lml/data';
+import { loadGameData, validateAiProfiles, validateAiTuning, validateRules, validateObjectiveNames, validateTeaching } from '@lml/data';
 
 const data = loadGameData();
 
@@ -59,4 +59,11 @@ test('validateAiProfiles and validateTeaching reject bad data', () => {
   const teaching = structuredClone(data.teaching);
   teaching[0]!.text = ' ';
   expect(() => validateTeaching(teaching)).toThrow(/teaching/);
+});
+
+test('objective names are loaded and validated', () => {
+  expect(data.objectiveNames.scuttle).toBe('le Carapateur');
+  const names = structuredClone(data.objectiveNames);
+  names.baron = '';
+  expect(() => validateObjectiveNames(names)).toThrow(/objectiveNames\.baron/);
 });

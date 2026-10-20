@@ -140,3 +140,11 @@ export interface TeachingRule {
   roundsLost: number;
   text: string;
 }
+
+/** French display names of objectives, used for the {objective} placeholder. */
+export type ObjectiveNames = Record<ObjectiveId, string>;
+
+export interface TeachingData {
+  rules: TeachingRule[];
+  objectiveNames: ObjectiveNames;
+}

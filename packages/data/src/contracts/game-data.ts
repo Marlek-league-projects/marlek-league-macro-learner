@@ -1,4 +1,4 @@
-import type { AiProfile, AiTuning, Rules, TeachingRule } from './rules';
+import type { AiProfile, AiTuning, ObjectiveNames, Rules, TeachingRule } from './rules';
 import type { Champion, DuoMatchup, Matchup } from './champions';
 import type { MapData, MapGraph } from './map';
 
@@ -13,6 +13,7 @@ export interface GameData {
   aiProfiles: AiProfile[];
   aiTuning: AiTuning;
   teaching: TeachingRule[];
+  objectiveNames: ObjectiveNames;
 }
 
 export interface GameDataSource {

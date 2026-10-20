@@ -16,11 +16,14 @@ import type {
   DuoMatchup,
   GameData,
   MapData,
+  ObjectiveId,
+  ObjectiveNames,
   Matchup,
   MistakeId,
   RosterEntry,
   Rules,
   Stage,
+  TeachingData,
   TeachingRule,
 } from './contracts';
 
@@ -94,6 +97,14 @@ export function validateTeaching(rules: TeachingRule[]): void {
   }
 }
 
+const OBJECTIVE_IDS: ObjectiveId[] = ['scuttle', 'dragon', 'voidgrubs', 'herald', 'baron'];
+
+export function validateObjectiveNames(names: ObjectiveNames): void {
+  for (const id of OBJECTIVE_IDS) {
+    if (!names?.[id] || names[id].trim() === '') fail('teaching', `objectiveNames.${id} is missing or empty`);
+  }
+}
+
 function checkRange(section: string, value: number | undefined, min: number, max: number): void {
   if (typeof value !== 'number' || value < min || value > max) fail(section, `value ${value} is not in ${min}..${max}`);
 }
@@ -142,11 +153,12 @@ export function loadGameData(): GameData {
   const rules = rulesJson as Rules;
   const aiProfiles = aiProfilesJson as AiProfile[];
   const aiTuning = aiTuningJson as AiTuning;
-  const teaching = teachingJson as TeachingRule[];
+  const { rules: teaching, objectiveNames } = teachingJson as TeachingData;
   validateRules(rules);
   validateAiProfiles(aiProfiles);
   validateAiTuning(aiTuning);
   validateTeaching(teaching);
+  validateObjectiveNames(objectiveNames);
   const map = mapJson as MapData;
   const championList = championsJson as ChampionBase[];
   const roster = rosterJson as RosterEntry[];
@@ -168,5 +180,6 @@ export function loadGameData(): GameData {
     aiProfiles,
     aiTuning,
     teaching,
+    objectiveNames,
   };
 }

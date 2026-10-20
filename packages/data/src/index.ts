@@ -8,6 +8,7 @@ export {
   validateAiProfiles,
   validateAiTuning,
   validateTeaching,
+  validateObjectiveNames,
   validateChampions,
   validateMatchups,
 } from './load';
