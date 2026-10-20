@@ -37,6 +37,16 @@ export const dec = (n: number): string => n.toLocaleString('fr-FR', { maximumFra
 /** `+1 450` / `−320`. */
 export const signed = (n: number): string => (Math.round(n) >= 0 ? `+${num(n)}` : `−${num(-n)}`);
 
+/** Team gold advantage: `+1,2k` / `−3,4k` from 1 000 on, else `+800` / `−800` / `0`. */
+export function goldLead(n: number): string {
+  const r = Math.round(n);
+  if (r === 0) return '0';
+  const sign = r > 0 ? '+' : '−';
+  const abs = Math.abs(r);
+  if (abs < 1000) return `${sign}${abs}`;
+  return `${sign}${(abs / 1000).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k`;
+}
+
 export const plural = (n: number, word: string): string => `${n} ${word}${n > 1 ? 's' : ''}`;
 
 export const OBJECTIVE_LABEL: Record<ObjectiveId, string> = {

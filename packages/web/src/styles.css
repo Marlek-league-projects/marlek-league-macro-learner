@@ -15,12 +15,13 @@ h2 { font-size:18px; margin:0; }
 .team.ally { border-top:3px solid var(--blue); }
 .team.enemy { border-bottom:3px solid var(--red); }
 .teamhead { display:flex; flex-wrap:wrap; gap:16px; align-items:center; margin-bottom:8px; font-size:13px; }
-.teamhead.foot { margin:8px 0 0; }
 .teamhead b { font-size:14px; }
 .kpi { color:var(--mut); } .kpi strong { color:var(--txt); }
 .pos { color:#4ade80 } .neg { color:#f87171 }
 .kpi strong.pos { color:#4ade80 } .kpi strong.neg { color:#f87171 }
-.cards { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+.cards { display:grid; grid-template-columns:1fr; gap:6px; }
+.teams-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.teams-row .cards { grid-template-columns:repeat(5,1fr); }
 .card { background:#0d1117; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:12px; }
 .card.pick { cursor:pointer; }
 .card.pick:hover { border-color:#6e7681; }
@@ -35,9 +36,25 @@ h2 { font-size:18px; margin:0; }
 .ri { width:16px; height:16px; vertical-align:-3px; margin-right:3px; }
 .sq { width:16px; height:16px; border-radius:3px; vertical-align:-3px; margin-right:4px; }
 
-/* Middle row */
-.mid { display:grid; grid-template-columns:190px minmax(0,1fr) 190px; gap:12px; margin:12px 0; align-items:start; }
-.mapbox { background:#2b3428; border-radius:10px; padding:6px; justify-self:center; width:100%; max-width:calc(100vh - 225px); }
+/* Scoreboard */
+.scoreboard { display:flex; gap:14px; align-items:baseline; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:5px 12px; font-size:13px; color:var(--mut); }
+.sb-item b { color:var(--txt); font-size:15px; }
+.sb-item b.sb-me { color:#93c5fd; } .sb-item b.sb-them { color:#fca5a5; }
+.sb-item b.pos { color:#4ade80; } .sb-item b.neg { color:#f87171; }
+
+/* Game: ally column, map with the round panel below, enemy column */
+.game { display:grid; grid-template-columns:minmax(180px,230px) minmax(0,1fr) minmax(180px,230px); gap:12px; margin:10px 0; align-items:start; }
+.center { display:flex; flex-direction:column; align-items:center; gap:12px; min-width:0; }
+.center > .side { width:100%; max-width:calc(100vh - 92px); }
+.mapbox { position:relative; background:#2b3428; border-radius:10px; padding:6px; width:100%; max-width:calc(100vh - 92px); }
+.over .mapbox { max-width:calc(100vh - 225px); justify-self:center; }
+
+/* Actions popover, next to the selected pawn */
+.popover { position:absolute; z-index:5; width:230px; background:#161b22f2; border:1px solid #6e7681; border-radius:8px; padding:8px 10px; font-size:12px; display:flex; flex-direction:column; gap:6px; box-shadow:0 6px 18px #000a; }
+.popover .close { position:absolute; top:4px; right:4px; padding:0 6px; line-height:18px; background:none; border:none; color:var(--mut); font-size:16px; }
+.popover button { padding:4px 6px; }
+.popover .opt label { margin:1px 0; }
+.seg.stance button { font-weight:600; }
 svg { width:100%; display:block; }
 .mpos.act .hit { cursor:pointer; }
 .mpos:hover .node { stroke:#fff; stroke-width:3; }
@@ -69,6 +86,9 @@ svg { width:100%; display:block; }
 .opt { display:flex; flex-direction:column; gap:4px; }
 .opt label { display:block; margin:3px 0; }
 .seg { display:flex; gap:4px; } .seg button { flex:1; }
+.choices { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+.choices button { min-width:0; white-space:normal; }
+.contacts { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:8px; }
 .seg.indent { margin:2px 0 6px 18px; }
 .stack { display:flex; flex-direction:column; gap:4px; }
 button { background:#21262d; color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font:inherit; cursor:pointer; }

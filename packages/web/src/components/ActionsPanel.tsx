@@ -1,9 +1,16 @@
-import { useState } from 'preact/hooks';
-import type { ChampionState, Order } from '@lml/engine/contracts';
+import { useLayoutEffect, useRef, useState } from 'preact/hooks';
+import type { ChampionState, Order, Stance } from '@lml/engine/contracts';
 import type { GameData } from '@lml/data/contracts';
 import type { Store } from '../store';
 import { championName, errorText, plural, positionLabel, roleIcon } from './format';
+import { placePopover } from './popover';
 import { deepWardSpots } from './ward-spots';
+
+const STANCES: { id: Stance; label: string }[] = [
+  { id: 'farm', label: 'Farmer' },
+  { id: 'trade', label: 'Trade' },
+  { id: 'allin', label: 'All-in' },
+];
 
 type Spot = 'from' | 'to';
 
@@ -29,30 +36,57 @@ function DeepWardChoice(
   );
 }
 
-export function ActionsPanel({ store }: { store: Store }) {
+/**
+ * The selected pawn's actions, floating next to it inside the map box (its offset parent).
+ * `anchor` (the pawn) and `avoid` (positions it should leave clickable) are shares (0..1) of the map's drawing.
+ */
+export function ActionsPanel(
+  { store, anchor, avoid }: { store: Store; anchor: { x: number; y: number }; avoid: { x: number; y: number }[] },
+) {
   const [error, setError] = useState<{ champion: string; text: string } | null>(null);
+  const [at, setAt] = useState<{ left: number; top: number } | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const view = store.view.value;
   const id = store.screen.value === 'orders' ? store.selected.value : null;
   const c = view?.allies.find((x) => x.id === id) ?? null;
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const box = el?.parentElement;
+    const svg = box?.querySelector('svg');
+    if (!el || !box || !svg) return;
+    const b = box.getBoundingClientRect();
+    const m = svg.getBoundingClientRect();
+    const px = (p: { x: number; y: number }) => ({ x: m.left - b.left + p.x * m.width, y: m.top - b.top + p.y * m.height });
+    const next = placePopover(
+      px(anchor),
+      { width: el.offsetWidth, height: el.offsetHeight },
+      { width: box.clientWidth, height: box.clientHeight },
+      avoid.map(px),
+    );
+    if (!at || Math.abs(at.left - next.left) > 0.5 || Math.abs(at.top - next.top) > 0.5) setAt(next);
+  });
+
+  if (!c) return null;
 
   const run = (fn: () => void) => {
     try {
       fn();
       setError(null);
     } catch (err) {
-      if (c) setError({ champion: c.id, text: errorText(err) });
+      setError({ champion: c.id, text: errorText(err) });
     }
   };
 
   return (
-    <div class="side">
-      <h3>Actions</h3>
-      {c ? <ChampionActions store={store} c={c} order={store.pending.value[c.id]} run={run} /> : (
-        <div class="note">
-          Clique un de tes pions sur la carte. Les positions atteignables ce round s'allument.
-        </div>
-      )}
-      {c && error?.champion === c.id && <div class="error">{error.text}</div>}
+    <div
+      ref={ref}
+      class="popover"
+      style={at ? { left: `${at.left}px`, top: `${at.top}px` } : { visibility: 'hidden' }}
+    >
+      <button class="close" title="Fermer" onClick={() => store.select(null)}>×</button>
+      <ChampionActions store={store} c={c} order={store.pending.value[c.id]} run={run} />
+      {error?.champion === c.id && <div class="error">{error.text}</div>}
     </div>
   );
 }
@@ -106,6 +140,8 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
   const canUnward = data.rules.wards.unwardRoles.includes(c.role);
   const target = data.graph.positions[move?.to ?? c.position];
   const heraldTarget = c.hasHerald && target?.kind === 'tower' && target.side !== c.side;
+  const stance = (move ?? recall)?.stance ?? c.stance;
+  const stepThenRecall = recall?.to !== undefined || (move !== null && data.graph.distance(c.position, move.to) === 1);
 
   return (
     <>
@@ -113,6 +149,15 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
       <div class="note">
         Portée : {plural(moves, 'mouvement')}. Clique une position allumée.
       </div>
+      {c.role !== 'jungle' && (
+        <div class="seg stance" title="Attitude en lane, gardée d'un round à l'autre">
+          {STANCES.map((s) => (
+            <button key={s.id} class={stance === s.id ? 'on' : ''} onClick={() => run(() => store.setStance(c.id, s.id))}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
       <div class="opt">
         <label>
           <input
@@ -148,7 +193,9 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
             )}
           </>
         )}
-        <button class={`wide${recall ? ' on' : ''}`} onClick={() => run(() => store.setRecall(c.id))}>Recall</button>
+        <button class={`wide${recall ? ' on' : ''}`} onClick={() => run(() => store.setRecall(c.id))}>
+          {stepThenRecall ? 'Déplacement puis recall' : 'Recall'}
+        </button>
         {heraldTarget && (
           <button
             class={`wide${move?.launchHerald ? ' on' : ''}`}
