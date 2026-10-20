@@ -1,4 +1,4 @@
-import type { Role, Side } from '@lml/data/contracts';
+import type { Lane, Role, Side } from '@lml/data/contracts';
 import type { ChampionState, GameState, Ward } from './state';
 
 /** What a side knows about one enemy champion. */
@@ -46,4 +46,6 @@ export interface PlayerView {
   platesTaken: GameState['platesTaken'];
   towersDestroyed: GameState['towersDestroyed'];
   scoreboard: Scoreboard;
+  /** Per lane, the side whose laner pushes the wave this round (null: even). */
+  pressure: Record<Lane, Side | null>;
 }

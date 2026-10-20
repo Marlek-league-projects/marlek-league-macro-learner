@@ -9,6 +9,9 @@ export interface Rng {
   state(): number;
 }
 
+/** A laner's attitude in its lane (playtest 2). */
+export type Stance = 'farm' | 'trade' | 'allin';
+
 /** -1 near blue frontmost tower, 1 near red frontmost tower. */
 export type WavePos = -1 | 0 | 1;
 
@@ -27,6 +30,7 @@ export interface ChampionState {
   bonusLead: number;
   goldEarned: number;
   hasHerald: boolean;
+  stance: Stance;
 }
 
 export interface Ward {

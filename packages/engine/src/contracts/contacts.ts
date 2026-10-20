@@ -1,7 +1,7 @@
 import type { Side } from '@lml/data/contracts';
 
 export type Choice = 'farm' | 'trade' | 'fight' | 'flee';
-export type ContactKind = 'trade' | 'gank' | 'objective' | 'invade' | 'skirmish';
+export type ContactKind = 'trade' | 'gank' | 'objective' | 'invade' | 'skirmish' | 'pressure';
 
 export interface Contact {
   /** Same as `position`: at most one contact per position. */
@@ -15,6 +15,8 @@ export interface Contact {
   defaults: Record<Side, Choice>;
   /** Side entering an enemy camp, for `invade` contacts. */
   invader: Side | null;
+  /** Resolved without asking the player. */
+  auto?: boolean;
 }
 
 /** Contact id to the choices given so far. */
