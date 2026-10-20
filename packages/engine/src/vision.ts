@@ -122,7 +122,7 @@ export function viewFor(state: GameState, data: GameData, side: Side): PlayerVie
  * enemy ones only where `side` saw them: the enemy was visible at the resolution, or the event's position
  * is in a lane holding an own alive champion, holds one, holds an own champion killed this round, or holds
  * a visible enemy. Contacts (fight, trade, death) always involve both sides, and waves, tower damage,
- * herald launches and taken objectives are public.
+ * herald launches and taken objectives other than the scuttle are public.
  */
 export function eventsFor(events: GameEvent[], after: GameState, data: GameData, side: Side): GameEvent[] {
   const byId = new Map(after.champions.map((c) => [c.id, c]));
@@ -143,8 +143,10 @@ export function eventsFor(events: GameEvent[], after: GameState, data: GameData,
       case 'wave':
       case 'towerDamage':
       case 'heraldLaunched':
-      case 'objectiveTaken':
         return true;
+      case 'objectiveTaken':
+        // Epic objectives are announced to everyone; a scuttle take is not.
+        return e.objective !== 'scuttle' || e.side === side || seen.has(e.position);
       case 'moved':
         return enemySeen(e.champion) || seen.has(e.to);
       case 'fled':

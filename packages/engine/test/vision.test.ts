@@ -115,15 +115,7 @@ describe('fog of war on objectives', () => {
   });
 
   test('an unseen enemy scuttle take leaves the scuttle shown as before', () => {
-    const run = (ward: boolean): GameState => {
-      const s = newGame(d, 5);
-      s.round = 7;
-      place(s, 'red', 'jungle', 'raptors-red');
-      place(s, 'blue', 'jungle', 'gromp-blue');
-      if (ward) s.wards.push({ side: 'blue', position: 'scuttle-top', placedRound: 6 });
-      const rj = get(s, 'red', 'jungle').id;
-      return resolveRound(s, d, ordersWith(s, [{ kind: 'move', champion: rj, to: 'scuttle-top' }]), {}).state;
-    };
+    const run = (ward: boolean): GameState => runScuttle(ward).state;
     const taken = d.rules.objectives.scuttle.respawn! + 230;
     const unseen = run(false);
     expect(unseen.scuttles['scuttle-top']).toBe(taken);
@@ -131,7 +123,36 @@ describe('fog of war on objectives', () => {
     expect(viewFor(unseen, d, 'red').scuttles['scuttle-top']).toBe(taken);
     expect(viewFor(run(true), d, 'blue').scuttles['scuttle-top']).toBe(taken);
   });
+
+  test('an enemy scuttle take is announced only where seen; epic objectives always', () => {
+    const scuttleTaken = (ward: boolean, side: 'blue' | 'red'): boolean => {
+      const { state, events } = runScuttle(ward);
+      expect(events.some((e) => e.type === 'objectiveTaken' && e.objective === 'scuttle')).toBe(true);
+      return eventsFor(events, state, d, side).some((e) => e.type === 'objectiveTaken' && e.objective === 'scuttle');
+    };
+    expect(scuttleTaken(false, 'blue')).toBe(false);
+    expect(scuttleTaken(false, 'red')).toBe(true);
+    expect(scuttleTaken(true, 'blue')).toBe(true);
+
+    const s = newGame(d, 5);
+    s.round = 13;
+    place(s, 'red', 'jungle', 'dragon-pit');
+    s.pits['dragon-pit'] = { objective: 'dragon', nextSpawn: null, capture: { side: 'red', startedRound: 12 } };
+    const { state, events } = resolveRound(s, d, ordersWith(s), {});
+    expect(events.some((e) => e.type === 'objectiveTaken' && e.objective === 'dragon')).toBe(true);
+    expect(eventsFor(events, state, d, 'blue').some((e) => e.type === 'objectiveTaken' && e.objective === 'dragon')).toBe(true);
+  });
 });
+
+function runScuttle(ward: boolean): ReturnType<typeof resolveRound> {
+  const s = newGame(d, 5);
+  s.round = 7;
+  place(s, 'red', 'jungle', 'raptors-red');
+  place(s, 'blue', 'jungle', 'gromp-blue');
+  if (ward) s.wards.push({ side: 'blue', position: 'scuttle-top', placedRound: 6 });
+  const rj = get(s, 'red', 'jungle').id;
+  return resolveRound(s, d, ordersWith(s, [{ kind: 'move', champion: rj, to: 'scuttle-top' }]), {});
+}
 
 describe('eventsFor', () => {
   test('keeps enemy moves only when the enemy was seen', () => {
