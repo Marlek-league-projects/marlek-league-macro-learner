@@ -171,6 +171,7 @@ export function clearCamps(
     const r = rules.camps;
     grant(c, buff ? r.buffGold : r.smallGold, buff ? r.buffXp : r.smallXp);
     state.camps[camp] = end + (buff ? r.buffRespawn : r.smallRespawn);
+    state.campsSeen[c.side][camp] = state.camps[camp]!;
     events.push({ type: 'campCleared', camp, champion: c.id });
   };
 

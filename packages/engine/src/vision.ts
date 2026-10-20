@@ -40,7 +40,7 @@ export function visibleEnemies(state: GameState, data: GameData, side: Side): st
 }
 
 /**
- * End of round: records the enemies and scuttle timers each side sees, then drops wards whose
+ * End of round: records the enemies, scuttle and camp timers each side sees, then drops wards whose
  * vision is spent.
  */
 export function updateVision(state: GameState, data: GameData): void {
@@ -51,6 +51,7 @@ export function updateVision(state: GameState, data: GameData): void {
     }
     const seen = seenPositions(state, data, side);
     for (const id of SCUTTLES) if (seen.has(id)) state.scuttlesSeen[side][id] = state.scuttles[id];
+    for (const [id, t] of Object.entries(state.camps)) if (seen.has(id)) state.campsSeen[side][id] = t;
   }
   state.wards = state.wards.filter((w) => w.placedRound >= state.round);
 }
@@ -69,7 +70,8 @@ function seenLastRound(state: GameState, side: Side): Map<string, string> {
  * What `side` knows at the start of `state.round`. Fog of war:
  * - enemies seen when the previous round resolved show where they are, the others their last seen position;
  * - an enemy pit capture shows only if an enemy was seen on that pit;
- * - scuttle timers are the side's last seen ones, so an unseen enemy take leaves the scuttle shown as before.
+ * - scuttle timers are the side's last seen ones, so an unseen enemy take leaves the scuttle shown as before;
+ * - own camp timers likewise (seen with an own champion or active ward on the camp, or cleared by the side).
  */
 export function viewFor(state: GameState, data: GameData, side: Side): PlayerView {
   const visible = seenLastRound(state, side);
@@ -88,7 +90,7 @@ export function viewFor(state: GameState, data: GameData, side: Side): PlayerVie
       };
     });
   const camps: GameState['camps'] = {};
-  for (const [id, t] of Object.entries(state.camps)) {
+  for (const [id, t] of Object.entries(state.campsSeen[side])) {
     if (data.graph.positions[id]?.side === side) camps[id] = t;
   }
   const s = structuredClone(state);

@@ -144,6 +144,47 @@ describe('fog of war on objectives', () => {
   });
 });
 
+describe('fog of war on own camps', () => {
+  /** Red jungler invades blue raptors in round 7; blue watches it with a champion there or a ward, or not at all. */
+  const invade = (watch: 'none' | 'champion' | 'ward'): GameState => {
+    const s = newGame(d, 5);
+    s.round = 7;
+    place(s, 'red', 'jungle', 'scuttle-bot');
+    place(s, 'blue', 'jungle', 'gromp-blue');
+    if (watch === 'champion') place(s, 'blue', 'jungle', 'raptors-blue');
+    if (watch === 'ward') s.wards.push({ side: 'blue', position: 'raptors-blue', placedRound: 6 });
+    const rj = get(s, 'red', 'jungle').id;
+    const bj = get(s, 'blue', 'jungle').id;
+    const stay: Order[] = watch === 'champion' ? [{ kind: 'move', champion: bj, to: 'raptors-blue' }] : [];
+    return resolveRound(s, d, ordersWith(s, [{ kind: 'move', champion: rj, to: 'raptors-blue' }, ...stay]), {}).state;
+  };
+
+  test('an unseen enemy invade leaves the own camp shown alive as before', () => {
+    const s = invade('none');
+    expect(s.camps['raptors-blue']).toBeGreaterThan(d.rules.camps.firstSpawn);
+    expect(viewFor(s, d, 'blue').camps['raptors-blue']).toBe(d.rules.camps.firstSpawn);
+  });
+
+  test('an own champion or an own ward on the camp updates its timer', () => {
+    for (const watch of ['champion', 'ward'] as const) {
+      const s = invade(watch);
+      expect(viewFor(s, d, 'blue').camps['raptors-blue']).toBe(s.camps['raptors-blue']!);
+      expect(viewFor(s, d, 'blue').camps['raptors-blue']).toBeGreaterThan(d.rules.camps.firstSpawn);
+    }
+  });
+
+  test('a camp the side clears itself shows its respawn timer, enemy camps never show', () => {
+    const s = newGame(d, 5);
+    s.round = 7;
+    place(s, 'blue', 'jungle', 'redbuff-blue');
+    const { state } = resolveRound(s, d, ordersWith(s), {});
+    const view = viewFor(state, d, 'blue');
+    expect(view.camps['redbuff-blue']).toBe(state.camps['redbuff-blue']!);
+    expect(view.camps['redbuff-blue']).toBeGreaterThan(d.rules.camps.firstSpawn);
+    expect(Object.keys(view.camps).every((id) => d.graph.positions[id]?.side === 'blue')).toBe(true);
+  });
+});
+
 function runScuttle(ward: boolean): ReturnType<typeof resolveRound> {
   const s = newGame(d, 5);
   s.round = 7;

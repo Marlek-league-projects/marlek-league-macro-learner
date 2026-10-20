@@ -43,6 +43,7 @@ export function stateFromView(view: PlayerView, data: GameData): GameState {
     camps,
     scuttles: view.scuttles,
     scuttlesSeen: { blue: view.scuttles, red: view.scuttles },
+    campsSeen: { blue: camps, red: camps },
     pits: view.pits,
     wards: view.wards,
     grubs: view.grubs,

@@ -75,6 +75,7 @@ export function newGame(data: GameData, seed: number, draft?: Draft): GameState 
       blue: { 'scuttle-top': scuttleSpawn, 'scuttle-bot': scuttleSpawn },
       red: { 'scuttle-top': scuttleSpawn, 'scuttle-bot': scuttleSpawn },
     },
+    campsSeen: { blue: { ...camps }, red: { ...camps } },
     pits: {
       'baron-pit': pit(rules.objectives.voidgrubs.firstSpawn),
       'dragon-pit': pit(rules.objectives.dragon.firstSpawn),
