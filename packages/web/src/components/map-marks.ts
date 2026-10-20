@@ -59,3 +59,47 @@ export function dotRadius(p: Position): number {
 export function hitRadius(p: Position): number {
   return p.kind === 'base' ? dotRadius(p) : 2 * dotRadius(p);
 }
+
+/** Smallest strength bar fill, so the weakest visible pawn still shows a sliver. */
+export const MIN_STRENGTH_FILL = 0.08;
+
+/** Bar fill (0..1) of a pawn of strength `strength` next to the strongest visible one. */
+export function strengthFill(strength: number, strongest: number): number {
+  if (strongest <= 0) return 1;
+  return Math.min(1, Math.max(MIN_STRENGTH_FILL, strength / strongest));
+}
+
+/**
+ * Strength bar fill of every pawn on the map, keyed by champion id: the xp its level needs plus its lead
+ * (fight score units). Allies use their own gold earned and bonus lead. A visible enemy only shows its
+ * level, so its lead is its team's average gold earned (public, the scoreboard) plus its side's Dragons.
+ */
+export function strengthFills(view: PlayerView, data: GameData, level: (xp: number) => number): Record<string, number> {
+  const { levelXp } = data.rules.economy;
+  const enemy: Side = view.side === 'blue' ? 'red' : 'blue';
+  const floor = (lvl: number) => levelXp[lvl - 1] ?? 0;
+  const strengths: Record<string, number> = {};
+  for (const c of view.allies) {
+    if (c.status === 'dead') continue;
+    strengths[c.id] = floor(level(c.xp)) + c.goldEarned + c.bonusLead;
+  }
+  const enemyLead = view.scoreboard.goldEarned[enemy] / Math.max(1, view.enemies.length)
+    + (view.objectivesTaken[enemy].dragon ?? 0) * data.rules.buffs.dragonLead;
+  for (const e of view.enemies) {
+    if (!e.visible || !e.position || e.level === null) continue;
+    strengths[e.id] = floor(e.level) + enemyLead;
+  }
+  const strongest = Math.max(0, ...Object.values(strengths));
+  return Object.fromEntries(Object.entries(strengths).map(([id, s]) => [id, strengthFill(s, strongest)]));
+}
+
+/** Unit vector along the lane pointing the way `side` pushes it (blue pushes toward red's towers). */
+export function pressureDirection(data: GameData, lane: Lane, side: Side): Point {
+  const from = data.graph.positions[data.graph.towers('blue', lane)[0]!]!;
+  const to = data.graph.positions[data.graph.towers('red', lane)[0]!]!;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const sign = side === 'blue' ? 1 : -1;
+  return { x: (sign * dx) / len, y: (sign * dy) / len };
+}

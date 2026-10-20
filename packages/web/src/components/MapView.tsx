@@ -2,7 +2,8 @@ import { useState } from 'preact/hooks';
 import type { Lane, Position, Role, Side } from '@lml/data/contracts';
 import type { PlayerView } from '@lml/engine/contracts';
 import type { Store } from '../store';
-import { dotRadius, hitRadius, spawnCountdown, wavePoint } from './map-marks';
+import { ActionsPanel } from './ActionsPanel';
+import { dotRadius, hitRadius, pressureDirection, spawnCountdown, strengthFills, wavePoint } from './map-marks';
 import { nodeClickKeepsSelection, pawnClick, pawnHitPassesThrough } from './pawn-click';
 import { ReplayLayer } from './ReplayLayer';
 import {
@@ -18,6 +19,8 @@ import {
 } from './format';
 
 const SIZE = 600;
+
+const SIDE_COLOR: Record<Side, string> = { blue: '#3b82f6', red: '#ef4444' };
 
 function nodeColor(p: Position): string {
   if (p.kind === 'pit') return p.pit === 'baron' ? '#a855f7' : '#f97316';
@@ -227,9 +230,21 @@ export function MapView({ store }: { store: Store }) {
     const { x, y } = wavePoint(view, data, lane);
     const w = view.waves[lane];
     const fill = w === 0 ? '#e5e7eb' : w < 0 ? '#ef4444' : '#3b82f6';
+    // Who has lane pressure (from what the viewer sees): an arrow the way that side pushes.
+    const by = view.pressure[lane];
+    let arrow = null;
+    if (by) {
+      const d = pressureDirection(data, lane, by);
+      const at = (k: number, side: number) => `${d.x * k - d.y * side},${-12 + d.y * k + d.x * side}`;
+      arrow = (
+        <polygon class="pressure" points={`${at(20, 0)} ${at(10, 6)} ${at(10, -6)}`} fill={SIDE_COLOR[by]} stroke="#111" stroke-width="1.2" />
+      );
+    }
     return (
       <g key={lane} class="wave" transform={`translate(${x} ${y})`}>
+        <title>{by ? `Pression ${by === view.side ? 'pour toi' : "pour l'adversaire"}` : 'Pas de pression'}</title>
         <polygon points="0,-8 7,0 0,8 -7,0" transform="translate(0 -12)" fill={fill} stroke="#111" stroke-width="1.5" />
+        {arrow}
       </g>
     );
   });
@@ -245,13 +260,23 @@ export function MapView({ store }: { store: Store }) {
     return [<polyline key={c.id} class="arrow" points={points} marker-end="url(#arr)" />];
   });
 
-  const pawnNodes = [...pawns].sort((a, b) => Number(a.ally) - Number(b.ally)).map((pawn) => {
+  /** Where a pawn is drawn: pawns sharing a position stand side by side. */
+  const pawnPoint = (pawn: Pawn): { x: number; y: number } | null => {
     const p = positions[pawn.position];
     if (!p) return null;
     const group = byPosition.get(pawn.position)!;
     const i = group.indexOf(pawn);
-    const x = p.x + (i - (group.length - 1) / 2) * 42;
-    const y = p.y;
+    return { x: p.x + (i - (group.length - 1) / 2) * 42, y: p.y };
+  };
+  const strength = strengthFills(view, data, store.level);
+  const selectedPawn = pawns.find((pawn) => pawn.ally && pawn.id === selected?.id);
+  const anchor = selectedPawn ? pawnPoint(selectedPawn) : null;
+
+  const pawnNodes = [...pawns].sort((a, b) => Number(a.ally) - Number(b.ally)).map((pawn) => {
+    const at = pawnPoint(pawn);
+    if (!at) return null;
+    const { x, y } = at;
+    const fill = strength[pawn.id];
     const name = championName(data, pawn.id);
     const clip = `clip-${pawn.id}`;
     const isSel = selected?.id === pawn.id;
@@ -276,6 +301,13 @@ export function MapView({ store }: { store: Store }) {
         <circle class="body" cx={x} cy={y} r={13} fill={pawn.side === 'blue' ? '#1d4ed8' : '#b91c1c'} stroke={pawn.side === 'blue' ? '#93c5fd' : '#fca5a5'} stroke-width={2} />
         <image href={championImage(data, pawn.id)} x={x - 12} y={y - 12} width={24} height={24} clip-path={`url(#${clip})`} />
         <image href={roleIcon(pawn.role)} x={x - 9} y={y - 33} width={18} height={18} pointer-events={passThrough ? 'none' : undefined} />
+        {fill !== undefined && (
+          <g class="strength" pointer-events="none">
+            <title>Force (niveau et avance)</title>
+            <rect x={x - 14} y={y - 40} width={28} height={5} rx={1.5} fill="#0b0f14" stroke="#000" stroke-width={0.8} />
+            <rect x={x - 13.5} y={y - 39.5} width={27 * fill} height={4} rx={1} fill={SIDE_COLOR[pawn.side]} />
+          </g>
+        )}
         <text x={x} y={y + 25} text-anchor="middle" class="pname">{name}</text>
       </g>
     );
@@ -310,6 +342,16 @@ export function MapView({ store }: { store: Store }) {
         {replaying ? <ReplayLayer key={store.replayRun.value} store={store} /> : <g>{pawnNodes}</g>}
         <g pointer-events="none">{timers}</g>
       </svg>
+      {ordering && anchor && (
+        <ActionsPanel
+          store={store}
+          anchor={{ x: anchor.x / SIZE, y: anchor.y / SIZE }}
+          avoid={Object.keys(reach ?? {}).flatMap((id) => {
+            const p = positions[id];
+            return p ? [{ x: p.x / SIZE, y: p.y / SIZE }] : [];
+          })}
+        />
+      )}
       {tip && (
         <div class="tip" style={{ left: `${tip.x + 12}px`, top: `${tip.y + 12}px` }}>
           {tip.text}

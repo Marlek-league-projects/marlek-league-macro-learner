@@ -1,9 +1,9 @@
 import type { Store } from './store';
-import { ActionsPanel } from './components/ActionsPanel';
 import { GameOver } from './components/GameOver';
 import { MapView } from './components/MapView';
 import { RoundBanner } from './components/RoundBanner';
 import { RoundPanel } from './components/RoundPanel';
+import { Scoreboard } from './components/Scoreboard';
 import { StartScreen } from './components/StartScreen';
 import { TeamPanel } from './components/TeamPanel';
 
@@ -11,22 +11,28 @@ const LEGAL =
   "League Macro Learner n'est pas approuvé par Riot Games et ne reflète pas les opinions de Riot Games ni de " +
   'quiconque officiellement impliqué dans la production ou la gestion de League of Legends.';
 
+/** Teams on the sides like League: your column, the map with the round panel below it, the enemy column. */
 function Game({ store }: { store: Store }) {
-  const over = store.screen.value === 'over';
-  return (
-    <>
-      <TeamPanel store={store} team="ally" />
-      {over ? (
+  if (store.screen.value === 'over') {
+    return (
+      <>
         <GameOver store={store} />
-      ) : (
-        <div class="mid">
-          <ActionsPanel store={store} />
-          <MapView store={store} />
-          <RoundPanel store={store} />
+        <div class="teams-row">
+          <TeamPanel store={store} team="ally" />
+          <TeamPanel store={store} team="enemy" />
         </div>
-      )}
+      </>
+    );
+  }
+  return (
+    <div class="game">
+      <TeamPanel store={store} team="ally" />
+      <div class="center">
+        <MapView store={store} />
+        <RoundPanel store={store} />
+      </div>
       <TeamPanel store={store} team="enemy" />
-    </>
+    </div>
   );
 }
 
@@ -38,6 +44,7 @@ export function App({ store }: { store: Store }) {
     <div class="wrap">
       <header class="head">
         {playing && <RoundBanner store={store} />}
+        {playing && <Scoreboard store={store} />}
         <h1>
           League Macro Learner
           {playing && <span class="muted"> · IA {profile?.label ?? rank} · graine {seed}</span>}

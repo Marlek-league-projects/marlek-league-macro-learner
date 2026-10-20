@@ -26,13 +26,12 @@ export function TeamPanel({ store, team }: Props) {
   return team === 'ally' ? <AllyTeam store={store} view={view} /> : <EnemyTeam store={store} view={view} />;
 }
 
+/** What the scoreboard does not show: Voidgrubs and plates. */
 function Kpis({ view, side }: { view: PlayerView; side: 'blue' | 'red' }) {
   const taken = view.objectivesTaken[side];
   return (
     <>
-      <span class="kpi">Dragons <strong>{taken.dragon ?? 0}</strong></span>
       <span class="kpi">Larves <strong>{taken.voidgrubs ?? 0}</strong></span>
-      <span class="kpi">Tours prises <strong>{view.towersDestroyed[side]}</strong></span>
       <span class="kpi">Plaques <strong>{view.platesTaken[side]}</strong></span>
     </>
   );
@@ -118,6 +117,10 @@ function EnemyTeam({ store, view }: { store: Store; view: PlayerView }) {
   const enemySide = view.side === 'blue' ? 'red' : 'blue';
   return (
     <div class="team enemy">
+      <div class="teamhead">
+        <b style="color:var(--red)">Équipe adverse (rouge)</b>
+        <Kpis view={view} side={enemySide} />
+      </div>
       <div class="cards">
         {view.enemies.map((e) => {
           return (
@@ -130,11 +133,6 @@ function EnemyTeam({ store, view }: { store: Store; view: PlayerView }) {
             </div>
           );
         })}
-      </div>
-      <div class="teamhead foot">
-        <b style="color:var(--red)">Équipe adverse (rouge)</b>
-        <Kpis view={view} side={enemySide} />
-        <span class="kpi muted">Positions et niveaux : seulement ce qui a été vu</span>
       </div>
     </div>
   );

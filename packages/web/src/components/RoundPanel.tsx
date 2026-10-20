@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import type { ChampionState, Order } from '@lml/engine/contracts';
+import type { ChampionState, Order, Stance } from '@lml/engine/contracts';
 import type { Store } from '../store';
 import { ContactPrompt } from './ContactPrompt';
 import { EventLog } from './EventLog';
@@ -33,6 +33,9 @@ function NextObjective({ store }: { store: Store }) {
   );
 }
 
+const STANCE_TEXT: Record<Stance, string> = { farm: 'farm', trade: 'trade', allin: 'all-in' };
+const stanceText = (s: Stance | undefined): string[] => (s ? [`posture ${STANCE_TEXT[s]}`] : []);
+
 function orderText(store: Store, c: ChampionState, o: Order | undefined): string {
   const at = (id: string) => positionLabel(store.data, id);
   if (c.status === 'dead') return `mort (retour round ${c.respawnRound})`;
@@ -40,7 +43,9 @@ function orderText(store: Store, c: ChampionState, o: Order | undefined): string
     const to = o?.kind === 'spawn' ? o.to : store.spawnPointsFor(c.id)[0];
     return to ? `réapparaît à ${at(to)}` : 'réapparaît';
   }
-  if (o?.kind === 'recall') return `recall${o.ward ? ' · ward au départ' : ''}`;
+  if (o?.kind === 'recall') {
+    return [o.to ? `→ ${at(o.to)} puis recall` : 'recall', ...(o.ward ? ['ward au départ'] : []), ...stanceText(o.stance)].join(' · ');
+  }
   const parts: string[] = [];
   parts.push(o?.kind === 'move' && o.to !== c.position ? `→ ${at(o.to)}` : 'reste en place');
   if (o?.kind === 'move') {
@@ -50,6 +55,7 @@ function orderText(store: Store, c: ChampionState, o: Order | undefined): string
     if (o.unward === 'from') parts.push('unward au départ');
     else if (o.unward === 'to') parts.push("unward à l'arrivée");
     if (o.launchHerald) parts.push('lance le Herald');
+    parts.push(...stanceText(o.stance));
   }
   return parts.join(' · ');
 }
@@ -70,6 +76,7 @@ function Orders({ store }: { store: Store }) {
     <>
       <div>
         <h3>Ordres du round</h3>
+        <div class="note">Clique un de tes pions sur la carte : ses actions s'ouvrent à côté de lui.</div>
         <ul class="orders">
           {view.allies.map((c) => (
             <li key={c.id}>{championName(store.data, c.id)} : {orderText(store, c, pending[c.id])}</li>
@@ -92,7 +99,9 @@ function Contacts({ store }: { store: Store }) {
         <h3>Contacts</h3>
         <div class="note">Tes champions croisent l'adversaire. Choisis la réaction de chacun.</div>
       </div>
-      {store.contacts.value.map((c) => <ContactPrompt key={c.id} store={store} contact={c} />)}
+      <div class="contacts">
+        {store.contacts.value.map((c) => <ContactPrompt key={c.id} store={store} contact={c} />)}
+      </div>
       <button class="go" onClick={() => store.confirmContacts()}>Valider les choix</button>
     </>
   );

@@ -13,6 +13,7 @@ import type {
   PlayerView,
   Rng,
   RoundWindow,
+  Stance,
   WardSpot,
 } from '@lml/engine/contracts';
 
@@ -60,7 +61,10 @@ export interface Store {
   setMove(champion: string, to: string): void;
   setWard(champion: string, spot: WardSpot | null): void;
   setUnward(champion: string, spot: 'from' | 'to' | null): void;
+  /** Recalls; after a pending 1-step move the champion walks there first (recall `to`). */
   setRecall(champion: string): void;
+  /** A laner's persistent lane stance; with no other order it keeps its default move. */
+  setStance(champion: string, stance: Stance): void;
   setSpawn(champion: string, to: string): void;
   clearOrder(champion: string): void;
   confirmRound(): void;
@@ -80,6 +84,9 @@ export interface Store {
   /** Both sides' scores once the game is over, otherwise null. */
   finalScores(): Record<Side, ScoreBreakdown> | null;
 }
+
+/** Contacts the player answers: automatic ones (lane stances, lane pressure) resolve without a prompt. */
+export const promptContacts = (contacts: Contact[]): Contact[] => contacts.filter((c) => !c.auto);
 
 const PLAYER: Side = 'blue';
 const ENEMY: Side = 'red';
@@ -267,6 +274,9 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       if (prev?.ward !== undefined) order.ward = prev.ward;
       if (prev?.unward !== undefined) order.unward = prev.unward;
       if (prev?.launchHerald) order.launchHerald = true;
+      const last = pending.value[id];
+      const stance = last && last.kind !== 'spawn' ? last.stance : undefined;
+      if (stance !== undefined) order.stance = stance;
       place(order);
     },
 
@@ -296,9 +306,25 @@ export function createStore(data: GameData, engine: GameEngine): Store {
 
     setRecall(id) {
       const prev = pending.value[id];
-      const order: Order = { kind: 'recall', champion: id };
-      if (prev?.kind === 'move' && prev.ward === 'from') order.ward = 'from';
+      if (prev?.kind === 'recall') return;
+      const order: Extract<Order, { kind: 'recall' }> = { kind: 'recall', champion: id };
+      if (prev?.kind === 'move') {
+        if (prev.ward === 'from') order.ward = 'from';
+        if (data.graph.distance(champion(id).position, prev.to) === 1) order.to = prev.to;
+      }
+      if (prev && prev.kind !== 'spawn' && prev.stance !== undefined) order.stance = prev.stance;
       place(order);
+    },
+
+    setStance(id, stance) {
+      const prev = pending.value[id];
+      if (prev?.kind === 'move' || prev?.kind === 'recall') {
+        place({ ...prev, stance });
+        return;
+      }
+      const fallback = engine.defaultOrders(current(), data, PLAYER).find((o) => o.champion === id);
+      if (fallback?.kind !== 'move') throw new Error(`${id}: cannot take a stance now`);
+      place({ ...fallback, stance });
     },
 
     setSpawn(id, to) {
@@ -317,7 +343,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       engine.validateOrders(s, data, PLAYER, blue);
       const red = engine.aiOrders(engine.viewFor(s, data, ENEMY), data, profile!, aiRng!);
       roundOrders = { blue, red };
-      const involving = engine.detectContacts(s, data, roundOrders).filter((c) => c.blue.length > 0);
+      const involving = promptContacts(engine.detectContacts(s, data, roundOrders).filter((c) => c.blue.length > 0));
       const redView = engine.viewFor(s, data, ENEMY);
       redChoices = {};
       for (const c of involving) {

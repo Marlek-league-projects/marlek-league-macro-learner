@@ -25,7 +25,7 @@ export function ContactPrompt({ store, contact }: { store: Store; contact: Conta
       </div>
       <div class="note">Toi : <Names store={store} ids={contact.blue} /></div>
       <div class="note">Adversaire : <Names store={store} ids={contact.red} /></div>
-      <div class="seg">
+      <div class="choices">
         {contact.options.blue.map((choice) => (
           <button key={choice} class={choice === chosen ? 'on' : ''} onClick={() => store.choose(contact.id, choice)}>
             {choiceLabel(contact.kind, choice)}
