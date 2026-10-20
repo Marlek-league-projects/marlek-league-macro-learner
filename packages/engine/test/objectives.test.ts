@@ -273,6 +273,35 @@ describe('herald launch', () => {
     ]);
   });
 
+  test('a Herald finishing a tower counts as a tower kill', () => {
+    const s = fresh(28);
+    const c = get(s, 'blue', 'top');
+    c.hasHerald = true;
+    c.position = 'top-t1-red';
+    s.towers['top-t1-red'] = 2;
+    const platesBefore = s.platesTaken.blue;
+    const ev = launch(s, c);
+    const t = d.rules.towers;
+    const plateGold = roundWindow(d.rules, 28).start < t.platesGoldUntil ? 2 * t.plateGold : 0;
+    expect(s.towers['top-t1-red']).toBe(0);
+    expect(s.towersDestroyed.blue).toBe(1);
+    expect(s.platesTaken.blue).toBe(platesBefore + 2);
+    expect(c.gold).toBe(t.towerGold + plateGold);
+    expect(c.goldEarned).toBe(t.towerGold + plateGold);
+    expect(ev[0]).toEqual({ type: 'towerDamage', tower: 'top-t1-red', side: 'red', damage: t.heraldDamage, hp: 0, destroyed: true });
+  });
+
+  test('Herald damage ignores the grubs and baron multiplier', () => {
+    const s = fresh(28);
+    s.grubs.blue = true;
+    s.baronUntilRound.blue = 30;
+    const c = get(s, 'blue', 'top');
+    c.hasHerald = true;
+    c.position = 'top-t1-red';
+    launch(s, c);
+    expect(s.towers['top-t1-red']).toBe(d.rules.towers.hp - d.rules.towers.heraldDamage);
+  });
+
   test('a carrier killed in the launch round deals no damage and loses the Herald', () => {
     const s = fresh(28);
     const c = get(s, 'blue', 'top');

@@ -29,6 +29,39 @@ function sign(n: number): WavePos {
   return (n > 0 ? 1 : n < 0 ? -1 : 0) as WavePos;
 }
 
+/**
+ * Mutates `state`: deals `damage` to `tower` (clamped at 0), credits plates crossed and the kill to the
+ * attacking side, splits plate gold (before `platesGoldUntil`) and tower gold among `attackers`.
+ */
+export function damageTower(
+  state: GameState,
+  data: GameData,
+  tower: string,
+  damage: number,
+  attackers: ChampionState[],
+  events: GameEvent[],
+): void {
+  const { rules } = data;
+  const defender = data.graph.positions[tower]!.side!;
+  const attacker = other(defender);
+  const before = state.towers[tower]!;
+  const after = Math.max(0, before - damage);
+  state.towers[tower] = after;
+  const plates = Math.ceil(before) - Math.ceil(after);
+  const destroyed = after <= 0;
+  let gold = 0;
+  if (plates > 0) {
+    state.platesTaken[attacker] += plates;
+    if (roundWindow(rules, state.round).start < rules.towers.platesGoldUntil) gold += plates * rules.towers.plateGold;
+  }
+  if (destroyed) {
+    state.towersDestroyed[attacker] += 1;
+    gold += rules.towers.towerGold;
+  }
+  for (const c of attackers) grant(c, gold / attackers.length);
+  events.push({ type: 'towerDamage', tower, side: defender, damage, hp: after, destroyed });
+}
+
 /** Mutates `state`: waves, tower hp, gold, xp and trade lead for one round. */
 export function updateLanes(
   state: GameState,
@@ -59,26 +92,6 @@ export function updateLanes(
     if (to !== from) events.push({ type: 'wave', lane, from, to });
 
     // 3 + 4. tower damage
-    const damageTower = (defender: Side, tower: string, damage: number, attackers: ChampionState[]): void => {
-      const attacker = other(defender);
-      const before = state.towers[tower]!;
-      const after = Math.max(0, before - damage);
-      state.towers[tower] = after;
-      const plates = Math.ceil(before) - Math.ceil(after);
-      const destroyed = after <= 0;
-      let gold = 0;
-      if (plates > 0) {
-        state.platesTaken[attacker] += plates;
-        if (win.start < rules.towers.platesGoldUntil) gold += plates * rules.towers.plateGold;
-      }
-      if (destroyed) {
-        state.towersDestroyed[attacker] += 1;
-        gold += rules.towers.towerGold;
-      }
-      for (const c of attackers) grant(c, gold / attackers.length);
-      events.push({ type: 'towerDamage', tower, side: defender, damage, hp: after, destroyed });
-    };
-
     if (to !== 0) {
       const defender: Side = to === -1 ? 'blue' : 'red';
       const attacker = other(defender);
@@ -89,7 +102,7 @@ export function updateLanes(
         const pushed = attackers.length > 0 && defenders.length === 0;
         if (pushed) {
           const n = Math.min(attackers.length, rules.towers.pushDamage.length);
-          damageTower(defender, front, rules.towers.pushDamage[n - 1]! * towerMultiplier(state, data, attacker), attackers);
+          damageTower(state, data, front, rules.towers.pushDamage[n - 1]! * towerMultiplier(state, data, attacker), attackers, events);
         }
         // 4. absent-laner chip (only when the tower did not already take push damage this round)
         const chipFront = pushed ? null : front;
@@ -100,7 +113,7 @@ export function updateLanes(
             if (!a || !d) return false;
             return (matchupAdvantage(data, a.id, d.id, win.stage) ?? 0) > 0;
           });
-          if (pressured) damageTower(defender, chipFront, rules.towers.absentLanerChip, present[attacker]);
+          if (pressured) damageTower(state, data, chipFront, rules.towers.absentLanerChip, present[attacker], events);
         }
       }
     }

@@ -6,5 +6,5 @@ export { randomDraft, newGame } from './setup';
 export { movesFor, reachable, spawnPoints, validateOrders, defaultOrders } from './movement';
 export { arrivalPositions, detectContacts, resolveChoice } from './contacts';
 export { lead, fightScore, resolveFight } from './fight';
-export { frontTower, towerMultiplier, updateLanes } from './lanes';
+export { damageTower, frontTower, towerMultiplier, updateLanes } from './lanes';
 export { spawnObjectives, clearCamps, captureObjectives, launchHeralds } from './objectives';

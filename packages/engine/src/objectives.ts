@@ -1,6 +1,7 @@
 import type { GameData, ObjectiveId, Side } from '@lml/data/contracts';
 import type { ChampionState, GameEvent, GameState, Orders, PitState } from './contracts';
 import { lead } from './fight';
+import { damageTower } from './lanes';
 import { roundWindow } from './time';
 
 type PitId = keyof GameState['pits'];
@@ -190,7 +191,7 @@ export function clearCamps(
 
 /**
  * Herald launches after contacts: an alive carrier ordered to launch on a standing enemy tower
- * deals `heraldDamage`. Carriers who are not alive lose the Herald.
+ * deals `heraldDamage` like any tower damage (plates, kill, gold) but without multiplier. Carriers who are not alive lose the Herald.
  */
 export function launchHeralds(state: GameState, data: GameData, orders: Orders, events: GameEvent[]): void {
   for (const c of state.champions) if (c.status !== 'alive') c.hasHerald = false;
@@ -203,11 +204,9 @@ export function launchHeralds(state: GameState, data: GameData, orders: Orders, 
       const tower = c.position;
       const p = data.graph.positions[tower];
       if (p?.kind !== 'tower' || !p.side || p.side === side || (state.towers[tower] ?? 0) <= 0) continue;
-      const damage = data.rules.towers.heraldDamage;
-      const hp = Math.max(0, state.towers[tower]! - damage);
-      state.towers[tower] = hp;
+      // Herald damage ignores the grubs/baron multiplier.
+      damageTower(state, data, tower, data.rules.towers.heraldDamage, [c], events);
       c.hasHerald = false;
-      events.push({ type: 'towerDamage', tower, side: p.side, damage, hp, destroyed: hp <= 0 });
       events.push({ type: 'heraldLaunched', tower, side: p.side });
     }
   }
