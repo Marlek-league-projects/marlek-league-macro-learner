@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { pawnClick } from '../src/components/pawn-click';
+import { pawnClick, pawnHitPassesThrough } from '../src/components/pawn-click';
 
 const reach = { 'top-lane': 1, 'gromp-blue': 1 };
 
@@ -27,5 +27,23 @@ describe('pawnClick', () => {
 
   test('an enemy out of reach does nothing', () => {
     expect(pawnClick({ id: 'Ornn', position: 'mid-lane', ally: false }, 'Vi', reach)).toEqual({ kind: 'none' });
+  });
+});
+
+describe('pawnHitPassesThrough', () => {
+  test('nothing selected: pawns keep their hit area', () => {
+    expect(pawnHitPassesThrough({ id: 'Ashe', position: 'bot-lane', ally: true }, null, null)).toBe(false);
+  });
+
+  test('selected: a pawn on an unreachable position passes clicks through', () => {
+    expect(pawnHitPassesThrough({ id: 'Ashe', position: 'bot-lane', ally: true }, 'Vi', reach)).toBe(true);
+  });
+
+  test('selected: a pawn on a reachable position stays a target', () => {
+    expect(pawnHitPassesThrough({ id: 'Fiora', position: 'top-lane', ally: true }, 'Vi', reach)).toBe(false);
+  });
+
+  test('the selected pawn itself keeps its hit area', () => {
+    expect(pawnHitPassesThrough({ id: 'Vi', position: 'bot-lane', ally: true }, 'Vi', reach)).toBe(false);
   });
 });

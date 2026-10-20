@@ -25,3 +25,15 @@ export function pawnClick(
   if (pawn.ally) return { kind: 'select', id: pawn.id };
   return { kind: 'none' };
 }
+
+/**
+ * With a pawn selected, the icon and padding of a pawn standing on a position it cannot reach must not
+ * swallow clicks meant for the node underneath; only its portrait stays clickable (to switch selection).
+ */
+export function pawnHitPassesThrough(
+  pawn: ClickedPawn,
+  selectedId: string | null,
+  reach: Record<string, number> | null,
+): boolean {
+  return selectedId !== null && selectedId !== pawn.id && reach?.[pawn.position] === undefined;
+}

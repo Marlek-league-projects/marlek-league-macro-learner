@@ -3,7 +3,7 @@ import type { Lane, Position, Role, Side } from '@lml/data/contracts';
 import type { PlayerView } from '@lml/engine/contracts';
 import type { Store } from '../store';
 import { dotRadius, hitRadius, spawnCountdown, wavePoint } from './map-marks';
-import { pawnClick } from './pawn-click';
+import { pawnClick, pawnHitPassesThrough } from './pawn-click';
 import {
   championImage,
   championName,
@@ -197,14 +197,20 @@ export function MapView({ store }: { store: Store }) {
     return <g key={p.id} class={`mpos${reach && ok ? ' act' : ''}`}>{dot}{hit}</g>;
   });
 
-  // Countdown before each pit, scuttle and own camp spawns, or that it is up.
+  const pawns = pawnsOf(view);
+  const byPosition = new Map<string, Pawn[]>();
+  for (const pawn of pawns) byPosition.set(pawn.position, [...(byPosition.get(pawn.position) ?? []), pawn]);
+
+  // Countdown before each pit, scuttle and own camp spawns, or that it is up (drawn right of any pawns there).
   const timers = Object.values(positions).map((p) => {
     const left = countdown(p.id);
     if (left === null) return null;
+    const n = byPosition.get(p.id)?.length ?? 0;
+    const reachX = Math.max(dotRadius(p), n > 0 ? ((n - 1) / 2) * 42 + 14 : 0);
     const pit = p.kind === 'pit' ? view.pits[p.id as 'baron-pit' | 'dragon-pit'] : null;
     const text = left !== 'up' ? clock(left) : pit?.objective ? OBJECTIVE_LABEL[pit.objective] : 'en vie';
     return (
-      <text key={p.id} class={`timer${left === 'up' ? ' live' : ''}`} x={p.x + dotRadius(p) + 4} y={p.y + 4} text-anchor="start">
+      <text key={p.id} class={`timer${left === 'up' ? ' live' : ''}`} x={p.x + reachX + 4} y={p.y + 4} text-anchor="start">
         {text}
       </text>
     );
@@ -217,7 +223,7 @@ export function MapView({ store }: { store: Store }) {
     const fill = w === 0 ? '#e5e7eb' : w < 0 ? '#ef4444' : '#3b82f6';
     return (
       <g key={lane} class="wave" transform={`translate(${x} ${y})`}>
-        <polygon points="0,-8 7,0 0,8 -7,0" fill={fill} stroke="#111" stroke-width="1.5" />
+        <polygon points="0,-8 7,0 0,8 -7,0" transform="translate(0 -12)" fill={fill} stroke="#111" stroke-width="1.5" />
       </g>
     );
   });
@@ -233,9 +239,6 @@ export function MapView({ store }: { store: Store }) {
     return [<polyline key={c.id} class="arrow" points={points} marker-end="url(#arr)" />];
   });
 
-  const pawns = pawnsOf(view);
-  const byPosition = new Map<string, Pawn[]>();
-  for (const pawn of pawns) byPosition.set(pawn.position, [...(byPosition.get(pawn.position) ?? []), pawn]);
   const pawnNodes = [...pawns].sort((a, b) => Number(a.ally) - Number(b.ally)).map((pawn) => {
     const p = positions[pawn.position];
     if (!p) return null;
@@ -246,6 +249,7 @@ export function MapView({ store }: { store: Store }) {
     const name = championName(data, pawn.id);
     const clip = `clip-${pawn.id}`;
     const isSel = selected?.id === pawn.id;
+    const passThrough = pawnHitPassesThrough(pawn, selected?.id ?? null, reach);
     return (
       <g
         key={pawn.id}
@@ -261,11 +265,11 @@ export function MapView({ store }: { store: Store }) {
           setTip({ text: `${name}${pawn.away ? ' · en base' : ''}`, x: e.clientX, y: e.clientY })}
         onMouseLeave={() => setTip(null)}
       >
-        <rect class="hit" x={x - 20} y={y - 34} width={40} height={64} fill="transparent" />
+        <rect class="hit" x={x - 13} y={y - 33} width={26} height={46} fill="transparent" pointer-events={passThrough ? 'none' : undefined} />
         <clipPath id={clip}><circle cx={x} cy={y} r={12} /></clipPath>
         <circle class="body" cx={x} cy={y} r={13} fill={pawn.side === 'blue' ? '#1d4ed8' : '#b91c1c'} stroke={pawn.side === 'blue' ? '#93c5fd' : '#fca5a5'} stroke-width={2} />
         <image href={championImage(data, pawn.id)} x={x - 12} y={y - 12} width={24} height={24} clip-path={`url(#${clip})`} />
-        <image href={roleIcon(pawn.role)} x={x - 9} y={y - 33} width={18} height={18} />
+        <image href={roleIcon(pawn.role)} x={x - 9} y={y - 33} width={18} height={18} pointer-events={passThrough ? 'none' : undefined} />
         <text x={x} y={y + 25} text-anchor="middle" class="pname">{name}</text>
       </g>
     );
@@ -282,9 +286,8 @@ export function MapView({ store }: { store: Store }) {
         <polygon points={view.side === 'blue' ? '0,0 600,0 600,600' : '0,0 0,600 600,600'} fill="#000" opacity=".22" pointer-events="none" />
         {base('blue') && <Nexus p={base('blue')!} side="blue" />}
         {base('red') && <Nexus p={base('red')!} side="red" />}
-        <g>{nodes}</g>
-        <g pointer-events="none">{timers}</g>
         <g pointer-events="none">{waves}</g>
+        <g>{nodes}</g>
         <g>
           {view.wards.map((w, i) => {
             const p = positions[w.position];
@@ -299,6 +302,7 @@ export function MapView({ store }: { store: Store }) {
         </g>
         <g pointer-events="none">{arrows}</g>
         <g>{pawnNodes}</g>
+        <g pointer-events="none">{timers}</g>
       </svg>
       {tip && (
         <div class="tip" style={{ left: `${tip.x + 12}px`, top: `${tip.y + 12}px` }}>

@@ -37,7 +37,7 @@ h2 { font-size:18px; margin:0; }
 
 /* Middle row */
 .mid { display:grid; grid-template-columns:190px minmax(0,1fr) 190px; gap:12px; margin:12px 0; align-items:start; }
-.mapbox { background:#2b3428; border-radius:10px; padding:6px; justify-self:center; width:100%; max-width:calc(100vh - 70px); }
+.mapbox { background:#2b3428; border-radius:10px; padding:6px; justify-self:center; width:100%; max-width:calc(100vh - 225px); }
 svg { width:100%; display:block; }
 .mpos.act .hit { cursor:pointer; }
 .mpos:hover .node { stroke:#fff; stroke-width:3; }
