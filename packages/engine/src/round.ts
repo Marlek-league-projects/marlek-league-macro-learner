@@ -64,11 +64,14 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   const stage = roundWindow(data.rules, s.round).stage;
   const fighters = new Set<string>();
   const tradeWinners: Partial<Record<Lane, Side | null>> = {};
+  const ganked = new Set<Lane>();
   const goBack = (ids: string[]): void => {
     for (const id of ids) byId(id).position = byId(id).previous;
   };
   for (const contact of contacts) {
     const choice = resolveChoice(contact, choices);
+    const contactLane = data.graph.positions[contact.position]!.lane;
+    if (contact.kind === 'gank' && contactLane) ganked.add(contactLane);
     const ids: Record<Side, string[]> = { blue: contact.blue, red: contact.red };
     const fleeing = SIDES.filter((side) => choice[side] === 'flee');
     if (fleeing.length > 0) {
@@ -132,7 +135,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   }
   clearCamps(s, data, viaById, events);
   captureObjectives(s, data, events);
-  updateLanes(s, data, tradeWinners, events);
+  updateLanes(s, data, tradeWinners, events, ganked);
 
   // 10. new wards
   for (const { c, o } of steps) {

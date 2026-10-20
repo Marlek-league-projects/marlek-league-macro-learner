@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
-import { defaultOrders, eventsFor, newGame, resolveRound, viewFor, visibleEnemies } from '@lml/engine';
+import { defaultOrders, eventsFor, lanePressure, newGame, resolveRound, viewFor, visibleEnemies } from '@lml/engine';
 import type { ChampionState, GameState, Order, Orders } from '@lml/engine/contracts';
 
 const d = loadGameData();
@@ -260,16 +260,34 @@ describe('scoreboard', () => {
 });
 
 describe('lane pressure in the view', () => {
-  test('computed from the champions the side sees; null when the enemy laner is not seen', () => {
+  /** Blue and red tops on top-lane at round 5; blue saw the red top last round unless `seen` is false. */
+  function lane(seen = true): { s: GameState; rt: ChampionState } {
     const s = newGame(d, 7);
     s.round = 5;
     place(s, 'blue', 'top', 'top-lane');
     place(s, 'red', 'top', 'top-lane');
     const rt = get(s, 'red', 'top');
-    rt.bonusLead = 100_000;
-    s.lastSeen.blue[rt.id] = { position: 'top-lane', round: 4 };
+    s.lastSeen.blue[rt.id] = { position: 'top-lane', round: seen ? 4 : 3 };
+    return { s, rt };
+  }
+
+  test('computed from what the side sees: a visible enemy level counts; an unseen enemy laner gives null', () => {
+    const { s, rt } = lane();
+    rt.xp = d.rules.economy.levelXp[17]!;
     expect(viewFor(s, d, 'blue').pressure.top).toBe('red');
-    s.lastSeen.blue[rt.id] = { position: 'top-lane', round: 3 };
-    expect(viewFor(s, d, 'blue').pressure.top).toBeNull();
+    expect(viewFor(s, d, 'red').pressure.top).toBeNull(); // red has not seen the blue top
+    const unseen = lane(false);
+    unseen.rt.xp = d.rules.economy.levelXp[17]!;
+    expect(viewFor(unseen.s, d, 'blue').pressure.top).toBeNull();
+  });
+
+  test("a visible enemy's hidden items and lead do not change the view's pressure", () => {
+    const a = lane();
+    const b = lane();
+    b.rt.items += 100_000;
+    b.rt.bonusLead += 100_000;
+    expect(viewFor(b.s, d, 'blue').pressure).toEqual(viewFor(a.s, d, 'blue').pressure);
+    // The engine's own push still uses the true values.
+    expect(lanePressure(b.s, d, 'top')).toBe('red');
   });
 });

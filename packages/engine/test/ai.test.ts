@@ -13,6 +13,7 @@ import {
   viewFor,
 } from '@lml/engine';
 import type { ChampionState, ContactChoices, GameState, Order, Orders, Rng } from '@lml/engine/contracts';
+import { assignStances, makeContext } from '../src/ai/heuristics';
 
 const d = loadGameData();
 const profile = (rank: Rank): AiProfile => d.aiProfiles.find((p) => p.rank === rank)!;
@@ -313,6 +314,18 @@ describe('AI lane stances', () => {
     expect(stanceOf(100_000, 'trade', tuned(1_000_000, 1_000_000))).toMatchObject({ stance: 'farm' });
     expect(stanceOf(-100_000, 'farm').stance).toBeUndefined();
   });
+});
+
+test('AI stance: a laner whose move leaves its home lane goes back to Farm', () => {
+  const s = newGame(d, 7);
+  s.round = 10;
+  place(s, 'red', 'top', 'top-lane');
+  const rt = get(s, 'red', 'top');
+  rt.stance = 'allin';
+  const view = viewFor(s, d, 'red');
+  const ctx = makeContext(view, d, false);
+  const orders = defaultOrders(s, d, 'red').map((o) => (o.champion === rt.id ? { kind: 'move' as const, champion: rt.id, to: 'scuttle-top' } : o));
+  expect(orderOf(assignStances(ctx, orders), rt.id)).toEqual({ kind: 'move', champion: rt.id, to: 'scuttle-top', stance: 'farm' });
 });
 
 describe('AI recall', () => {

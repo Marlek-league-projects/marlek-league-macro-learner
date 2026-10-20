@@ -1,5 +1,6 @@
 import type { GameData, Lane, ObjectiveId, Side } from '@lml/data/contracts';
-import type { ChampionState, EnemyInfo, PlayerView } from '../contracts';
+import type { PlayerView } from '../contracts';
+import { estimateEnemy } from '../estimate';
 import { lead } from '../fight';
 import { objectiveAt, type PitId } from '../objectives';
 import { roundWindow, totalRounds } from '../time';
@@ -35,22 +36,6 @@ export function pitTiming(view: PlayerView, data: GameData, id: PitId): PitTimin
   const live = pit.nextSpawn <= roundEnd(data, view.round);
   const soon = !live && view.round < totalRounds(data.rules) && pit.nextSpawn <= roundEnd(data, view.round + 1);
   return { objective, live, soon };
-}
-
-/**
- * What an enemy is assumed to have: xp from its level when visible, otherwise the expected farm so far;
- * items from the expected farm and passive gold; lead from its side's dragons.
- */
-export function estimateEnemy(view: PlayerView, data: GameData, e: EnemyInfo): Pick<ChampionState, 'xp' | 'items' | 'bonusLead'> {
-  const { economy, buffs, phases } = data.rules;
-  const round = Math.min(view.round, totalRounds(data.rules));
-  const minutes = Math.max(0, roundWindow(data.rules, round).start - phases[0]!.start) / 60;
-  const share = e.role === 'support' ? economy.supportShare : 1;
-  const xpShare = e.role === 'adc' || e.role === 'support' ? economy.duoXpShare : 1;
-  const xp = e.level !== null ? economy.levelXp[e.level - 1]! : economy.farmXpPerMin * xpShare * minutes;
-  const items = (economy.farmGoldPerMin * share + economy.passiveGoldPerMin) * minutes;
-  const bonusLead = (view.objectivesTaken[other(view.side)].dragon ?? 0) * buffs.dragonLead;
-  return { xp, items, bonusLead };
 }
 
 /** Pit captures in progress for us, or our champions standing on an objective that is up or about to be. */

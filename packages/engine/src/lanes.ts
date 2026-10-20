@@ -87,13 +87,16 @@ export function lanePressure(state: GameState, data: GameData, lane: Lane): Side
 
 /**
  * Mutates `state`: waves, tower hp, gold, xp and trade lead for one round. A lane in `tradeWinners` had a trade
- * contact this round (null: tied); otherwise even laners push by fight score.
+ * contact this round (null: tied); otherwise even laners push by fight score. An uneven lane with both sides
+ * present and no gank this round (not in `ganked`) is under pressure: the smaller side farms at
+ * `economy.pressureFarmShare`.
  */
 export function updateLanes(
   state: GameState,
   data: GameData,
   tradeWinners: Partial<Record<Lane, Side | null>>,
   events: GameEvent[],
+  ganked: ReadonlySet<Lane> = new Set(),
 ): void {
   const { rules } = data;
   const win = roundWindow(rules, state.round);
@@ -145,11 +148,14 @@ export function updateLanes(
     }
 
     // 5. farming
+    const underPressure = nb > 0 && nr > 0 && nb !== nr && !ganked.has(lane);
+    const pressured: Side | null = underPressure ? (nb < nr ? 'blue' : 'red') : null;
     for (const side of ['blue', 'red'] as Side[]) {
       const here = present[side];
       const carries = here.filter((c) => c.role !== 'support');
-      const gold = (rules.economy.farmGoldPerMin * win.seconds) / 60;
-      const soloXp = (rules.economy.farmXpPerMin * win.seconds) / 60;
+      const share = side === pressured ? rules.economy.pressureFarmShare : 1;
+      const gold = (rules.economy.farmGoldPerMin * win.seconds * share) / 60;
+      const soloXp = (rules.economy.farmXpPerMin * win.seconds * share) / 60;
       // A real adc + support duo: each gets `duoXpShare` of a solo laner's xp. Otherwise a support takes
       // `supportShare` of it, as of the gold.
       const duo = here.some((c) => c.role === 'adc') && here.some((c) => c.role === 'support');

@@ -63,6 +63,10 @@ export function validateRules(rules: Rules): void {
   });
   checkPerStage('rules.towers.pushDamage', rules.towers.pushDamage);
   checkPerStage('rules.fight.numbers', rules.fight.numbers);
+  const share = rules.economy.pressureFarmShare;
+  if (typeof share !== 'number' || !Number.isFinite(share) || share < 0 || share > 1) {
+    fail('rules.economy', `pressureFarmShare = ${String(share)} is not a number in 0..1`);
+  }
 }
 
 export function validateAiProfiles(profiles: AiProfile[]): void {

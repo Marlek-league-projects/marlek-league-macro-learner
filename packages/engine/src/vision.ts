@@ -1,6 +1,7 @@
 import type { GameData, Lane, Side } from '@lml/data/contracts';
 import type { ChampionState, EnemyInfo, GameEvent, GameState, PlayerView, Scoreboard } from './contracts';
 import { level } from './economy';
+import { estimateEnemy } from './estimate';
 import { lanePressure } from './lanes';
 
 type ScuttleId = keyof GameState['scuttles'];
@@ -118,13 +119,21 @@ export function viewFor(state: GameState, data: GameData, side: Side): PlayerVie
     platesTaken: s.platesTaken,
     towersDestroyed: s.towersDestroyed,
     scoreboard: scoreboard(s),
-    pressure: pressureSeen(s, data, side, visible),
+    pressure: pressureSeen(s, data, side, enemies),
   };
 }
 
-/** Lane pressure among `side`'s champions and the enemies it sees (`visible`); an unseen side gives null. */
-function pressureSeen(s: GameState, data: GameData, side: Side, visible: Map<string, string>): Record<Lane, Side | null> {
-  const seen = { ...s, champions: s.champions.filter((c) => c.side === side || visible.has(c.id)) };
+/**
+ * Lane pressure as `side` may know it: its own champions as they are, the enemies it sees with the stats it would
+ * estimate for them (never their true lead or items). An unseen side gives null.
+ */
+function pressureSeen(s: GameState, data: GameData, side: Side, enemies: EnemyInfo[]): Record<Lane, Side | null> {
+  const champions = s.champions.flatMap((c) => {
+    if (c.side === side) return [c];
+    const e = enemies.find((x) => x.id === c.id)!;
+    return e.visible ? [{ ...c, ...estimateEnemy({ round: s.round, side, objectivesTaken: s.objectivesTaken }, data, e) }] : [];
+  });
+  const seen = { ...s, champions };
   const out = {} as Record<Lane, Side | null>;
   for (const lane of LANES) out[lane] = lanePressure(seen, data, lane);
   return out;

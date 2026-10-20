@@ -199,7 +199,7 @@ function followWave(state: GameState, data: GameData, c: ChampionState): string 
   if (reach[target] !== undefined) return target;
   const inLane = Object.keys(reach).filter((p) => data.graph.positions[p]?.lane === lane);
   return inLane.sort(
-    (a, b) => data.graph.distance(a, target) - data.graph.distance(b, target) || a.localeCompare(b),
+    (a, b) => data.graph.distance(a, target) - data.graph.distance(b, target) || (a < b ? -1 : a > b ? 1 : 0),
   )[0]!;
 }
 

@@ -425,7 +425,8 @@ export function assignWards(ctx: Ctx, orders: Order[], mistakes: Mistakes): Orde
 /**
  * Lane stances from the predicted fight on each laner's destination, with what `view.side` knows: its laners
  * heading into that lane against the known enemies there. All-in above `aiTuning.allInMargin`, Trade above
- * `tradeMargin`, otherwise (or with no known enemy there) Farm. Set on the order only when it changes.
+ * `tradeMargin`, otherwise (or with no known enemy there, or when the move leaves the home lane) Farm. Set on the
+ * order only when it changes.
  */
 export function assignStances(ctx: Ctx, orders: Order[]): Order[] {
   const { view, data } = ctx;
@@ -436,7 +437,8 @@ export function assignStances(ctx: Ctx, orders: Order[]): Order[] {
     const c = view.allies.find((a) => a.id === o.champion)!;
     if (o.kind !== 'move' || c.role === 'jungle') return o;
     const lane = HOME_LANE[c.role];
-    if (laneOf(data, o.to) !== lane) return o;
+    // Leaving the home lane drops back to Farm, so no All-in is left behind for the return.
+    if (laneOf(data, o.to) !== lane) return c.stance === 'farm' ? o : { ...o, stance: 'farm' };
     const allies = orders.flatMap((x) => {
       const a = view.allies.find((y) => y.id === x.champion)!;
       const laner = a.role !== 'jungle' && HOME_LANE[a.role] === lane;

@@ -56,6 +56,8 @@ export interface Rules {
     duoXpShare: number;
     /** Support's share of the lane farm gold. */
     supportShare: number;
+    /** Share of its normal farm gold and xp the smaller side gets in a lane under pressure (uneven, no gank). */
+    pressureFarmShare: number;
     passiveGoldPerMin: number;
     killGold: number;
     killXp: number;

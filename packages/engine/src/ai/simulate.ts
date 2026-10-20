@@ -5,7 +5,8 @@ import { detectContacts } from '../contacts';
 import { defaultOrders } from '../movement';
 import { resolveRound } from '../round';
 import { viewFor } from '../vision';
-import { estimateEnemy, other } from './evaluate';
+import { estimateEnemy } from '../estimate';
+import { other } from './evaluate';
 
 /**
  * A full state built from what `view.side` knows: its own champions as they are, enemies alive at their

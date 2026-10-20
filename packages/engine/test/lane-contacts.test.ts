@@ -136,6 +136,24 @@ describe('stances', () => {
     expect(alive(state, rt)).toBe(false);
   });
 
+  test('a side with mixed stances (farm + All-in) plays its most aggressive one', () => {
+    const s = setup(10, [
+      ['blue', 'adc', 'bot-lane'],
+      ['blue', 'support', 'bot-lane'],
+      ['red', 'adc', 'bot-lane'],
+      ['red', 'support', 'bot-lane'],
+    ]);
+    s.waves.bot = 0;
+    get(s, 'blue', 'adc').bonusLead += 100_000;
+    get(s, 'blue', 'support').stance = 'allin';
+    const c = detectContacts(s, d, ordersWith(s)).find((x) => x.position === 'bot-lane')!;
+    expect(c.kind).toBe('trade');
+    expect(c.options.blue).toEqual(['fight']);
+    const { state, events } = resolveRound(s, d, ordersWith(s), {});
+    expect(events.some((e) => e.type === 'fight' && e.winner === 'blue')).toBe(true);
+    expect(alive(state, get(s, 'red', 'adc').id)).toBe(false);
+  });
+
   test('a stance persists across rounds until an order changes it', () => {
     const s = lane();
     const bt = get(s, 'blue', 'top').id;

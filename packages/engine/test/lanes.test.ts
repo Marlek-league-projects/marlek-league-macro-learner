@@ -15,9 +15,9 @@ function fresh(round = 1): GameState {
   }
   return s;
 }
-const run = (s: GameState, tw: Partial<Record<Lane, Side | null>> = {}): GameEvent[] => {
+const run = (s: GameState, tw: Partial<Record<Lane, Side | null>> = {}, ganked: Set<Lane> = new Set()): GameEvent[] => {
   const ev: GameEvent[] = [];
-  updateLanes(s, d, tw, ev);
+  updateLanes(s, d, tw, ev, ganked);
   return ev;
 };
 /** Puts three blue champions on the red T1 with the top wave already pushed. */
@@ -157,6 +157,24 @@ describe('farming', () => {
     // With a non-bot carry, the support and the carry farm as if no duo.
     expect(get(s, 'red', 'support').xp).toBeCloseTo(soloXp * d.rules.economy.supportShare, 6);
     expect(get(s, 'red', 'top').xp).toBeCloseTo(soloXp, 6);
+  });
+  test('under lane pressure the smaller side farms at pressureFarmShare; not after a gank', () => {
+    const farmed = (ganked: Set<Lane>): { gold: number; xp: number } => {
+      const s = fresh();
+      for (const r of ['adc', 'support']) get(s, 'blue', r).position = 'bot-lane';
+      get(s, 'red', 'adc').position = 'bot-lane';
+      run(s, {}, ganked);
+      const passive = (d.rules.economy.passiveGoldPerMin * 20) / 60;
+      return { gold: get(s, 'red', 'adc').gold - passive, xp: get(s, 'red', 'adc').xp };
+    };
+    const solo = { gold: (d.rules.economy.farmGoldPerMin * 20) / 60, xp: (d.rules.economy.farmXpPerMin * 20) / 60 };
+    const share = d.rules.economy.pressureFarmShare;
+    const pressured = farmed(new Set());
+    expect(pressured.gold).toBeCloseTo(solo.gold * share, 6);
+    expect(pressured.xp).toBeCloseTo(solo.xp * share, 6);
+    const ganked = farmed(new Set(['bot']));
+    expect(ganked.gold).toBeCloseTo(solo.gold, 6);
+    expect(ganked.xp).toBeCloseTo(solo.xp, 6);
   });
   test('a solo laner who only farms hits level 6 by round 15, 11 by round 26 and 15 by the end', () => {
     const s = fresh();

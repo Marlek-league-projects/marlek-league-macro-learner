@@ -42,6 +42,14 @@ test('validateRules rejects non-divisible phase and bad PerStage', () => {
   expect(() => validateRules(b)).toThrow(/fight\.numbers/);
 });
 
+test('validateRules rejects a pressureFarmShare outside 0..1', () => {
+  const r = structuredClone(data.rules);
+  r.economy.pressureFarmShare = 1.5;
+  expect(() => validateRules(r)).toThrow(/pressureFarmShare/);
+  delete (r.economy as Partial<typeof r.economy>).pressureFarmShare;
+  expect(() => validateRules(r)).toThrow(/pressureFarmShare/);
+});
+
 test('validateAiTuning rejects bad tuning', () => {
   expect(() => validateAiTuning(data.aiTuning)).not.toThrow();
   const a = structuredClone(data.aiTuning);
