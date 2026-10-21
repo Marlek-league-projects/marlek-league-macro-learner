@@ -71,6 +71,19 @@ function presentIn(state: GameState, data: GameData, lane: Lane): Record<Side, C
   return { blue: inLane('blue'), red: inLane('red') };
 }
 
+const pushing = (cs: ChampionState[]): boolean => cs.some((c) => c.stance === 'push');
+
+/**
+ * How exposed `side` is to a gank in `lane`: its wave position toward the enemy tower (-1 under its own tower,
+ * 0 in the middle, 1 in front of the enemy tower), +1 when one of its alive champions in the lane is on Push.
+ */
+export function laneExposure(state: GameState, data: GameData, side: Side, lane: Lane): number {
+  // TODO(combat): the gank lane-position bonus (fight.ts / round.ts) reads the wave position only; plug
+  // `laneExposure` in there so a Push laner (standing forward) is more exposed to ganks.
+  const wave = state.waves[lane] * -waveToward(side);
+  return wave + (pushing(presentIn(state, data, lane)[side]) ? 1 : 0);
+}
+
 /**
  * Side with lane pressure in `lane`: its champions present there score higher in a fight on the lane middle (no
  * tower: matchup, level and lead). Null on a tie or when a side has nobody in the lane.
@@ -116,7 +129,10 @@ export function updateLanes(
       const pusher = lane in tradeWinners ? winner : lanePressure(state, data, lane);
       step = pusher ? waveToward(other(pusher)) : 0;
     } else step = -from;
-    const to = Math.max(-1, Math.min(1, from + sign(step))) as WavePos;
+    // A side with a Push laner in the lane shoves the wave one extra step toward the enemy (both pushing cancel).
+    let extra = 0;
+    for (const side of ['blue', 'red'] as Side[]) if (pushing(present[side])) extra += waveToward(other(side));
+    const to = Math.max(-1, Math.min(1, from + sign(step) + extra)) as WavePos;
     state.waves[lane] = to;
     if (to !== from) events.push({ type: 'wave', lane, from, to });
 
@@ -131,7 +147,8 @@ export function updateLanes(
         const pushed = attackers.length > 0 && defenders.length === 0;
         if (pushed) {
           const n = Math.min(attackers.length, rules.towers.pushDamage.length);
-          damageTower(state, data, front, rules.towers.pushDamage[n - 1]! * towerMultiplier(state, data, attacker), attackers, events);
+          const base = rules.towers.pushDamage[n - 1]! + (pushing(attackers) ? rules.lanes.pushBonus : 0);
+          damageTower(state, data, front, base * towerMultiplier(state, data, attacker), attackers, events);
         }
         // 4. absent-laner chip (only when the tower did not already take push damage this round)
         const chipFront = pushed ? null : front;

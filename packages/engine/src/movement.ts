@@ -4,7 +4,7 @@ import { frontTower } from './lanes';
 
 const LANES: Lane[] = ['top', 'mid', 'bot'];
 export const HOME_LANE: Record<Exclude<Role, 'jungle'>, Lane> = { top: 'top', mid: 'mid', adc: 'bot', support: 'bot' };
-const STANCES: Stance[] = ['farm', 'trade', 'allin'];
+const STANCES: Stance[] = ['push', 'farm', 'trade', 'allin'];
 
 export function movesFor(c: ChampionState, rules: Rules): number {
   return c.role === 'jungle' ? rules.moves.jungler : rules.moves.laner;

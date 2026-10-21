@@ -7,6 +7,8 @@
   "presenceShare": 0.25,
   "allInMargin": 3,
   "tradeMargin": 0.5,
+  "pushMargin": 0,
+  "pushJunglerDistance": 2,
   "waveSacrificeCost": 2000,
   "laningPhaseUntil": 840,
   "priorities": {

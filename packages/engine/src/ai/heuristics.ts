@@ -480,16 +480,25 @@ export function assignWards(ctx: Ctx, orders: Order[], mistakes: Mistakes): Orde
 }
 
 /**
+ * The enemy jungler may gank `pos`: unseen (not known), or known within `aiTuning.pushJunglerDistance` of it.
+ */
+function junglerThreat(ctx: Ctx, pos: string): boolean {
+  if (!known(ctx, ctx.jungler)) return true;
+  return dist(ctx.data, ctx.jungler.position, pos) <= ctx.data.aiTuning.pushJunglerDistance;
+}
+
+/**
  * Lane stances from the predicted fight on each laner's destination, with what `view.side` knows: its laners
  * heading into that lane against the known enemies there. All-in above `aiTuning.allInMargin`, Trade above
- * `tradeMargin`, otherwise (or with no known enemy there, when the move leaves the home lane, or on a recall) Farm. Set on the
+ * `tradeMargin`, otherwise (or with no known enemy there, when the move leaves the home lane, or on a recall) Farm.
+ * A Farm with lane pressure (above `pushMargin`) and no enemy jungler threat becomes Push. Set on the
  * order only when it changes.
  */
 export function assignStances(ctx: Ctx, orders: Order[]): Order[] {
   const { view, data } = ctx;
   const state = stateFromView(view, data);
   const stage = roundWindow(data.rules, view.round).stage;
-  const { allInMargin, tradeMargin } = data.aiTuning;
+  const { allInMargin, tradeMargin, pushMargin } = data.aiTuning;
   return orders.map((o) => {
     const c = view.allies.find((a) => a.id === o.champion)!;
     if (o.kind === 'spawn' || c.role === 'jungle') return o;
@@ -508,6 +517,7 @@ export function assignStances(ctx: Ctx, orders: Order[]): Order[] {
       const { scores } = resolveFight(state, data, o.to, blue, red, stage);
       const margin = scores[ctx.side] - scores[ctx.enemy];
       stance = margin > allInMargin ? 'allin' : margin > tradeMargin ? 'trade' : 'farm';
+      if (stance === 'farm' && margin > pushMargin && !junglerThreat(ctx, o.to)) stance = 'push';
     }
     return stance === c.stance ? o : { ...o, stance };
   });
