@@ -13,7 +13,7 @@ export interface Rng {
 export type WavePos = -1 | 0 | 1;
 
 /** A laner's persistent posture in even lane contacts and lane pressure. */
-export type Stance = 'farm' | 'trade' | 'allin';
+export type Stance = 'farm' | 'push' | 'trade' | 'allin';
 
 export interface ChampionState {
   id: string;

@@ -1,8 +1,15 @@
 import type { Store } from '../store';
 import { confirmRound } from './confirm-round';
+import { bannerHasReplay, bannerPrimary } from './banner-action';
 import { clock, shownRound as roundOn } from './format';
 
 /** The round on screen (see format.shownRound). */
+export function runBannerAction(store: Store, action: 'confirm' | 'next' | 'new'): void {
+  if (action === 'confirm') confirmRound(store);
+  else if (action === 'next') store.next();
+  else store.reset();
+}
+
 export function shownRound(store: Store): number {
   return roundOn(store.screen.value, store.view.value!.round);
 }
@@ -16,13 +23,19 @@ export function RoundBanner({ store }: { store: Store }) {
   const round = shownRound(store);
   const win = store.roundWindow(round);
   const phase = store.data.rules.phases[win.phase];
+  const primary = bannerPrimary(store.screen.value);
   return (
     <div class="banner">
       Round {round}/{store.totalRounds()} · {clock(win.start)} → {clock(win.end)}
       {phase && <> · <span class="phase">{phase.name}</span></>}
-      {store.screen.value === 'orders' && (
-        <button class="go banner-go" onClick={() => confirmRound(store)} title="Raccourci : Entrée">
-          Valider le round
+      {primary && (
+        <button class="go banner-go" onClick={() => runBannerAction(store, primary.action)} title={primary.enter ? 'Raccourci : Entrée' : undefined}>
+          {primary.label}
+        </button>
+      )}
+      {bannerHasReplay(store.screen.value) && store.previousView.value && (
+        <button class="banner-replay" onClick={() => store.replay()} title="Rejouer l'animation du tour">
+          Revoir le tour
         </button>
       )}
     </div>

@@ -20,7 +20,8 @@ export type Order =
       champion: string;
       /** A position at most 1 step away to move to first; the recall happens there unless caught in a fight. */
       to?: string;
-      ward?: 'from';
+      ward?: 'from' | 'to';
+      unward?: 'from' | 'to';
       stance?: Stance;
     }
   | { kind: 'spawn'; champion: string; to: string; stance?: Stance };

@@ -304,9 +304,9 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     setWard(id, spot) {
       const prev = pending.value[id];
       if (prev?.kind === 'recall') {
-        if (spot !== null && spot !== 'from') throw new Error(`${id}: a recall can only ward its own position`);
+        if (spot !== null && spot !== 'from' && spot !== 'to') throw new Error(`${id}: a recall can only ward its start or arrival`);
         const { ward: _drop, ...rest } = prev;
-        place(spot === null ? rest : { ...rest, ward: 'from' });
+        place(spot === null ? rest : { ...rest, ward: spot });
         return;
       }
       const base = moveBase(id);
@@ -316,6 +316,12 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     },
 
     setUnward(id, spot) {
+      const prev = pending.value[id];
+      if (prev?.kind === 'recall') {
+        const { unward: _drop, ...rest } = prev;
+        place(spot === null ? rest : { ...rest, unward: spot });
+        return;
+      }
       const base = moveBase(id);
       delete base.unward;
       if (spot !== null) base.unward = spot;
@@ -327,8 +333,10 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       if (prev?.kind === 'recall') return;
       const order: Extract<Order, { kind: 'recall' }> = { kind: 'recall', champion: id };
       if (prev?.kind === 'move') {
-        if (prev.ward === 'from') order.ward = 'from';
-        if (data.graph.distance(champion(id).position, prev.to) === 1) order.to = prev.to;
+        const step = data.graph.distance(champion(id).position, prev.to) === 1;
+        if (prev.ward === 'from' || (prev.ward === 'to' && step)) order.ward = prev.ward;
+        if (prev.unward !== undefined && (step || prev.unward === 'from')) order.unward = prev.unward;
+        if (step) order.to = prev.to;
       }
       if (prev?.stance !== undefined) order.stance = prev.stance;
       place(order);

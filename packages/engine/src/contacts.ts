@@ -19,7 +19,7 @@ export function arrivalPositions(state: GameState, orders: Orders): Record<strin
   return out;
 }
 
-const STANCE_CHOICE: Record<Stance, Choice> = { farm: 'farm', trade: 'trade', allin: 'fight' };
+const STANCE_CHOICE: Record<Stance, Choice> = { farm: 'farm', push: 'farm', trade: 'trade', allin: 'fight' };
 const AGGRESSION: Choice[] = ['farm', 'trade', 'fight'];
 
 /** A side's lane choice from its champions' stances (an order's `stance` first): the most aggressive one. */

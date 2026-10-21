@@ -7,6 +7,8 @@ h1 { font-size:15px; margin:0 0 10px; color:var(--mut); font-weight:500; }
 .head h1 { margin:0; font-size:13px; }
 .banner { font-size:26px; font-weight:700; letter-spacing:.01em; }
 .banner .phase { color:var(--gold); }
+.banner-replay { font-size:14px; margin-left:8px; padding:6px 12px; vertical-align:middle; }
+.ward-n { font-size:6px; font-weight:700; fill:#fde68a; }
 .banner-go { font-size:14px; margin-left:14px; padding:6px 12px; vertical-align:middle; }
 /* Desktop: one header row, so the map keeps its place; the title shrinks and wraps instead. */
 @media (min-width: 1200px) {
