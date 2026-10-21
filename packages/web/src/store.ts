@@ -161,7 +161,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     const c = champion(id);
     const { graph, rules } = data;
     if (graph.distance(c.position, to) !== 2) return undefined;
-    const mids = (graph.adj[c.position] ?? []).filter((n) => n !== `base-${ENEMY}` && graph.distance(n, to) === 1);
+    const mids = (graph.adj[c.position] ?? []).filter((n) => n !== `base-${ENEMY}` && graph.distance(n, to) === 1 && !engine.isLaneChange(data, c.position, n));
     const fast = c.role === 'jungle' && (data.champions[id]?.clearSpeed ?? 0) >= rules.camps.fastClearAt;
     if (fast) {
       const camp = mids.find((n) => {

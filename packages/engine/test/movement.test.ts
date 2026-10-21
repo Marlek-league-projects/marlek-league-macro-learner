@@ -245,3 +245,33 @@ describe('laners follow their wave', () => {
     expect(target(s, 'blue', 'jungle')).toBe(get(s, 'blue', 'jungle').position);
   });
 });
+
+describe('changing lane ends the move', () => {
+  test('jungler reaches mid-t1 from top-t1 but not bot-t1', () => {
+    const s = fresh();
+    const j = get(s, 'blue', 'jungle');
+    j.position = 'top-t1-blue';
+    const r = reachable(s, d, j.id);
+    expect(r['mid-t1-blue']).toBe(1);
+    expect(r['bot-t1-blue']).toBeUndefined();
+  });
+  test('mid laner still reaches top-t1', () => {
+    const s = fresh();
+    const mid = get(s, 'blue', 'mid');
+    mid.position = 'mid-t1-blue';
+    expect(reachable(s, d, mid.id)['top-t1-blue']).toBe(1);
+  });
+  test('via a lane change is rejected, even to a reachable target', () => {
+    const s = fresh();
+    const j = get(s, 'blue', 'jungle');
+    j.position = 'top-t1-blue';
+    expect(() => validateOrders(s, d, 'blue', orders(s, [{ kind: 'move', champion: j.id, to: 'bot-t1-blue', via: 'mid-t1-blue' }]))).toThrow();
+  });
+  test('jungler still goes raptors to krugs', () => {
+    const s = fresh();
+    const j = get(s, 'blue', 'jungle');
+    j.position = 'raptors-blue';
+    const r = reachable(s, d, j.id);
+    expect(r['krugs-blue']).toBeDefined();
+  });
+});

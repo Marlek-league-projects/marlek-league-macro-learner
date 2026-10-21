@@ -27,6 +27,8 @@ export interface GameEngine {
   newGame(data: GameData, seed: number, draft?: Draft): GameState;
   defaultOrders(state: GameState, data: GameData, side: Side): Order[];
   reachable(state: GameState, data: GameData, championId: string): Record<string, number>;
+  /** True when a step between two positions changes lane (which ends the move). */
+  isLaneChange(data: GameData, from: string, to: string): boolean;
   spawnPoints(state: GameState, data: GameData, championId: string): string[];
   validateOrders(state: GameState, data: GameData, side: Side, orders: Order[]): void;
   detectContacts(state: GameState, data: GameData, orders: Orders): Contact[];

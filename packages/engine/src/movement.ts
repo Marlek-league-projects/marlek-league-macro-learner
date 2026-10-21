@@ -24,13 +24,21 @@ export function reachable(state: GameState, data: GameData, championId: string):
   return reachableFrom(data, c.position, movesFor(c, data.rules), c.side, c.role);
 }
 
+/** True when a step from `a` to `b` goes between two lane positions (tower or lane middle) of different lanes. */
+export function isLaneChange(data: GameData, a: string, b: string): boolean {
+  const pa = data.graph.positions[a];
+  const pb = data.graph.positions[b];
+  const onLane = (p: typeof pa): boolean => p?.kind === 'tower' || p?.kind === 'laneMid';
+  return !!pa && !!pb && onLane(pa) && onLane(pb) && pa.lane !== undefined && pb.lane !== undefined && pa.lane !== pb.lane;
+}
+
 /** Positions a jungler standing on a camp reaches within its whole move budget whatever the graph says. */
 const OBJECTIVE_POSITIONS = ['scuttle-top', 'scuttle-bot', 'baron-pit', 'dragon-pit'];
 
 /**
  * Position to distance within `moves` steps of `position` for a `side` champion (the enemy base is off limits).
  * A jungler on a camp (`moves.junglerObjectiveReach`) also reaches every objective position, at distance
- * `moves` at most: the bonus costs the whole budget.
+ * `moves` at most: the bonus costs the whole budget. Changing lane ends the move (see `isLaneChange`).
  */
 export function reachableFrom(
   data: GameData,
@@ -48,7 +56,8 @@ export function reachableFrom(
     for (const n of data.graph.adj[cur] ?? []) {
       if (n === banned || dist[n] !== undefined) continue;
       dist[n] = dist[cur]! + 1;
-      queue.push(n);
+      // Changing lane ends the move: the arrival position is reached but never expanded.
+      if (!isLaneChange(data, cur, n)) queue.push(n);
     }
   }
   if (role === 'jungle' && data.rules.moves.junglerObjectiveReach && data.graph.positions[position]?.kind === 'camp') {
@@ -129,6 +138,9 @@ function validateOne(state: GameState, data: GameData, c: ChampionState, o: Orde
   if (reach[o.to] === undefined) fail(c.id, `cannot reach ${o.to}`);
   if (o.via !== undefined) {
     if (!graph.positions[o.via] || o.via === enemyBase(c.side)) fail(c.id, `invalid via ${o.via}`);
+    if (o.via !== c.position && o.via !== o.to && isLaneChange(data, c.position, o.via)) {
+      fail(c.id, `via ${o.via} changes lane, which ends the move`);
+    }
     if (graph.distance(c.position, o.via) + graph.distance(o.via, o.to) > movesFor(c, rules)) {
       fail(c.id, `via ${o.via} is out of range`);
     }
