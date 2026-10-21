@@ -334,9 +334,10 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       if (prev?.kind === 'recall') return;
       const order: Extract<Order, { kind: 'recall' }> = { kind: 'recall', champion: id };
       if (prev?.kind === 'move') {
-        if (prev.ward === 'from') order.ward = 'from';
-        if (prev.unward === 'from') order.unward = 'from';
-        if (data.graph.distance(champion(id).position, prev.to) === 1) order.to = prev.to;
+        const step = data.graph.distance(champion(id).position, prev.to) === 1;
+        if (prev.ward === 'from' || (prev.ward === 'to' && step)) order.ward = prev.ward;
+        if (prev.unward !== undefined && (step || prev.unward === 'from')) order.unward = prev.unward;
+        if (step) order.to = prev.to;
       }
       if (prev?.stance !== undefined) order.stance = prev.stance;
       place(order);

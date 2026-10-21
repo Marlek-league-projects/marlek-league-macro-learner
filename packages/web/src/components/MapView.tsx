@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import type { Lane, Position, Role, Side } from '@lml/data/contracts';
 import type { PlayerView } from '@lml/engine/contracts';
 import type { Store } from '../store';
+import { wardRoundsLeft, wardTooltip } from './wards';
 import { ActionsPanel } from './ActionsPanel';
 import { ContactsOverlay } from './ContactPrompt';
 import { contactDock } from './popover';
@@ -112,11 +113,14 @@ function Nexus({ p, side }: { p: Position; side: Side }) {
   );
 }
 
-function Eye({ x, y }: { x: number; y: number }) {
+function Eye({ x, y, left, tip }: { x: number; y: number; left: number; tip: string }) {
   return (
-    <g transform={`translate(${x} ${y})`} pointer-events="none" class="ward">
+    <g transform={`translate(${x} ${y})`} class="ward">
+      <title>{tip}</title>
       <ellipse rx="6.5" ry="4" fill="#fde68a" stroke="#111" stroke-width="1" />
       <circle r="2" fill="#111" />
+      <circle cx="7" cy="-5" r="4.5" fill="#111" stroke="#fde68a" stroke-width=".8" />
+      <text x="7" y="-2.6" text-anchor="middle" class="ward-n">{left}</text>
     </g>
   );
 }
@@ -356,7 +360,7 @@ export function MapView({ store }: { store: Store }) {
         <g>
           {view.wards.map((w, i) => {
             const p = positions[w.position];
-            return p ? <Eye key={`${w.position}-${i}`} x={p.x + 11} y={p.y - 11} /> : null;
+            return p ? <Eye key={`${w.position}-${i}`} x={p.x + 11} y={p.y - 11} left={wardRoundsLeft(w.placedRound, view.round)} tip={wardTooltip(w.placedRound)} /> : null;
           })}
         </g>
         <g pointer-events="none">

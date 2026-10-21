@@ -8,6 +8,7 @@ import { deepWardSpots } from './ward-spots';
 
 const STANCES: { id: Stance; label: string }[] = [
   { id: 'farm', label: 'Farmer' },
+  { id: 'push', label: 'Push' },
   { id: 'trade', label: 'Trade' },
   { id: 'allin', label: 'All-in' },
 ];
@@ -202,6 +203,7 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
   const ward = move?.ward ?? recall?.ward;
   const wardSpot: Spot | null = ward === 'to' ? 'to' : ward === 'from' ? 'from' : null;
   const deepSpots = recall ? [] : deepWardSpots(data, c, store.view.value?.round ?? 0);
+  const unward = move?.unward ?? recall?.unward;
   const canUnward = data.rules.wards.unwardRoles.includes(c.role);
   const target = data.graph.positions[move?.to ?? c.position];
   const heraldTarget = c.hasHerald && target?.kind === 'tower' && target.side !== c.side;
@@ -232,7 +234,7 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
           Poser une ward
         </label>
         {ward !== undefined && (
-          <SpotChoice value={wardSpot} onlyFrom={!!recall} onPick={(s) => run(() => store.setWard(c.id, s))} />
+          <SpotChoice value={wardSpot} onlyFrom={recall !== null && recall.to === undefined} onPick={(s) => run(() => store.setWard(c.id, s))} />
         )}
         {ward !== undefined && deepSpots.length > 0 && (
           <DeepWardChoice
@@ -247,13 +249,13 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
             <label>
               <input
                 type="checkbox"
-                checked={move?.unward !== undefined}
+                checked={unward !== undefined}
                 onChange={(e) => run(() => store.setUnward(c.id, (e.currentTarget as HTMLInputElement).checked ? 'from' : null))}
               />{' '}
               Unward
             </label>
-            {move?.unward !== undefined && (
-              <SpotChoice value={move.unward} onPick={(s) => run(() => store.setUnward(c.id, s))} />
+            {unward !== undefined && (
+              <SpotChoice value={unward} onlyFrom={recall !== null && recall.to === undefined} onPick={(s) => run(() => store.setUnward(c.id, s))} />
             )}
           </>
         )}
