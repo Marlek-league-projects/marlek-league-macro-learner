@@ -5,7 +5,7 @@ import type { Contact } from '@lml/engine/contracts';
 import { goldLead } from '../src/components/format';
 import { HUD_DROP, HUD_RISE, hpColor, hpShare, hudTop, hudValues, powerOf, POWER_UNIT, strengths, xpProgress } from '../src/components/hud';
 import { pressureDirection } from '../src/components/map-marks';
-import { clampInside, contactDock, placePopover, POPOVER_GAP, visibleRegion } from '../src/components/popover';
+import { clampInside, contactDock, dragSpotUsable, placePopover, POPOVER_GAP, visibleRegion } from '../src/components/popover';
 import { createStore, promptContacts } from '../src/store';
 
 const data = loadGameData();
@@ -411,5 +411,46 @@ describe('after the merge with the engine lanes (Task 2)', () => {
       store.next();
     }
     expect(autoTrades).toBeGreaterThan(0);
+  });
+});
+
+describe('dragSpotUsable', () => {
+  const pop = { width: 100, height: 100 };
+  const anchor = { x: 300, y: 300 };
+  const avoid = [{ x: 350, y: 300 }, { x: 400, y: 300 }, { x: 600, y: 600 }, { x: 700, y: 700 }];
+
+  test('clear of the pawn and its moves: usable', () => {
+    expect(dragSpotUsable({ left: 0, top: 0 }, pop, anchor, avoid)).toBe(true);
+  });
+
+  test('covering the pawn: not usable', () => {
+    expect(dragSpotUsable({ left: 250, top: 250 }, pop, { x: 300, y: 300 }, [])).toBe(false);
+  });
+
+  test('covering most of the reachable positions: not usable', () => {
+    expect(dragSpotUsable({ left: 340, top: 200 }, pop, { x: 100, y: 100 }, [
+      { x: 350, y: 250 }, { x: 400, y: 250 }, { x: 420, y: 260 }, { x: 900, y: 900 },
+    ])).toBe(false);
+  });
+});
+
+describe('panelDragging', () => {
+  test('is cleared by the store transitions, so a stuck drag cannot swallow clicks', () => {
+    const store = started();
+    store.panelDragging.value = true;
+    store.confirmRound();
+    expect(store.panelDragging.value).toBe(false);
+    store.panelDragging.value = true;
+    store.reset();
+    expect(store.panelDragging.value).toBe(false);
+  });
+
+  test('is cleared when the next round starts', () => {
+    const store = started();
+    store.confirmRound();
+    if (store.screen.value === 'contacts') store.confirmContacts();
+    store.panelDragging.value = true;
+    store.next();
+    expect(store.panelDragging.value).toBe(false);
   });
 });

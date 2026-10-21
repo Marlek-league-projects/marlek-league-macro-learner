@@ -102,5 +102,5 @@ export function hudTop(y: number): number {
 
 /** One-line HUD summary for tooltips. */
 export function hudText(hud: Hud, hpMax: number): string {
-  return `PV ${Math.round(hud.hp * hpMax)} · niv ${hud.level} · puissance ${hud.power}`;
+  return `PV ${Math.round(hud.hp * hpMax)} · niv ${hud.level} · ⚔ puissance ${hud.power}`;
 }

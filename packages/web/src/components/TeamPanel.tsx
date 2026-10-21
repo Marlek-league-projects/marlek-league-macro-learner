@@ -85,10 +85,13 @@ function AllyTeam({ store, view }: { store: Store; view: PlayerView }) {
               onClick={() => canSelect && c.status !== 'dead' && store.select(store.selected.value === c.id ? null : c.id)}
             >
               <CardTitle store={store} id={c.id} role={c.role} level={h.level} />
-              <HpBar hp={h.hp} max={data.rules.health.max} />
-              <div class="bar xp" title="XP vers le niveau suivant"><i style={{ width: pct(h.xp ?? 0) }} /></div>
-              <div class="bar lead" title={`Or gagné ${num(c.goldEarned)}`}>
-                <i style={{ width: pct(c.goldEarned / bestGold) }} />
+              <div class="barrow"><span>PV</span><HpBar hp={h.hp} max={data.rules.health.max} /></div>
+              <div class="barrow"><span>XP</span><div class="bar xp" title="XP vers le niveau suivant"><i style={{ width: pct(h.xp ?? 0) }} /></div></div>
+              <div class="barrow">
+                <span>Avance</span>
+                <div class="bar lead" title={`Avance : or gagné ${num(c.goldEarned)}`}>
+                  <i style={{ width: pct(c.goldEarned / bestGold) }} />
+                </div>
               </div>
               {out ? (
                 <span class="neg">
@@ -110,7 +113,7 @@ function AllyTeam({ store, view }: { store: Store; view: PlayerView }) {
 function Power({ hud }: { hud: Hud | undefined }) {
   return (
     <div class="muted" title="Puissance : niveau et avance (estimée pour un adversaire)">
-      Puissance <strong>{hud ? hud.power : '—'}</strong>
+      ⚔ Puissance <strong>{hud ? hud.power : '—'}</strong>
     </div>
   );
 }

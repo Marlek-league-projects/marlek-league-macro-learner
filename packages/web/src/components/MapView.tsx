@@ -131,7 +131,7 @@ function PawnHud({ x, y, hud }: { x: number; y: number; hud: Hud }) {
   return (
     <g class="hud" pointer-events="none">
       <text x={x} y={top + 8} text-anchor="middle">
-        niv {hud.level}·<tspan class="pow">{hud.power}</tspan>
+        niv {hud.level} · <tspan class="pow">⚔ {hud.power}</tspan>
       </text>
       <rect x={x - w / 2} y={top + 10} width={w} height={4.5} rx={1} fill="#0b0f14" stroke="#000" stroke-width={0.8} />
       <rect x={x - w / 2 + 0.5} y={top + 10.5} width={(w - 1) * hud.hp} height={3.5} rx={0.8} fill={hpColor(hud.hp)} />

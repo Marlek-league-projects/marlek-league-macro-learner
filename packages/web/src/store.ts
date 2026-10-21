@@ -254,6 +254,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       recalled.value = [];
       previousView.value = null;
       stopReplay();
+      panelDragging.value = false;
       publish();
       screen.value = 'orders';
     },
@@ -271,6 +272,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       recalled.value = [];
       previousView.value = null;
       stopReplay();
+      panelDragging.value = false;
       view.value = null;
       screen.value = 'start';
     },
@@ -354,6 +356,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       const s = current();
       const blue = blueOrders(pending.value);
       engine.validateOrders(s, data, PLAYER, blue);
+      panelDragging.value = false;
       const red = engine.aiOrders(engine.viewFor(s, data, ENEMY), data, profile!, aiRng!);
       roundOrders = { blue, red };
       const involving = promptContacts(engine.detectContacts(s, data, roundOrders).filter((c) => c.blue.length > 0));
@@ -377,6 +380,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
 
     confirmContacts() {
       if (screen.value !== 'contacts') return;
+      panelDragging.value = false;
       resolve();
     },
 
@@ -388,6 +392,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       choices.value = {};
       previousView.value = null;
       stopReplay();
+      panelDragging.value = false;
       screen.value = 'orders';
     },
 

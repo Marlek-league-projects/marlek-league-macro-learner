@@ -40,10 +40,7 @@ export function placePopover(
     { left: midX, top: anchor.y - gap - pop.height },
   ];
   const points = [anchor, ...avoid];
-  const covered = (c: { left: number; top: number }) =>
-    points.filter((p) =>
-      p.x > c.left - AVOID_MARGIN && p.x < c.left + pop.width + AVOID_MARGIN
-      && p.y > c.top - AVOID_MARGIN && p.y < c.top + pop.height + AVOID_MARGIN).length;
+  const covered = (c: { left: number; top: number }) => coveredPoints(c, pop, points);
   const scored = intended.map((want) => {
     const at = clampInside(want, pop, region);
     return { at, covered: covered(at), moved: Math.hypot(at.left - want.left, at.top - want.top) };
@@ -93,4 +90,20 @@ export function clampInside(at: { left: number; top: number }, pop: Size, region
     left: clamp(at.left, region.left, region.right - pop.width),
     top: clamp(at.top, region.top, region.bottom - pop.height),
   };
+}
+
+/** How many of `points` a `pop`-sized panel at `at` covers (each with a click-circle margin). */
+export function coveredPoints(at: { left: number; top: number }, pop: Size, points: Point[]): number {
+  return points.filter((p) =>
+    p.x > at.left - AVOID_MARGIN && p.x < at.left + pop.width + AVOID_MARGIN
+    && p.y > at.top - AVOID_MARGIN && p.y < at.top + pop.height + AVOID_MARGIN).length;
+}
+
+/**
+ * Whether a remembered (dragged) panel spot is still usable for the selected pawn: it must not cover the pawn
+ * (`anchor`) nor more than half of the positions it can be ordered to (`avoid`).
+ */
+export function dragSpotUsable(at: { left: number; top: number }, pop: Size, anchor: Point, avoid: Point[]): boolean {
+  if (coveredPoints(at, pop, [anchor]) > 0) return false;
+  return coveredPoints(at, pop, avoid) * 2 <= avoid.length;
 }

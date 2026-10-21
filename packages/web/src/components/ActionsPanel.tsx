@@ -1,9 +1,9 @@
-import { useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { ChampionState, Order, Stance } from '@lml/engine/contracts';
 import type { GameData } from '@lml/data/contracts';
 import type { Store } from '../store';
 import { championName, errorText, plural, positionLabel, roleIcon } from './format';
-import { clampInside, placePopover, visibleRegion } from './popover';
+import { clampInside, dragSpotUsable, placePopover, visibleRegion } from './popover';
 import { deepWardSpots } from './ward-spots';
 
 const STANCES: { id: Stance; label: string }[] = [
@@ -65,20 +65,40 @@ export function ActionsPanel(
     return { box, b, size, region, pop: { width: el.offsetWidth, height: el.offsetHeight } };
   };
 
-  useLayoutEffect(() => {
+  const place = () => {
     const f = frame();
     const svg = f?.box.querySelector('svg');
     if (!f || !svg) return;
-    let next: { left: number; top: number };
-    if (dragged) next = { left: dragged.x * f.size.width, top: dragged.y * f.size.height };
-    else {
-      const m = svg.getBoundingClientRect();
-      const px = (p: { x: number; y: number }) => ({ x: m.left - f.b.left + p.x * m.width, y: m.top - f.b.top + p.y * m.height });
-      next = placePopover(px(anchor), f.pop, f.region, avoid.map(px));
+    const m = svg.getBoundingClientRect();
+    const px = (p: { x: number; y: number }) => ({ x: m.left - f.b.left + p.x * m.width, y: m.top - f.b.top + p.y * m.height });
+    const spots = avoid.map(px);
+    let next = dragged ? clampInside({ left: dragged.x * f.size.width, top: dragged.y * f.size.height }, f.pop, f.region) : null;
+    // The remembered spot is for the last pawn: leave it when it hides this pawn or most of its moves.
+    if (!next || !dragSpotUsable(next, f.pop, px(anchor), spots)) {
+      next = clampInside(placePopover(px(anchor), f.pop, f.region, spots), f.pop, f.region);
     }
-    next = clampInside(next, f.pop, f.region);
-    if (!at || Math.abs(at.left - next.left) > 0.5 || Math.abs(at.top - next.top) > 0.5) setAt(next);
-  });
+    setAt((cur) => (cur && Math.abs(cur.left - next!.left) <= 0.5 && Math.abs(cur.top - next!.top) <= 0.5 ? cur : next));
+  };
+  const placeRef = useRef(place);
+  placeRef.current = place;
+
+  useLayoutEffect(place);
+
+  // Keep the panel on screen when the window is resized or scrolled.
+  useEffect(() => {
+    const again = () => placeRef.current();
+    window.addEventListener('resize', again);
+    window.addEventListener('scroll', again, true);
+    return () => {
+      window.removeEventListener('resize', again);
+      window.removeEventListener('scroll', again, true);
+    };
+  }, []);
+
+  // The panel can vanish mid-drag (round confirmed, pawn deselected): no release would then clear the flag.
+  useEffect(() => () => {
+    store.panelDragging.value = false;
+  }, [store]);
 
   if (!c) return null;
 
@@ -111,6 +131,11 @@ export function ActionsPanel(
     // Still "dragging" for the click this release may fire, so the map ignores it.
     setTimeout(() => (store.panelDragging.value = false), 0);
   };
+  const onLost = (e: PointerEvent) => {
+    if (drag.current?.pointer !== e.pointerId) return;
+    drag.current = null;
+    store.panelDragging.value = false;
+  };
 
   return (
     <div
@@ -124,7 +149,8 @@ export function ActionsPanel(
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
-        onPointerCancel={onUp}
+        onPointerCancel={onLost}
+        onLostPointerCapture={onLost}
         onDblClick={() => (store.panelAt.value = null)}
       >
         <img class="ri" src={roleIcon(c.role)} alt="" />
@@ -149,7 +175,7 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
   const { data } = store;
 
   if (c.status === 'dead') {
-    return <><div class="neg">Mort (retour round {c.respawnRound})</div></>;
+    return <div class="neg">Mort (retour round {c.respawnRound})</div>;
   }
 
   if (c.status === 'respawning') {

@@ -124,6 +124,8 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     if (winner === null) {
       goBack([...contact.blue, ...contact.red]);
     } else {
+      // "All losers are Farm" cannot happen in a decided fight: a side whose choice is farm never fights (farm vs
+      // farm is skipped above, Farm against All-in is only a trade), and a stance-farm laner loses only HP in a trade.
       // Farm is per champion: in an even lane, a loser on Farm survives the fight and loses HP as a trade loser.
       const losers = ids[other(winner)];
       const safe = contact.kind === 'trade' ? losers.filter((id) => byId(id).stance === 'farm') : [];
