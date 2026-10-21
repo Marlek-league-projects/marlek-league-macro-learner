@@ -92,6 +92,7 @@ When a contact happens, resolution pauses and each player involved chooses to **
 
 **Lane contacts.** With even numbers in lane, each side's stance decides, with no prompt. A stance is one of:
 
+- **Push**: shove the wave: it moves one extra step toward the enemy tower and hits it harder, but the laner stands forward and is more exposed to ganks. In a lane contact it behaves like Farm (no all-in).
 - **Farm** (default): play the lane normally, with no trade. The wave moves by matchup and lead, as when the laners don't meet.
 - **Trade**: exchange spells without going for the kill. Nobody dies. The trade winner (fight score) gains lead and pushes the wave.
 - **All-in**: go for the kill, which turns the contact into a fight where the losers die.
@@ -115,7 +116,8 @@ Game stages for matchups, skirmish and teamfight: *really early, early, mid, mid
 
 **How the factors combine** *(design call, to tune in playtest)*. Each side gets a fight score, which is a weighted sum. Numbers carry by far the biggest weight, and that weight is highest in early game. Lead, matchup and skirmish or teamfight strength come after. In a fight with more than one champion per side, each matchup term is the average over the opposing champions that have a matchup row. All weights live in data.
 
-- **The side with the higher score wins.** Every losing champion dies. Winners gain gold and XP for each kill.
+- **The side with the higher score wins.** The **score gap** sets how many champions die on the losing side (`fight.deathGap` per death, data): a small gap can kill nobody, a large one kills everyone. The most wounded die first. Every losing survivor loses HP. Winners gain gold and XP for each kill.
+- **Ganks and lane position.** A ganked laner's position on its wave matters: pushed toward the enemy tower it is exposed (bonus to the gankers), in the middle it is neutral, under its own tower it is protected (the tower already helps the defenders). A gank that kills nobody still costs the ganked champions HP.
 - **On an exact tie**, nobody dies and both sides go back to their previous position.
 
 ## Lanes and towers
@@ -187,11 +189,12 @@ The map positions form a graph, and a move is one step on it. Starting values:
 - **Along a lane**: a laner can go from the enemy T1 back to its own T1 (or forward) in one move.
 - **Lane to Scuttle**: from the T1s or the middle of a lane, the nearest Scuttle is 1 move away (top → top Scuttle, bot → bottom Scuttle, mid → both).
 - **River to jungle**: from a river position (both Scuttles and both pits), any jungle camp on either side is 1 move away.
+- **Crossing your own jungle**: from the top-side camps to the bot-side camps (e.g. Wolves → Krugs) the path goes through the mid T1 (2 moves), not through the river.
 - **Ganks from the outer camps**: an outer camp is 1 move from its nearby lane (Gromp and Blue Buff → top lane, Krugs and Red Buff → bot lane on the blue side, and the mirror on the red side), so a jungler can gank from there in one round.
 - **Neutral objectives** *(jungler rule, not map links)*: a jungler standing on any jungle camp can reach both Scuttles, the Dragon pit and the Baron pit in one round. Laners get no such shortcut. Data flag `rules.moves.junglerObjectiveReach`.
 
 - **Camps and Scuttle** are taken by ending the move on their position. **Pit objectives** (Dragon, Voidgrubs, Herald, Baron) take one extra round, unless 4 or more champions are on them (except Baron, which always takes the extra round) (see [Neutral objectives](#neutral-objectives)).
-- **Recall** can follow a move of **1 step** in the same round (for example, step back under your tower, then recall). The champion recalls from where it ends, if it is not caught in a fight there, and respawns at a base position the next round, so a recall costs 1 round.
+- **Recall** can follow a move of **1 step** in the same round (and can place or clear a ward on the way, like a move) (for example, step back under your tower, then recall). The champion recalls from where it ends, if it is not caught in a fight there, and respawns at a base position the next round, so a recall costs 1 round.
 - **Bases** are two more positions (Base blue and Base red), which brings the total to 39. *(design call)* A champion who respawns after death or recall picks a starting point: a laner picks the frontmost standing tower of the lane they choose, and a jungler picks a camp on their own side.
 
 **Sacrificing a wave.** Leaving a lane while the wave crashes under your own tower costs the wave (gold, XP, possibly plates), but it can be the right play when it gives your team the numbers on a neutral objective. Teaching mode doesn't call this a mistake when the champion went to an objective that was up, about to spawn, or taken that round. It explains the trade-off instead, and higher AI ranks make this sacrifice when the objective is worth more than the wave.
@@ -233,6 +236,8 @@ Vision is revealed when the round resolves, so you use what you saw this round t
 - **Actions** (a small panel next to the selected token, opened on the side where it hides the fewest positions, and **draggable** by its title; it keeps its position between rounds): the selected token's options, including a laner's stance. Place a ward or clear one, each on the starting or arrival position. Recall.
 - **Round summary** (below the map): current phase, round and game time, next objective spawn, the list of this round's orders, the **Confirm round** button, and teaching-mode explanations after the round resolves.
 - **Contact prompts**: when a contact needs an answer during resolution, the fight or flee choices appear in an overlay docked on the map, next to the contacts.
+- **After a round resolves**, the banner button becomes **Round suivant**, next to **Revoir le tour**.
+- **Ward markers**: an eye icon on every position where your team has a ward, with the rounds it has left.
 - **Round replay**: after a round resolves, a short animation (about 2 s, with replay and skip buttons) plays it on the map: visible tokens slide to their destination, fights flash, deaths and taken objectives appear. Only what you saw is shown. The text log stays below.
 - **Giving orders**: click a token, and only the positions it can reach this round light up. Then click its next position. A dashed arrow shows the move. With no order, a laner standing in its home lane follows its wave; any other token stays where it is.
 
