@@ -28,7 +28,8 @@ export interface Rules {
   phases: Phase[];
   /** Step budget of every champion per round, by the round's length in seconds (`Phase.roundSeconds`). */
   moves: { budgetBySeconds: Record<string, number> };
-  wards: { perRound: number; unwardPerRound: number; unwardRoles: Role[] };
+  /** `duration`: rounds a ward gives vision, from the round after it is placed. */
+  wards: { perRound: number; duration: number; unwardPerRound: number; unwardRoles: Role[] };
   towers: {
     hp: number;
     pushDamage: number[];

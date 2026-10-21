@@ -147,7 +147,7 @@ Game stages for matchups, skirmish and teamfight: *really early, early, mid, mid
 
 | Objective | Reward |
 |---|---|
-| **Scuttle Crab** | Gold for the champion who takes it, plus vision of the nearby pit (Dragon for the bottom Scuttle, Baron for the top one) This vision lasts like a normal ward and does not count toward the 3-ward limit. |
+| **Scuttle Crab** | Gold for the champion who takes it, plus a **Scuttle ward** on the Scuttle's own position, which also sees the nearby pit (Dragon for the bottom Scuttle, Baron for the top one). It lasts like a normal ward, never counts toward the 3-ward limit, and replaces only your previous Scuttle ward on that Scuttle. |
 | **Dragon** | Lead for the whole team |
 | **Voidgrubs** | Tower damage ×1.5 for the team, for the rest of the game |
 | **Herald** | Picked up by the champion who takes it, then launched on a tower in a later round to remove 3 HP |
@@ -160,7 +160,7 @@ Tower damage bonuses stack: Voidgrubs plus Baron gives ×3. The Herald launch is
 - **Dragon, Voidgrubs, Herald and Baron take time.** You arrive on the pit one round and take the objective at the end of the next round, as long as you stay there. With **4 or more champions** on the pit, Dragon, Voidgrubs and Herald are taken on arrival. Baron always takes the extra round, even with 5 champions. In between, the enemy has a round to contest it. The Scuttle Crab is taken on arrival.
 - Voidgrubs, Herald and Baron follow their real spawn timers from the current patch, stored in data. They share the Baron pit, each one replacing the previous.
 - There is no Dragon Soul bonus. Each Dragon simply adds team lead.
-- Jungle camps respawn on their real timers and give gold and XP to whoever clears them: one camp per round, the one the champion stands on with a step left (see [Movement](#movement)). `clearSpeed` no longer lets a jungler clear a second camp on the way.
+- Jungle camps respawn on their real timers and give gold and XP to whoever clears them: one camp per round, the one the champion stands on with a step left (see [Movement](#movement)). `clearSpeed` no longer lets a jungler clear a second camp on the way. Clearing an enemy camp works like your own, and you then know its respawn timer.
 
 ## Lead, gold and recall
 
@@ -212,11 +212,15 @@ Enemy champions are hidden in fog of war. You see an enemy champion only if it i
 
 Vision is revealed when the round resolves, so you use what you saw this round to plan the next one. The enemy jungler's starting camp is visible only during the first round.
 
+**Camp timers.** You know a camp's respawn timer, yours or the enemy's, from the last time you saw it: with a champion or a ward on it, or by clearing it. An enemy clear you did not see leaves the camp shown as before.
+
 **Wards**
 
 - A champion can place a ward in addition to its move, **either on its starting position or on its arrival position** (the player chooses).
 - Each team can place up to **3 wards per round**.
-- A ward placed in round N gives vision when round N+1 resolves, then fades once round N+1 is confirmed.
+- A ward lasts **2 rounds** (`wards.duration`): placed in round N, it gives vision when rounds N+1 and N+2 resolve, then fades. Its marker shows the rounds it has left.
+- **Spotting.** An enemy whose path this round (its start, every step and its arrival) crosses one of your active wards is reported in your log: *"Ward à {position} : {champion} repéré"*, with its arrival when you see it there. Otherwise its last seen position becomes the last warded position on its path. An enemy standing still on a ward is simply visible. Only the ward's team gets the report.
+- The **Scuttle ward** (see [Neutral objectives](#neutral-objectives)) shows on the dead Scuttle.
 - First round: depending on their starting side, the jungler can place their ward at the **Blue Buff** or at the **Raptors**.
 
 **Clearing wards**

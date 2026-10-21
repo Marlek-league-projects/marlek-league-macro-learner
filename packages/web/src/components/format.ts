@@ -126,6 +126,8 @@ export function eventText(e: GameEvent, data: GameData): string {
       return `Ward ${SIDE_LABEL[e.side].toLowerCase()} posée à ${at(e.position)}`;
     case 'wardCleared':
       return `Ward ${SIDE_LABEL[e.side].toLowerCase()} détruite à ${at(e.position)}`;
+    case 'wardSpotted':
+      return `Ward à ${at(e.position)} : ${name(e.champion)} repéré${e.to ? ` → ${at(e.to)}` : ''}`;
     case 'heraldLaunched':
       return `Herald lancé sur ${at(e.tower)}`;
   }

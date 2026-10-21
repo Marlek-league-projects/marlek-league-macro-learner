@@ -2,7 +2,7 @@ import type { AiProfile, GameData, Role, Rules, Side, Stage } from '@lml/data/co
 import type { Choice, Contact, ContactChoices } from './contacts';
 import type { GameEvent } from './events';
 import type { Order, Orders } from './orders';
-import type { GameState, Rng } from './state';
+import type { GameState, Rng, Ward } from './state';
 import type { Explanation } from './teaching';
 import type { EnemyEstimate, EnemyInfo, PlayerView } from './view';
 
@@ -41,6 +41,8 @@ export interface GameEngine {
   /** What `view.side` assumes `enemy` has (xp, items, lead), from what it knows; the AI uses the same estimate. */
   estimateEnemy(view: PlayerView, data: GameData, enemy: EnemyInfo): EnemyEstimate;
   eventsFor(events: GameEvent[], after: GameState, data: GameData, side: Side): GameEvent[];
+  /** Rounds of vision a ward has left seen from `round`, that round included (`wards.duration` down to 1, 0 once spent). */
+  wardRoundsLeft(ward: Ward, round: number, rules: Rules): number;
   /** AI orders from what its side sees (a view, never the state). */
   aiOrders(view: PlayerView, data: GameData, profile: AiProfile, rng: Rng): Order[];
   aiContactChoice(view: PlayerView, data: GameData, contact: Contact, profile: AiProfile, rng: Rng): Choice;

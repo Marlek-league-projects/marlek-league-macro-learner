@@ -36,10 +36,12 @@ export interface ChampionState {
   hp: number;
 }
 
+/** Gives vision while rounds `placedRound + 1` … `placedRound + rules.wards.duration` resolve. */
 export interface Ward {
   side: Side;
   position: string;
   placedRound: number;
+  /** Put on the scuttle by taking it (never one of the round's order wards); also sees the scuttle's pit. */
   scuttle?: boolean;
 }
 
@@ -75,7 +77,10 @@ export interface GameState {
   towersDestroyed: Record<Side, number>;
   /** Enemy champions each side has killed. */
   kills: Record<Side, number>;
-  /** Per side, enemy champion id to last known position. */
-  lastSeen: Record<Side, Record<string, { position: string; round: number } | null>>;
+  /**
+   * Per side, enemy champion id to last known position. `spotted`: only seen passing an own ward that round, not
+   * where it ended it (so not shown as visible).
+   */
+  lastSeen: Record<Side, Record<string, { position: string; round: number; spotted?: boolean } | null>>;
   winner: Side | 'draw' | null;
 }
