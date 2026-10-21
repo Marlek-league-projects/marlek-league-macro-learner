@@ -48,6 +48,9 @@ describe('store', () => {
   test('recall orders take ward and unward on the start or the step', () => {
     const store = started();
     const j = blue(store, 'jungle');
+    store.select(j.id);
+    const step = Object.entries(store.reachableForSelected()).find(([, d]) => d === 1)![0];
+    store.setMove(j.id, step);
     store.setRecall(j.id);
     store.setWard(j.id, 'to');
     store.setUnward(j.id, 'from');
