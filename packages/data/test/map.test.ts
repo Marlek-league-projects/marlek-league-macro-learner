@@ -58,3 +58,11 @@ test('every scuttle and pit reaches all 12 camps in 1', () => {
   for (const river of ['scuttle-top', 'scuttle-bot', 'baron-pit', 'dragon-pit'])
     for (const camp of camps) expect(g.distance(river, camp.id)).toBe(1);
 });
+
+test('a laner goes from either T1 of its lane to the other in one move, in top, mid and bot', () => {
+  for (const lane of ['top', 'mid', 'bot']) {
+    expect(g.distance(`${lane}-t1-blue`, `${lane}-t1-red`)).toBe(1);
+    expect(g.distance(`${lane}-t1-red`, `${lane}-t1-blue`)).toBe(1);
+  }
+  for (const [a, ns] of Object.entries(g.adj)) for (const b of ns) expect(g.adj[mirrorId(a)]).toContain(mirrorId(b));
+});

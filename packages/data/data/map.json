@@ -73,6 +73,8 @@
     ["redbuff-blue","dragon-pit"],
     ["gromp-blue","top-t1-blue"],
     ["krugs-blue","bot-t1-blue"],
+    ["top-t1-blue","top-t1-red"],
+    ["mid-t1-blue","mid-t1-red"],
     ["base-blue","top-t3-blue"],
     ["base-blue","mid-t3-blue"],
     ["base-blue","bot-t3-blue"],
