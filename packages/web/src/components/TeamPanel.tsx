@@ -1,6 +1,6 @@
 import type { ChampionState, EnemyInfo, PlayerView } from '@lml/engine/contracts';
 import type { Store } from '../store';
-import { type Hud, HP_MAX, hpColor, hudValues } from './hud';
+import { type Hud, hpColor, hudValues } from './hud';
 import { championImage, championName, num, objectiveScore, positionLabel, roleIcon } from './format';
 
 interface Props {
@@ -12,9 +12,9 @@ const pct = (share: number): string => `${Math.round(share * 100)}%`;
 const tone = (n: number): string => (n > 0 ? 'pos' : n < 0 ? 'neg' : '');
 
 /** HP bar, filled and coloured by the share of health left. */
-function HpBar({ hp }: { hp: number }) {
+function HpBar({ hp, max }: { hp: number; max: number }) {
   return (
-    <div class="bar hp" title={`PV ${Math.round(hp * HP_MAX)} / ${HP_MAX}`}>
+    <div class="bar hp" title={`PV ${Math.round(hp * max)} / ${max}`}>
       <i style={{ width: pct(hp), background: hpColor(hp) }} />
     </div>
   );
@@ -85,7 +85,7 @@ function AllyTeam({ store, view }: { store: Store; view: PlayerView }) {
               onClick={() => canSelect && c.status !== 'dead' && store.select(store.selected.value === c.id ? null : c.id)}
             >
               <CardTitle store={store} id={c.id} role={c.role} level={h.level} />
-              <HpBar hp={h.hp} />
+              <HpBar hp={h.hp} max={data.rules.health.max} />
               <div class="bar xp" title="XP vers le niveau suivant"><i style={{ width: pct(h.xp ?? 0) }} /></div>
               <div class="bar lead" title={`Or gagné ${num(c.goldEarned)}`}>
                 <i style={{ width: pct(c.goldEarned / bestGold) }} />
@@ -140,7 +140,7 @@ function EnemyTeam({ store, view }: { store: Store; view: PlayerView }) {
           return (
             <div key={e.id} class="card">
               <CardTitle store={store} id={e.id} role={e.role} level={h?.level ?? null} />
-              {h ? <HpBar hp={h.hp} /> : <div class="muted">PV —</div>}
+              {h ? <HpBar hp={h.hp} max={store.data.rules.health.max} /> : <div class="muted">PV —</div>}
               <Power hud={h} />
               <div class="muted">{seenText(store, e)}</div>
             </div>

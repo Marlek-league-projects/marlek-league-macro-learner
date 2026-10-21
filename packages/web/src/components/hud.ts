@@ -3,9 +3,6 @@
 import type { GameData } from '@lml/data/contracts';
 import type { EnemyEstimate, EnemyInfo, PlayerView } from '@lml/engine/contracts';
 
-/** Full health (HP run 0..100, see ChampionState.hp). */
-export const HP_MAX = 100;
-
 /** Strength points per power point: the shown power is the strength value scaled to a short integer. */
 export const POWER_UNIT = 100;
 
@@ -29,8 +26,8 @@ export function xpProgress(data: GameData, xp: number, level: number): number {
 }
 
 /** 0..1 share of full health, clamped. */
-export function hpShare(hp: number): number {
-  return Math.min(1, Math.max(0, hp / HP_MAX));
+export function hpShare(hp: number, max: number): number {
+  return Math.min(1, Math.max(0, hp / max));
 }
 
 /** HP bar colour: green at full health through yellow to red at none. */
@@ -78,15 +75,16 @@ export function hudValues(
   estimate: (enemy: EnemyInfo) => EnemyEstimate,
 ): Record<string, Hud> {
   const strength = strengths(view, data, level, estimate);
+  const max = data.rules.health.max;
   const out: Record<string, Hud> = {};
   for (const c of view.allies) {
     const lvl = level(c.xp);
-    out[c.id] = { hp: hpShare(c.hp), power: powerOf(strength[c.id]!), level: lvl, xp: xpProgress(data, c.xp, lvl) };
+    out[c.id] = { hp: hpShare(c.hp, max), power: powerOf(strength[c.id]!), level: lvl, xp: xpProgress(data, c.xp, lvl) };
   }
   for (const e of view.enemies) {
     const s = strength[e.id];
     if (s === undefined || e.level === null || e.hp === null) continue;
-    out[e.id] = { hp: hpShare(e.hp), power: powerOf(s), level: e.level, xp: null };
+    out[e.id] = { hp: hpShare(e.hp, max), power: powerOf(s), level: e.level, xp: null };
   }
   return out;
 }
@@ -103,6 +101,6 @@ export function hudTop(y: number): number {
 }
 
 /** One-line HUD summary for tooltips. */
-export function hudText(hud: Hud): string {
-  return `PV ${Math.round(hud.hp * HP_MAX)} · niv ${hud.level} · puissance ${hud.power}`;
+export function hudText(hud: Hud, hpMax: number): string {
+  return `PV ${Math.round(hud.hp * hpMax)} · niv ${hud.level} · puissance ${hud.power}`;
 }

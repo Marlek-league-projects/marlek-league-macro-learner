@@ -320,7 +320,7 @@ export function MapView({ store }: { store: Store }) {
           else if (action.kind === 'order') order(action.to);
         }}
         onMouseMove={(e: MouseEvent) =>
-          setTip({ text: `${name}${pawn.away ? ' · en base' : ''}${values ? ` · ${hudText(values)}` : ''}`, x: e.clientX, y: e.clientY })}
+          setTip({ text: `${name}${pawn.away ? ' · en base' : ''}${values ? ` · ${hudText(values, data.rules.health.max)}` : ''}`, x: e.clientX, y: e.clientY })}
         onMouseLeave={() => setTip(null)}
       >
         <rect class="hit" x={x - 13} y={y - 33} width={26} height={46} fill="transparent" pointer-events={passThrough ? 'none' : undefined} />

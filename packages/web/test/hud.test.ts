@@ -88,9 +88,9 @@ describe('HUD values', () => {
   });
 
   test('hpShare clamps to 0..1; hpColor goes from green to red', () => {
-    expect(hpShare(50)).toBe(0.5);
-    expect(hpShare(-5)).toBe(0);
-    expect(hpShare(150)).toBe(1);
+    expect(hpShare(50, 100)).toBe(0.5);
+    expect(hpShare(-5, 100)).toBe(0);
+    expect(hpShare(150, 100)).toBe(1);
     expect(hpColor(1)).toBe('hsl(120 75% 45%)');
     expect(hpColor(0)).toBe('hsl(0 75% 45%)');
     expect(hpColor(0.5)).toBe('hsl(60 75% 45%)');
@@ -128,6 +128,44 @@ describe('HUD values', () => {
     expect(h.hp).toBe(0.25);
     expect(h.level).toBe(4);
     expect(h.xp).toBeNull();
+  });
+});
+
+describe('HP through the store', () => {
+  test('playing rounds: enemy HP is null while unseen and real while seen; ally HP is a real value in range', () => {
+    const store = started(42);
+    const max = data.rules.health.max;
+    let sawVisible = false;
+    let sawUnseen = false;
+    let sawHurt = false;
+    for (let i = 0; i < 14 && store.screen.value !== 'over'; i++) {
+      store.confirmRound();
+      while (store.screen.value === 'contacts') {
+        for (const c of store.contacts.value) store.choose(c.id, c.options.blue[0]!);
+        store.confirmContacts();
+      }
+      const v = store.view.value!;
+      for (const a of v.allies) {
+        expect(a.hp).toBeGreaterThanOrEqual(0);
+        expect(a.hp).toBeLessThanOrEqual(max);
+        if (a.hp < max) sawHurt = true;
+      }
+      for (const e of v.enemies) {
+        if (e.visible) {
+          sawVisible = true;
+          expect(typeof e.hp).toBe('number');
+        } else {
+          sawUnseen = true;
+          expect(e.hp).toBeNull();
+        }
+      }
+      if (store.screen.value === 'review') store.next();
+    }
+    expect(sawVisible && sawUnseen && sawHurt).toBe(true);
+  });
+
+  test('HP bar share follows the data max', () => {
+    expect(hpShare(data.rules.health.max / 2, data.rules.health.max)).toBe(0.5);
   });
 });
 
