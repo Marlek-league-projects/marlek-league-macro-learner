@@ -89,6 +89,7 @@ export function viewFor(state: GameState, data: GameData, side: Side): PlayerVie
         position: last?.position ?? null,
         lastSeenRound: last?.round ?? null,
         level: seen ? level(c.xp, data.rules) : null,
+        hp: seen ? c.hp : null,
       };
     });
   const camps: GameState['camps'] = {};

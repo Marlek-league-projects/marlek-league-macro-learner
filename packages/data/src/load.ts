@@ -67,6 +67,15 @@ export function validateRules(rules: Rules): void {
   if (typeof share !== 'number' || !Number.isFinite(share) || share < 0 || share > 1) {
     fail('rules.economy', `pressureFarmShare = ${String(share)} is not a number in 0..1`);
   }
+  const h = rules.health;
+  const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  if (!h || !isNum(h.max) || h.max <= 0) fail('rules.health', 'max must be a positive number');
+  for (const key of ['tradeLoss', 'tradeWinnerLoss', 'regenPerRound'] as const) {
+    if (!isNum(h[key]) || h[key] < 0 || h[key] > h.max) fail('rules.health', `${key} = ${String(h[key])} is not a number in 0..${h.max}`);
+  }
+  if (!isNum(h.fightWeight) || h.fightWeight < 0 || h.fightWeight > 1) {
+    fail('rules.health', `fightWeight = ${String(h.fightWeight)} is not a number in 0..1`);
+  }
 }
 
 export function validateAiProfiles(profiles: AiProfile[]): void {
@@ -90,6 +99,7 @@ export function validateAiTuning(t: AiTuning): void {
     }
   };
   num('recallGold', t.recallGold, 0);
+  num('recallHp', t.recallHp, 0);
   num('knownRounds', t.knownRounds, 0, Infinity, true);
   num('lookaheadSets', t.lookaheadSets, 1, Infinity, true);
   num('captureShare', t.captureShare, 0, 1);

@@ -9,6 +9,12 @@ export function lead(c: ChampionState, _rules: Rules): number {
   return c.xp + c.items + c.bonusLead;
 }
 
+/** A wounded champion weighs less: its fight-score contributions are scaled by `1 - fightWeight * (1 - hp / max)`. */
+export function healthFactor(c: ChampionState, rules: Rules): number {
+  const { max, fightWeight } = rules.health;
+  return 1 - fightWeight * (1 - c.hp / max);
+}
+
 /** Side owning a standing tower at `position`, or null. */
 function towerOwner(state: GameState, data: GameData, position: string): Side | null {
   const p = data.graph.positions[position];
@@ -28,25 +34,24 @@ export function fightScore(
   const W = data.rules.fight;
   const byId = (id: string): ChampionState => state.champions.find((c) => c.id === id)!;
   const hasTower = towerFor === side;
-  const n = ids.length + (hasTower ? W.towerNumbersFactor : 0);
   const teamfight = ids.length + enemyIds.length >= W.teamfightMinTotal;
-  let leadSum = 0;
-  let matchupSum = 0;
-  let strengthSum = hasTower ? W.towerStrength / 10 : 0; // the tower counts once, as one extra weak champion
+  let score = 0;
   for (const id of ids) {
     const c = byId(id);
-    leadSum += lead(c, data.rules) / 1000;
     const ratings = data.champions[c.id];
     const base = (teamfight ? ratings?.teamfight : ratings?.skirmish)?.[stage] ?? 0;
-    strengthSum += base / 10;
     const advs: number[] = [];
     for (const e of enemyIds) {
       const a = matchupAdvantage(data, c.id, byId(e).id, stage);
       if (a !== null) advs.push(a);
     }
-    if (advs.length) matchupSum += advs.reduce((x, y) => x + y, 0) / advs.length;
+    const matchup = advs.length ? advs.reduce((x, y) => x + y, 0) / advs.length : 0;
+    const own = W.numbers[stage] + (W.lead * lead(c, data.rules)) / 1000 + W.matchup * matchup + (W.strength * base) / 10;
+    score += own * healthFactor(c, data.rules);
   }
-  return W.numbers[stage] * n + W.lead * leadSum + W.matchup * matchupSum + W.strength * strengthSum;
+  // The tower counts once, as a fraction of a champion and one extra weak champion.
+  if (hasTower) score += W.numbers[stage] * W.towerNumbersFactor + (W.strength * W.towerStrength) / 10;
+  return score;
 }
 
 export function resolveFight(

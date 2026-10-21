@@ -12,10 +12,12 @@ export interface EnemyInfo {
   lastSeenRound: number | null;
   /** Only known while visible. */
   level: number | null;
+  /** Health, only known while visible. */
+  hp: number | null;
 }
 
 /** What a side assumes an enemy has (fog of war: never its true lead), as the AI and lane pressure estimate it. */
-export type EnemyEstimate = Pick<ChampionState, 'xp' | 'items' | 'bonusLead'>;
+export type EnemyEstimate = Pick<ChampionState, 'xp' | 'items' | 'bonusLead' | 'hp'>;
 
 /** League-style scoreboard: all public, except `goldEarned`, the README-declared exception to the fog. */
 export interface Scoreboard {

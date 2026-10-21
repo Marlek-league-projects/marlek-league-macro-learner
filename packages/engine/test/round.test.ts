@@ -297,11 +297,17 @@ describe('resolveRound', () => {
       const { events } = laneRound({ blue: 'trade', red: 'trade' });
       expect(events).toContainEqual({ type: 'trade', position: 'top-lane', lane: 'top', winner: 'blue' });
     });
-    test.each<Stance>(['farm', 'trade'])('all-in vs %s is a fight and the loser dies', (other) => {
-      const { state, events, bt, rt } = laneRound({ blue: 'allin', red: other });
+    test('all-in vs trade is a fight and the loser dies', () => {
+      const { state, events, bt, rt } = laneRound({ blue: 'allin', red: 'trade' });
       expect(events.some((e) => e.type === 'fight' && e.winner === 'blue')).toBe(true);
       expect(alive(state, bt.id)).toBe(true);
       expect(alive(state, rt.id)).toBe(false);
+    });
+    test('all-in vs farm: Farm plays safe, the all-in side only wins the trade', () => {
+      const { state, events, bt, rt } = laneRound({ blue: 'allin', red: 'farm' });
+      expect(events).toContainEqual({ type: 'trade', position: 'top-lane', lane: 'top', winner: 'blue' });
+      expect(events.some((e) => e.type === 'fight' || e.type === 'death')).toBe(false);
+      expect(alive(state, bt.id) && alive(state, rt.id)).toBe(true);
     });
   });
 

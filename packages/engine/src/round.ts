@@ -1,7 +1,7 @@
 import type { GameData, Lane, Side } from '@lml/data/contracts';
 import type { ChampionState, ContactChoices, GameEvent, GameState, Order, Orders, RoundResult } from './contracts';
 import { detectContacts, resolveChoice } from './contacts';
-import { advanceRespawns, applyKill, completeRecall, finishIfOver } from './economy';
+import { advanceRespawns, applyKill, changeHp, completeRecall, finishIfOver } from './economy';
 import { resolveFight } from './fight';
 import { updateLanes } from './lanes';
 import { retreatStep, validateOrders } from './movement';
@@ -29,7 +29,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   const steps: Step[] = SIDES.flatMap((side) => orders[side].map((o) => ({ c: byId(o.champion), o })));
 
   // 2. round start
-  advanceRespawns(s);
+  advanceRespawns(s, data);
   spawnObjectives(s, data);
 
   // 3. unwards, on the target position before moving
@@ -103,14 +103,20 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
       applyKill(s, data, ids[other(winner)], ids[winner], events);
       continue;
     }
-    const allIn = SIDES.some((side) => choice[side] === 'fight');
     // Farm vs farm has no effect: the lane falls back to the fight-score push.
-    if (!allIn && choice.blue === 'farm' && choice.red === 'farm') continue;
+    if (choice.blue === 'farm' && choice.red === 'farm') continue;
+    // A fight with deaths needs both sides on Trade or All-in and at least one All-in: Farm plays safe in an even
+    // lane, so Farm against All-in is only a trade (prompted contacts never offer Farm).
+    const allIn = SIDES.some((side) => choice[side] === 'fight') && SIDES.every((side) => choice[side] !== 'farm');
     const { winner, scores } = resolveFight(s, data, contact.position, contact.blue, contact.red, stage);
     if (!allIn) {
       const lane = data.graph.positions[contact.position]!.lane!;
       tradeWinners[lane] = winner;
       events.push({ type: 'trade', position: contact.position, lane, winner });
+      if (winner !== null) {
+        for (const id of ids[winner]) changeHp(byId(id), data.rules, -data.rules.health.tradeWinnerLoss);
+        for (const id of ids[other(winner)]) changeHp(byId(id), data.rules, -data.rules.health.tradeLoss);
+      }
       continue;
     }
     events.push({ type: 'fight', position: contact.position, blue: contact.blue, red: contact.red, winner, scores });
@@ -124,7 +130,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
 
   // 6. recalls not interrupted by a fight
   for (const { c, o } of steps) {
-    if (o.kind === 'recall' && c.status === 'alive' && !fighters.has(c.id)) completeRecall(s, c, events);
+    if (o.kind === 'recall' && c.status === 'alive' && !fighters.has(c.id)) completeRecall(s, data, c, events);
   }
 
   // 7-9. herald, camps, objectives, lanes
@@ -150,9 +156,10 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   // 11. vision
   updateVision(s, data);
 
-  // 12. next round; `rngState` is carried over untouched for the AI
+  // 12. health regeneration, then next round; `rngState` is carried over untouched for the AI
+  for (const c of s.champions) if (c.status === 'alive') changeHp(c, data.rules, data.rules.health.regenPerRound);
   s.round += 1;
   finishIfOver(s, data);
-  if (!s.over) advanceRespawns(s);
+  if (!s.over) advanceRespawns(s, data);
   return { state: s, events };
 }

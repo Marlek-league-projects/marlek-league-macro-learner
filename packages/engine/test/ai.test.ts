@@ -578,4 +578,24 @@ describe('AI recall', () => {
     validateOrders(s, d, 'blue', orders);
     expect(orderOf(orders, top.id)).toEqual({ kind: 'recall', champion: top.id, to: 'top-t1-blue' });
   });
+
+  test('a laner under recallHp recalls with no gold when its wave allows it, not with its wave pushed in', () => {
+    const s = newGame(d, 7);
+    s.round = 10;
+    s.pits['dragon-pit'].nextSpawn = 600;
+    place(s, 'blue', 'top', 'top-t1-blue');
+    const top = get(s, 'blue', 'top');
+    top.gold = 0;
+    top.hp = d.aiTuning.recallHp - 1;
+    s.waves.top = 1;
+    const go = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
+    expect(orderOf(go, top.id).kind).toBe('recall');
+    s.waves.top = -1;
+    const stay = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
+    expect(orderOf(stay, top.id).kind).not.toBe('recall');
+    s.waves.top = 1;
+    top.hp = d.aiTuning.recallHp;
+    const healthy = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
+    expect(orderOf(healthy, top.id).kind).not.toBe('recall');
+  });
 });

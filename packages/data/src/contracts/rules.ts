@@ -73,6 +73,18 @@ export interface Rules {
     towerStrength: number;
     teamfightMinTotal: number;
   };
+  /** Champion health: trades cost it, it regenerates each round, recall and respawn restore it; it never kills. */
+  health: {
+    max: number;
+    /** Lost by each champion on a trade's losing side. */
+    tradeLoss: number;
+    /** Lost by each champion on a trade's winning side. */
+    tradeWinnerLoss: number;
+    /** Regained by every alive champion at the end of a round. */
+    regenPerRound: number;
+    /** A champion's fight-score contributions are scaled by `1 - fightWeight * (1 - hp / max)`. */
+    fightWeight: number;
+  };
   death: { lateExtraRoundsFromStage: Stage; lateExtraRounds: number };
   verdict: { plateValue: number; towerValue: number };
 }
@@ -129,6 +141,8 @@ export type AiPriority =
 export interface AiTuning {
   /** Unspent gold that makes a recall worth it. */
   recallGold: number;
+  /** A laner under this HP recalls when its wave allows it, whatever its gold. */
+  recallHp: number;
   /** An enemy seen at most this many rounds ago counts as known (its position is current). */
   knownRounds: number;
   /** Candidate order sets compared by the look-ahead. */

@@ -57,8 +57,29 @@ describe('death', () => {
     const v = id(s, 'red', 'top');
     applyKill(s, d, [v.id], [id(s, 'blue', 'top').id], []);
     s.round = 11;
-    advanceRespawns(s);
+    advanceRespawns(s, d);
     expect(v.status).toBe('respawning');
+  });
+  test('a victim spends its unspent gold on items before dying', () => {
+    const s = fresh(10);
+    const v = id(s, 'red', 'top');
+    v.gold = 900;
+    v.items = 400;
+    const earned = v.goldEarned;
+    applyKill(s, d, [v.id], [id(s, 'blue', 'top').id], []);
+    expect(v.items).toBe(1300);
+    expect(v.gold).toBe(0);
+    expect(v.goldEarned).toBe(earned);
+    expect(v.status).toBe('dead');
+  });
+  test('a respawn restores full health', () => {
+    const s = fresh(10);
+    const v = id(s, 'red', 'top');
+    v.hp = 15;
+    applyKill(s, d, [v.id], [id(s, 'blue', 'top').id], []);
+    s.round = 11;
+    advanceRespawns(s, d);
+    expect(v.hp).toBe(d.rules.health.max);
   });
 });
 
@@ -69,12 +90,19 @@ describe('recall', () => {
     const items = c.items;
     c.gold = 1200;
     const ev: GameEvent[] = [];
-    completeRecall(s, c, ev);
+    completeRecall(s, d, c, ev);
     expect(c.items).toBe(items + 1200);
     expect(c.gold).toBe(0);
     expect(c.status).toBe('respawning');
     expect(c.respawnRound).toBe(6);
     expect(ev[0]).toEqual({ type: 'recall', champion: c.id, itemsBought: 1200 });
+  });
+  test('restores full health', () => {
+    const s = fresh(5);
+    const c = id(s, 'blue', 'adc');
+    c.hp = 30;
+    completeRecall(s, d, c, []);
+    expect(c.hp).toBe(d.rules.health.max);
   });
 });
 

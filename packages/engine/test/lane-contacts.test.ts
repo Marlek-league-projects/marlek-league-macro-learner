@@ -143,10 +143,42 @@ describe('stances', () => {
     expect(events.some((e) => e.type === 'death')).toBe(false);
   });
 
-  test('farm vs All-in resolves as a fight where the loser dies', () => {
+  test('Farm plays safe: a stronger All-in against Farm only wins the trade (wave, lead, HP), nobody dies', () => {
+    const s = lane();
+    const bt = get(s, 'blue', 'top');
+    const rt = get(s, 'red', 'top');
+    const o = ordersWith(s, [{ kind: 'move', champion: bt.id, to: 'top-lane', stance: 'allin' }]);
+    const c = detectContacts(s, d, o).find((x) => x.position === 'top-lane')!;
+    expect(c.options).toEqual({ blue: ['fight'], red: ['farm'] });
+    const { state, events } = resolveRound(s, d, o, {});
+    expect(events.some((e) => e.type === 'fight' || e.type === 'death')).toBe(false);
+    expect(events).toContainEqual({ type: 'trade', position: 'top-lane', lane: 'top', winner: 'blue' });
+    expect(alive(state, rt.id)).toBe(true);
+    expect(state.waves.top).toBe(1);
+    expect(get(state, 'blue', 'top').bonusLead).toBe(bt.bonusLead + d.rules.economy.tradeLead);
+    const { max, tradeLoss, tradeWinnerLoss, regenPerRound } = d.rules.health;
+    expect(get(state, 'red', 'top').hp).toBe(max - tradeLoss + regenPerRound);
+    expect(get(state, 'blue', 'top').hp).toBe(Math.min(max, max - tradeWinnerLoss + regenPerRound));
+  });
+
+  test('a weaker All-in against Farm loses the trade, nobody dies', () => {
     const s = lane();
     const rt = get(s, 'red', 'top').id;
     const { state, events } = resolveRound(s, d, ordersWith(s, [{ kind: 'move', champion: rt, to: 'top-lane', stance: 'allin' }]), {});
+    expect(events.some((e) => e.type === 'fight' || e.type === 'death')).toBe(false);
+    expect(events).toContainEqual({ type: 'trade', position: 'top-lane', lane: 'top', winner: 'blue' });
+    expect(alive(state, rt)).toBe(true);
+  });
+
+  test('Trade vs All-in is still a fight where the loser dies', () => {
+    const s = lane();
+    const bt = get(s, 'blue', 'top').id;
+    const rt = get(s, 'red', 'top').id;
+    const o = ordersWith(s, [
+      { kind: 'move', champion: bt, to: 'top-lane', stance: 'allin' },
+      { kind: 'move', champion: rt, to: 'top-lane', stance: 'trade' },
+    ]);
+    const { state, events } = resolveRound(s, d, o, {});
     expect(events.some((e) => e.type === 'fight' && e.winner === 'blue')).toBe(true);
     expect(alive(state, rt)).toBe(false);
   });
@@ -161,6 +193,7 @@ describe('stances', () => {
     s.waves.bot = 0;
     get(s, 'blue', 'adc').bonusLead += 100_000;
     get(s, 'blue', 'support').stance = 'allin';
+    get(s, 'red', 'adc').stance = 'trade';
     const c = detectContacts(s, d, ordersWith(s)).find((x) => x.position === 'bot-lane')!;
     expect(c.kind).toBe('trade');
     expect(c.options.blue).toEqual(['fight']);
@@ -207,6 +240,7 @@ describe('move then recall', () => {
     s.waves.top = -1;
     get(s, 'blue', 'top').bonusLead += 100_000;
     get(s, 'red', 'top').stance = 'allin';
+    get(s, 'blue', 'top').stance = 'trade';
     const bt = get(s, 'blue', 'top').id;
     const { state, events } = resolveRound(s, d, ordersWith(s, [{ kind: 'recall', champion: bt, to: 'top-t1-blue' }]), {});
     expect(events.some((e) => e.type === 'fight' && e.winner === 'blue')).toBe(true);

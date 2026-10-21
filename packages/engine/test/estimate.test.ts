@@ -43,9 +43,10 @@ describe('estimateEnemy', () => {
     const s = midGame();
     s.objectivesTaken.red.dragon = 2;
     const view = viewFor(s, d, 'blue');
-    const est = estimateEnemy(view, d, { role: 'top', level: 7 });
+    const est = estimateEnemy(view, d, { role: 'top', level: 7, hp: 60 });
     expect(est.xp).toBe(d.rules.economy.levelXp[6]!);
     expect(est.bonusLead).toBe(2 * d.rules.buffs.dragonLead);
+    expect(est.hp).toBe(60);
   });
 
   test('the engine surface exposes the same estimate', () => {

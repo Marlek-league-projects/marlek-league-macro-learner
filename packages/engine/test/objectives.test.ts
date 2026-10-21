@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
 import type { GameData, Side } from '@lml/data/contracts';
-import { captureObjectives, clearCamps, launchHeralds, newGame, roundWindow, spawnObjectives } from '@lml/engine';
+import { captureObjectives, clearCamps, launchHeralds, level, newGame, roundWindow, spawnObjectives } from '@lml/engine';
 import type { ChampionState, GameEvent, GameState, Orders } from '@lml/engine/contracts';
 
 const d = loadGameData();
@@ -226,6 +226,20 @@ describe('camps', () => {
     expect(s.camps['krugs-blue']).toBe(end + d.rules.camps.smallRespawn);
     expect(jg.gold).toBe(d.rules.camps.buffGold + d.rules.camps.smallGold);
     expect(jg.xp).toBe(d.rules.camps.buffXp + d.rules.camps.smallXp);
+  });
+
+  test('a jungler who clears all 6 own camps, its start buff included, reaches level 4', () => {
+    const s = newGame(d, 7);
+    s.round = 2;
+    const jg = get(s, 'blue', 'jungle');
+    const start = jg.position;
+    for (const camp of ['bluebuff-blue', 'gromp-blue', 'wolves-blue', 'raptors-blue', 'redbuff-blue', 'krugs-blue']) {
+      if (camp === start) continue;
+      jg.position = camp;
+      clear(s, {});
+    }
+    expect(jg.xp).toBe(2 * d.rules.camps.buffXp + 4 * d.rules.camps.smallXp);
+    expect(level(jg.xp, d.rules)).toBeGreaterThanOrEqual(4);
   });
 
   test('slow jungler clears only the arrival camp', () => {

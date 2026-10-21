@@ -32,6 +32,8 @@ export interface ChampionState {
   hasHerald: boolean;
   /** Kept until an order changes it. */
   stance: Stance;
+  /** Health, 0..`rules.health.max`: lost in trades, regained each round, full after a recall or a respawn. */
+  hp: number;
 }
 
 export interface Ward {

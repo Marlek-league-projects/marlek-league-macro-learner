@@ -50,6 +50,18 @@ test('validateRules rejects a pressureFarmShare outside 0..1', () => {
   expect(() => validateRules(r)).toThrow(/pressureFarmShare/);
 });
 
+test('validateRules rejects bad health values', () => {
+  const a = structuredClone(data.rules);
+  a.health.fightWeight = 2;
+  expect(() => validateRules(a)).toThrow(/rules\.health.*fightWeight/);
+  const b = structuredClone(data.rules);
+  b.health.tradeLoss = -1;
+  expect(() => validateRules(b)).toThrow(/rules\.health.*tradeLoss/);
+  const c = structuredClone(data.rules);
+  delete (c as Partial<typeof c>).health;
+  expect(() => validateRules(c)).toThrow(/rules\.health/);
+});
+
 test('validateAiTuning rejects bad tuning', () => {
   expect(() => validateAiTuning(data.aiTuning)).not.toThrow();
   const a = structuredClone(data.aiTuning);
@@ -67,6 +79,9 @@ test('validateAiTuning rejects bad tuning', () => {
   const f = structuredClone(data.aiTuning);
   delete (f as Partial<typeof f>).laningPhaseUntil;
   expect(() => validateAiTuning(f)).toThrow(/aiTuning.*laningPhaseUntil/);
+  const g = structuredClone(data.aiTuning);
+  delete (g as Partial<typeof g>).recallHp;
+  expect(() => validateAiTuning(g)).toThrow(/aiTuning.*recallHp/);
 });
 
 test('validateAiProfiles and validateTeaching reject bad data', () => {

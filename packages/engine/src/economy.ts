@@ -12,7 +12,7 @@ export function level(xp: number, rules: Rules): number {
   return l;
 }
 
-/** Victims die (and lose the herald); alive winners split kill gold and xp per victim. */
+/** Victims spend their unspent gold on items and die (and lose the herald); alive winners split kill gold and xp per victim. */
 export function applyKill(
   state: GameState,
   data: GameData,
@@ -27,6 +27,9 @@ export function applyKill(
   for (const id of victims) {
     const v = state.champions.find((c) => c.id === id);
     if (!v) continue;
+    // A death spends the unspent gold on items, as a recall does.
+    v.items += v.gold;
+    v.gold = 0;
     v.status = 'dead';
     v.respawnRound = state.round + 1 + extra;
     v.hasHerald = false;
@@ -36,21 +39,28 @@ export function applyKill(
   }
 }
 
-/** Banks all unspent gold into items; the champion is back next round. */
-export function completeRecall(state: GameState, c: ChampionState, events: GameEvent[]): void {
+/** Clamps `c.hp` to 0..`health.max` after adding `delta`. Health never kills by itself. */
+export function changeHp(c: ChampionState, rules: Rules, delta: number): void {
+  c.hp = Math.max(0, Math.min(rules.health.max, c.hp + delta));
+}
+
+/** Banks all unspent gold into items and restores full health; the champion is back next round. */
+export function completeRecall(state: GameState, data: GameData, c: ChampionState, events: GameEvent[]): void {
   const itemsBought = c.gold;
   c.items += itemsBought;
   c.gold = 0;
+  c.hp = data.rules.health.max;
   c.status = 'respawning';
   c.respawnRound = state.round + 1;
   events.push({ type: 'recall', champion: c.id, itemsBought });
 }
 
-/** At round start: dead champions whose timer is up become respawning. */
-export function advanceRespawns(state: GameState): void {
+/** At round start: dead champions whose timer is up become respawning, at full health. */
+export function advanceRespawns(state: GameState, data: GameData): void {
   for (const c of state.champions) {
     if (c.status === 'dead' && c.respawnRound !== null && c.respawnRound <= state.round) {
       c.status = 'respawning';
+      c.hp = data.rules.health.max;
     }
   }
 }

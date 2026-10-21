@@ -16,8 +16,8 @@ export interface Candidate {
   /** Lane a jungler gank targets, for the laners to join. */
   gank?: Lane;
   /**
-   * A laner's paying rotation: kept over the look-ahead, which cannot value the numbers it brings (simulated
-   * enemies stand still).
+   * Kept over the look-ahead: a laner's paying rotation, which cannot value the numbers it brings (simulated
+   * enemies stand still), or a wounded laner's recall (the evaluation does not value health).
    */
   committed?: boolean;
 }
@@ -268,9 +268,14 @@ function objectives(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: numb
   }
 }
 
-/** Recall on a shoved or even wave (no objective coming for the jungler); `badRecall` inverts it. */
-function recall(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, o: Order) => void): void {
-  if (c.gold < ctx.data.aiTuning.recallGold) return;
+/**
+ * Recall with `recallGold` unspent, or as a laner under `recallHp`, on a shoved or even wave (no objective coming
+ * for the jungler); `badRecall` inverts it. A wounded laner's recall is committed.
+ */
+function recall(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, o: Order, extra?: Extra) => void): void {
+  const { recallGold, recallHp } = ctx.data.aiTuning;
+  const wounded = c.role !== 'jungle' && c.hp < recallHp;
+  if (c.gold < recallGold && !wounded) return;
   const good =
     c.role === 'jungle'
       ? !PITS.some((p) => {
@@ -288,7 +293,7 @@ function recall(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, 
     const oneStep = own !== null && laneOf(ctx.data, c.position) === lane && dist(ctx.data, c.position, own) === 1;
     if (oneStep && !guarded) order.to = own;
   }
-  add(ctx.data.aiTuning.priorities.recall, order);
+  add(ctx.data.aiTuning.priorities.recall, order, wounded ? { committed: true } : undefined);
 }
 
 /**

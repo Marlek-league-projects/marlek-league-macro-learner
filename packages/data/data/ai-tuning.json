@@ -1,5 +1,6 @@
 {
   "recallGold": 2000,
+  "recallHp": 40,
   "knownRounds": 1,
   "lookaheadSets": 3,
   "captureShare": 0.5,

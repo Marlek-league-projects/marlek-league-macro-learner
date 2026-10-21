@@ -17,12 +17,13 @@
     "herald": { "firstSpawn": 840, "respawn": null, "despawnAt": 1200, "minChampions": 1, "extraRound": true, "instantAt": 4, "gold": 100, "xp": 150, "value": 3000 },
     "baron": { "firstSpawn": 1200, "respawn": 360, "despawnAt": null, "minChampions": 3, "extraRound": true, "instantAt": null, "gold": 300, "xp": 300, "value": 6000 }
   },
-  "camps": { "firstSpawn": 90, "buffRespawn": 300, "smallRespawn": 135, "buffGold": 90, "buffXp": 100, "smallGold": 60, "smallXp": 70, "fastClearAt": 7 },
+  "camps": { "firstSpawn": 90, "buffRespawn": 300, "smallRespawn": 135, "buffGold": 90, "buffXp": 230, "smallGold": 60, "smallXp": 170, "fastClearAt": 7 },
   "economy": {
     "farmGoldPerMin": 330, "farmXpPerMin": 600, "duoXpShare": 0.7, "supportShare": 0.3, "pressureFarmShare": 0.5, "passiveGoldPerMin": 120, "killGold": 300, "killXp": 250, "tradeLead": 60,
     "levelXp": [0, 280, 660, 1140, 1720, 2400, 3180, 4060, 5040, 6120, 7300, 8580, 9960, 11440, 13020, 14700, 16480, 18360]
   },
   "fight": { "numbers": [10, 8, 6, 5, 5], "towerNumbersFactor": 0.5, "lead": 1, "matchup": 0.5, "strength": 2, "towerStrength": 3, "teamfightMinTotal": 7 },
+  "health": { "max": 100, "tradeLoss": 20, "tradeWinnerLoss": 5, "regenPerRound": 8, "fightWeight": 0.5 },
   "death": { "lateExtraRoundsFromStage": 4, "lateExtraRounds": 1 },
   "verdict": { "plateValue": 150, "towerValue": 500 }
 }
