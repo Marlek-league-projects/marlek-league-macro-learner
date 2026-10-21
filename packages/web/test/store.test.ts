@@ -221,7 +221,8 @@ describe('store', () => {
     const top = blue(store, 'top');
     expect(() => store.setLaunchHerald(top.id, true)).toThrow(/herald/);
     store.setLaunchHerald(top.id, false);
-    expect(store.pending.value[top.id]).toEqual({ kind: 'move', champion: top.id, to: top.position });
+    // No pending order: the default one (a laner in its lane follows its wave).
+    expect(store.pending.value[top.id]).toEqual({ kind: 'move', champion: top.id, to: 'top-lane' });
   });
 
   test('resolving a round keeps the previous view and starts the replay; skip, replay and next drive it', () => {
@@ -260,6 +261,25 @@ describe('store', () => {
     store.confirmRound();
     store.confirmContacts();
     expect(blue(store, 'top').stance).toBe('allin');
+  });
+
+  test('ward, unward and herald with no pending order keep a laner following its wave', () => {
+    const store = started();
+    const top = blue(store, 'top');
+    const support = blue(store, 'support');
+    const bot = blue(store, 'adc');
+    const def = (id: string) => {
+      const o = engine.defaultOrders(engine.newGame(data, 1), data, 'blue').find((x) => x.champion === id)!;
+      if (o.kind !== 'move') throw new Error('expected a move');
+      return o;
+    };
+    expect(def(top.id)).toMatchObject({ kind: 'move', to: 'top-lane' });
+    store.setWard(top.id, 'to');
+    expect(store.pending.value[top.id]).toEqual({ ...def(top.id), ward: 'to' });
+    store.setUnward(support.id, 'to');
+    expect(store.pending.value[support.id]).toEqual({ ...def(support.id), unward: 'to' });
+    store.setLaunchHerald(bot.id, false);
+    expect(store.pending.value[bot.id]).toEqual(def(bot.id));
   });
 
   test('lane contacts resolved from stances are never prompted', () => {

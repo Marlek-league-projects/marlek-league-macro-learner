@@ -172,6 +172,14 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     return o?.kind === 'move' ? o : null;
   };
 
+  /** The pending move to amend, else the engine's default (a laner in its lane follows its wave), else stay put. */
+  const moveBase = (id: string): Extract<Order, { kind: 'move' }> => {
+    const prev = existingMove(id);
+    if (prev) return { ...prev };
+    const def = engine.defaultOrders(current(), data, PLAYER).find((o) => o.champion === id);
+    return def?.kind === 'move' ? { ...def } : { kind: 'move', champion: id, to: champion(id).position };
+  };
+
   const resolve = (): void => {
     const before = current();
     const orders = roundOrders;
@@ -292,17 +300,14 @@ export function createStore(data: GameData, engine: GameEngine): Store {
         place(spot === null ? rest : { ...rest, ward: 'from' });
         return;
       }
-      const base: Extract<Order, { kind: 'move' }> =
-        prev?.kind === 'move' ? { ...prev } : { kind: 'move', champion: id, to: champion(id).position };
+      const base = moveBase(id);
       delete base.ward;
       if (spot !== null) base.ward = spot;
       place(base);
     },
 
     setUnward(id, spot) {
-      const prev = pending.value[id];
-      const base: Extract<Order, { kind: 'move' }> =
-        prev?.kind === 'move' ? { ...prev } : { kind: 'move', champion: id, to: champion(id).position };
+      const base = moveBase(id);
       delete base.unward;
       if (spot !== null) base.unward = spot;
       place(base);
@@ -410,9 +415,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     },
 
     setLaunchHerald(id, on) {
-      const prev = pending.value[id];
-      const base: Extract<Order, { kind: 'move' }> =
-        prev?.kind === 'move' ? { ...prev } : { kind: 'move', champion: id, to: champion(id).position };
+      const base = moveBase(id);
       delete base.launchHerald;
       if (on) base.launchHerald = true;
       place(base);
