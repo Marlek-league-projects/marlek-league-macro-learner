@@ -234,13 +234,13 @@ function inLaningPhase(ctx: Ctx): boolean {
 
 /**
  * A paying rotation a laner may take in the laning phase: top and bot to the pit on their half of the map (a wave
- * sacrifice is allowed); mid, equally far from both pits, only with lane priority (its wave even or pushed).
+ * sacrifice is allowed); mid, equally far from both pits, only with lane priority (its wave pushed to the enemy).
  */
 function laningRotation(ctx: Ctx, c: ChampionState, pit: PitId): boolean {
   if (c.role === 'jungle') return true;
   const lane = HOME_LANE[c.role];
   const h = half(ctx.data, laneMid(ctx.data, lane));
-  return h === null ? ourWave(ctx.view, lane) >= 0 : h === pit;
+  return h === null ? ourWave(ctx.view, lane) === 1 : h === pit;
 }
 
 /**

@@ -410,9 +410,10 @@ describe('laning phase', () => {
     expect(adcRotates(late, 'diamond', onlyMistake())).toBe(true);
   });
 
-  test('a paying wave sacrifice is kept to the laner\'s half of the map: top stays, mid rotates to the Dragon', () => {
+  test('a paying wave sacrifice is kept to the laner\'s half of the map: top stays, mid (with priority) rotates to the Dragon', () => {
     const s = newGame(d, 7);
     s.round = 10; // Dragon spawns next round; no enemy seen, the rotation gives the numbers
+    s.waves.mid = 1; // blue mid has priority
     place(s, 'blue', 'jungle', 'raptors-blue');
     expect(d.graph.distance('top-t1-blue', 'dragon-pit')).toBeLessThanOrEqual(d.rules.moves.jungler);
     const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('diamond'), onlyMistake());
@@ -434,8 +435,8 @@ describe('laning phase', () => {
       const i = view.allies.findIndex((c) => c.role === 'mid');
       return per[i]![0]!.score === d.aiTuning.priorities.objective;
     };
-    expect(midRotates(0)).toBe(true);
     expect(midRotates(1)).toBe(true);
+    expect(midRotates(0)).toBe(false);
     expect(midRotates(-1)).toBe(false);
   });
 
