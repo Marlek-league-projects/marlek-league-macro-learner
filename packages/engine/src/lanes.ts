@@ -99,17 +99,17 @@ export function lanePressure(state: GameState, data: GameData, lane: Lane): Side
 /**
  * Mutates `state`: waves, tower hp, gold, xp and trade lead for one round. A lane in `tradeWinners` had a trade
  * contact this round (null: tied); otherwise even laners push by fight score. An uneven lane with both sides
- * present and no gank this round (not in `ganked`) is under pressure: the smaller side farms at
- * `economy.pressureFarmShare`. Only `acting` champions (a step left on arrival; all of them when omitted) farm: a
- * laner arriving in its lane on its last step still counts for the wave and the towers, but gets no farm.
+ * present that is not in `noPressure` is under pressure: the smaller side farms at `economy.pressureFarmShare`.
+ * Only `acting` champions (a step left on arrival, no flee or retreat) farm: a laner arriving in its lane on its last
+ * step still counts for the wave and the towers, but gets no farm.
  */
 export function updateLanes(
   state: GameState,
   data: GameData,
   tradeWinners: Partial<Record<Lane, Side | null>>,
   events: GameEvent[],
-  ganked: ReadonlySet<Lane> = new Set(),
-  acting?: ReadonlySet<string>,
+  noPressure: ReadonlySet<Lane>,
+  acting: ReadonlySet<string>,
 ): void {
   const { rules } = data;
   const win = roundWindow(rules, state.round);
@@ -165,11 +165,11 @@ export function updateLanes(
     }
 
     // 5. farming
-    const underPressure = nb > 0 && nr > 0 && nb !== nr && !ganked.has(lane);
+    const underPressure = nb > 0 && nr > 0 && nb !== nr && !noPressure.has(lane);
     const pressured: Side | null = underPressure ? (nb < nr ? 'blue' : 'red') : null;
     for (const side of ['blue', 'red'] as Side[]) {
       const standing = present[side];
-      const here = acting ? standing.filter((c) => acting.has(c.id)) : standing;
+      const here = standing.filter((c) => acting.has(c.id));
       const carries = here.filter((c) => c.role !== 'support');
       const share = side === pressured ? rules.economy.pressureFarmShare : 1;
       const gold = (rules.economy.farmGoldPerMin * win.seconds * share) / 60;

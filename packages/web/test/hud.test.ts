@@ -310,6 +310,7 @@ describe('promptContacts', () => {
   const contact = (id: string, auto = false): Contact => ({
     id,
     position: id,
+    positions: [id],
     kind: 'trade',
     blue: ['a'],
     red: ['b'],

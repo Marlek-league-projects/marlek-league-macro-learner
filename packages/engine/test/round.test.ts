@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
-import { defaultOrders, newGame, resolveFight, resolveRound, roundWindow } from '@lml/engine';
-import type { ChampionState, ContactChoices, GameState, Order, Orders, Stance } from '@lml/engine/contracts';
+import { defaultOrders, eventsFor, newGame, resolveFight, resolveRound, roundWindow } from '@lml/engine';
+import type { ChampionState, ContactChoices, GameEvent, GameState, Order, Orders, Stance } from '@lml/engine/contracts';
 
 const d = loadGameData();
 const get = (s: GameState, side: string, role: string): ChampionState =>
@@ -51,7 +51,7 @@ describe('resolveRound', () => {
   test('scuttle 1v2: blue choosing fight loses and dies, red takes the scuttle', () => {
     const { s, o } = scuttleScenario();
     const bj = get(s, 'blue', 'jungle').id;
-    const choices: ContactChoices = { 'scuttle-bot': { blue: 'fight' } };
+    const choices: ContactChoices = { 'river-bot': { blue: 'fight' } };
     const { state, events } = resolveRound(s, d, o, choices);
     const fight = events.find((e) => e.type === 'fight');
     expect(fight).toMatchObject({ type: 'fight', position: 'scuttle-bot', winner: 'red' });
@@ -65,7 +65,7 @@ describe('resolveRound', () => {
 
   test('is deterministic and does not mutate its input', () => {
     const { s, o } = scuttleScenario();
-    const choices: ContactChoices = { 'scuttle-bot': { blue: 'fight' } };
+    const choices: ContactChoices = { 'river-bot': { blue: 'fight' } };
     const before = structuredClone(s);
     const a = resolveRound(s, d, o, choices);
     const b = resolveRound(s, d, o, choices);
@@ -105,7 +105,9 @@ describe('resolveRound', () => {
       { kind: 'move', champion: rj, to: 'top-t1-blue' },
     ]);
     const { state, events } = resolveRound(s, d, o, {});
-    expect(events.filter((e) => e.type === 'fled')).toEqual([{ type: 'fled', champion: bt, to: 'top-t1-blue' }]);
+    expect(events.filter((e) => e.type === 'fled' && e.champion !== get(s, 'red', 'adc').id)).toEqual([
+      { type: 'fled', champion: bt, to: 'top-t1-blue' },
+    ]);
     expect(events.filter((e) => e.type === 'fight')).toHaveLength(0);
     const btAfter = state.champions.find((c) => c.id === bt)!;
     const rjAfter = state.champions.find((c) => c.id === rj)!;
@@ -145,7 +147,7 @@ describe('resolveRound', () => {
   test('a champion killed in round N can spawn in round respawnRound', () => {
     const { s, o } = scuttleScenario();
     const bj = get(s, 'blue', 'jungle').id;
-    const r1 = resolveRound(s, d, o, { 'scuttle-bot': { blue: 'fight' } });
+    const r1 = resolveRound(s, d, o, { 'river-bot': { blue: 'fight' } });
     const dead = r1.state.champions.find((c) => c.id === bj)!;
     expect(dead.respawnRound).toBe(r1.state.round);
     expect(dead.status).toBe('respawning');
@@ -249,7 +251,7 @@ describe('resolveRound', () => {
       { kind: 'move', champion: get(s, 'red', 'top').id, to: 'top-t1-blue' },
       { kind: 'move', champion: get(s, 'red', 'mid').id, to: 'top-t1-blue' },
     ]);
-    const { state } = resolveRound(s, d, o, { 'top-t1-blue': { blue: 'flee' } });
+    const { state } = resolveRound(s, d, o, { 'lane-top': { blue: 'flee' } });
     const after = state.champions.find((c) => c.id === bt.id)!;
     expect([after.position, after.status]).toEqual(['top-t2-blue', 'alive']);
   });
@@ -268,7 +270,7 @@ describe('resolveRound', () => {
       { kind: 'move', champion: rt.id, to: 'top-lane' },
       { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'top-lane' },
     ]);
-    const { state, events } = resolveRound(s, d, o, { 'top-lane': { blue: 'flee' } });
+    const { state, events } = resolveRound(s, d, o, { 'lane-top': { blue: 'flee' } });
     expect(events).toContainEqual({ type: 'fled', champion: bt.id, to: 'top-t1-blue' });
     expect(events).toContainEqual({ type: 'trade', position: 'top-lane', lane: 'top', winner: 'red' });
     expect(state.waves.top).toBe(-1);
@@ -388,5 +390,142 @@ describe('an action needs a step left on arrival', () => {
     };
     expect(farmOf('top-t2-blue')).toBe(0);
     expect(farmOf('top-t1-blue')).toBeGreaterThan(0);
+  });
+});
+
+describe('fleeing, retreating or an interrupted recall forfeits the action', () => {
+  test('a jungler fleeing back to its camp does not clear it, and its move did not act', () => {
+    const s = setup(7, [
+      ['blue', 'jungle', 'raptors-blue'],
+      ['red', 'mid', 'mid-t1-red'],
+      ['red', 'jungle', 'raptors-red'],
+    ]);
+    const bj = get(s, 'blue', 'jungle').id;
+    const o = ordersWith(s, [
+      { kind: 'move', champion: bj, to: 'scuttle-bot' },
+      { kind: 'move', champion: get(s, 'red', 'mid').id, to: 'scuttle-bot' },
+      { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'scuttle-bot' },
+    ]);
+    const { state, events } = resolveRound(s, d, o, {});
+    expect(get(state, 'blue', 'jungle').position).toBe('raptors-blue');
+    expect(events.some((e) => e.type === 'campCleared' && e.champion === bj)).toBe(false);
+    expect(events).toContainEqual({ type: 'moved', champion: bj, from: 'raptors-blue', to: 'scuttle-bot', acted: false });
+  });
+
+  test('a recall interrupted by a fight forfeits the action at the step position (no farm)', () => {
+    const s = setup(10, [
+      ['blue', 'top', 'top-lane'],
+      ['red', 'top', 'top-t1-blue'],
+    ]);
+    s.waves.top = -1;
+    get(s, 'blue', 'top').bonusLead += 100_000;
+    get(s, 'red', 'top').stance = 'allin';
+    get(s, 'blue', 'top').stance = 'trade';
+    const bt = get(s, 'blue', 'top');
+    const before = bt.gold;
+    const { state, events } = resolveRound(s, d, ordersWith(s, [{ kind: 'recall', champion: bt.id, to: 'top-t1-blue' }]), {});
+    expect(events.some((e) => e.type === 'fight' && e.winner === 'blue')).toBe(true);
+    expect(events).toContainEqual({ type: 'moved', champion: bt.id, from: 'top-lane', to: 'top-t1-blue', acted: false });
+    const kills = events.filter((e) => e.type === 'death').length;
+    const passive = (d.rules.economy.passiveGoldPerMin * roundWindow(d.rules, 10).seconds) / 60;
+    expect(get(state, 'blue', 'top').gold - before).toBeCloseTo(passive + kills * d.rules.economy.killGold, 6);
+  });
+});
+
+describe('a contested river', () => {
+  /** Round 11, Dragon up and held by the blue jungler since round 10; the red jungler arrives on the Scuttle. */
+  function river(): { s: GameState; o: Orders; bj: string; rj: string } {
+    const s = setup(11, [
+      ['blue', 'jungle', 'dragon-pit'],
+      ['red', 'jungle', 'bluebuff-red'],
+    ]);
+    s.pits['dragon-pit'] = { objective: 'dragon', nextSpawn: null, capture: { side: 'blue', startedRound: 10 } };
+    const bj = get(s, 'blue', 'jungle').id;
+    const rj = get(s, 'red', 'jungle').id;
+    const o = ordersWith(s, [
+      { kind: 'move', champion: bj, to: 'dragon-pit' },
+      { kind: 'move', champion: rj, to: 'scuttle-bot' },
+    ]);
+    return { s, o, bj, rj };
+  }
+  const taken = (events: GameEvent[], objective: string): GameEvent | undefined =>
+    events.find((e) => e.type === 'objectiveTaken' && e.objective === objective);
+
+  test('objective against flee: the Dragon (when due) and the Scuttle are taken', () => {
+    const { s, o, bj, rj } = river();
+    const { events } = resolveRound(s, d, o, { 'river-bot': { blue: 'objective', red: 'flee' } });
+    expect(events).toContainEqual(expect.objectContaining({ type: 'fled', champion: rj }));
+    expect(taken(events, 'dragon')).toMatchObject({ side: 'blue', champions: [bj] });
+    expect(taken(events, 'scuttle')).toMatchObject({ side: 'blue', position: 'scuttle-bot', champions: [bj] });
+  });
+
+  test('objective against fight: the objective side scores objectiveFocus of its strength', () => {
+    const { s, o, bj, rj } = river();
+    const { events } = resolveRound(s, d, o, { 'river-bot': { blue: 'objective', red: 'fight' } });
+    const fight = events.find((e) => e.type === 'fight');
+    const stage = roundWindow(d.rules, 11).stage;
+    const plain = resolveFight(s, d, 'dragon-pit', [bj], [rj], stage).scores;
+    expect(fight?.type === 'fight' && fight.scores.blue).toBeCloseTo(plain.blue * d.rules.fight.objectiveFocus, 9);
+    expect(fight?.type === 'fight' && fight.scores.red).toBeCloseTo(plain.red, 9);
+  });
+
+  test('objective against fight: if the objective side still wins it takes the objective and the kill', () => {
+    const { s, o, bj, rj } = river();
+    get(s, 'blue', 'jungle').bonusLead += 100_000;
+    const { state, events } = resolveRound(s, d, o, { 'river-bot': { blue: 'objective', red: 'fight' } });
+    expect(events).toContainEqual(expect.objectContaining({ type: 'death', champion: rj }));
+    expect(taken(events, 'dragon')).toMatchObject({ side: 'blue', champions: [bj] });
+    expect(state.objectivesTaken.blue.dragon).toBe(1);
+  });
+
+  test('objective against objective: a race won by the higher score, nobody dies or loses HP', () => {
+    const { s, o, bj, rj } = river();
+    get(s, 'blue', 'jungle').bonusLead += 100_000;
+    const { state, events } = resolveRound(s, d, o, { 'river-bot': { blue: 'objective', red: 'objective' } });
+    expect(events.some((e) => e.type === 'fight' || e.type === 'death' || e.type === 'hpLost')).toBe(false);
+    expect(events).toContainEqual(expect.objectContaining({ type: 'fled', champion: rj }));
+    expect(taken(events, 'dragon')).toMatchObject({ side: 'blue', champions: [bj] });
+    expect(get(state, 'red', 'jungle').status).toBe('alive');
+  });
+
+  test('objective against objective on an exact tie: nobody takes anything', () => {
+    const { s, o, bj, rj } = river();
+    // Even the scores out through the red jungler's lead (full HP: one lead point is `fight.lead / 1000` score).
+    const stage = roundWindow(d.rules, 11).stage;
+    const gap = (): number => {
+      const { scores } = resolveFight(s, d, 'dragon-pit', [bj], [rj], stage);
+      return scores.blue - scores.red;
+    };
+    get(s, 'red', 'jungle').bonusLead += (gap() * 1000) / d.rules.fight.lead;
+    expect(Math.abs(gap())).toBeLessThan(1e-9);
+    const { state, events } = resolveRound(s, d, o, { 'river-bot': { blue: 'objective', red: 'objective' } });
+    expect(events.some((e) => e.type === 'objectiveTaken' || e.type === 'fled' || e.type === 'death')).toBe(false);
+    expect(state.pits['dragon-pit'].objective).toBe('dragon');
+  });
+});
+
+describe('HP losses are visible', () => {
+  test('a trade loser at 100 ends the round at 80, with no regen, and an hpLost event', () => {
+    const s = setup(10, [['blue', 'top', 'top-lane'], ['red', 'top', 'top-lane']]);
+    s.waves.top = 0;
+    get(s, 'blue', 'top').bonusLead += 100_000;
+    const rt = get(s, 'red', 'top').id;
+    const { state, events } = resolveRound(s, d, ordersWith(s, [{ kind: 'move', champion: rt, to: 'top-lane', stance: 'trade' }]), {});
+    expect(get(state, 'red', 'top').hp).toBe(80);
+    expect(events).toContainEqual({ type: 'hpLost', champion: rt, amount: d.rules.health.tradeLoss });
+  });
+
+  test('eventsFor shows hpLost for own champions and for enemies visible after the round only', () => {
+    const s = setup(10, [['blue', 'top', 'top-lane'], ['red', 'top', 'top-lane']]);
+    get(s, 'blue', 'top').bonusLead += 100_000;
+    const bt = get(s, 'blue', 'top').id;
+    const rt = get(s, 'red', 'top').id;
+    const { state, events } = resolveRound(s, d, ordersWith(s, [{ kind: 'move', champion: rt, to: 'top-lane', stance: 'trade' }]), {});
+    const hidden: GameEvent[] = [...events, { type: 'hpLost', champion: get(s, 'red', 'jungle').id, amount: 15 }];
+    const forBlue = eventsFor(hidden, state, d, 'blue').filter((e) => e.type === 'hpLost');
+    expect(forBlue).toEqual([
+      { type: 'hpLost', champion: bt, amount: d.rules.health.tradeWinnerLoss },
+      { type: 'hpLost', champion: rt, amount: d.rules.health.tradeLoss },
+    ]);
   });
 });

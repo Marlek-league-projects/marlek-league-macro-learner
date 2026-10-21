@@ -32,9 +32,47 @@ const capture = (s: GameState, acting = everyone(s)): GameEvent[] => {
   return ev;
 };
 
+describe('grouped river', () => {
+  test('taking the Dragon with the Scuttle up takes both in one round, shared by the takers', () => {
+    const s = fresh(11);
+    for (const r of ['jungle', 'mid', 'adc', 'support']) get(s, 'blue', r).position = 'dragon-pit';
+    const ev = capture(s);
+    expect(ev.map((e) => e.type === 'objectiveTaken' && e.objective)).toEqual(['dragon', 'scuttle']);
+    expect(s.objectivesTaken.blue.scuttle).toBe(1);
+    const share = (d.rules.objectives.dragon.gold + d.rules.objectives.scuttle.gold) / 4;
+    expect(get(s, 'blue', 'mid').gold).toBe(share);
+    expect(s.scuttles['scuttle-bot']).toBeGreaterThan(roundWindow(d.rules, 11).end);
+  });
+
+  test('starting the Dragon does not take the Scuttle', () => {
+    const s = fresh(11);
+    get(s, 'blue', 'jungle').position = 'dragon-pit';
+    expect(capture(s).map((e) => e.type)).toEqual(['objectiveStarted']);
+    expect(s.objectivesTaken.blue.scuttle).toBeUndefined();
+  });
+
+  test('standing on the Scuttle alone takes only the Scuttle, with no objectiveStarted', () => {
+    const s = fresh(11);
+    get(s, 'blue', 'jungle').position = 'scuttle-bot';
+    const ev = capture(s);
+    expect(ev.map((e) => e.type)).toEqual(['objectiveTaken']);
+    expect(ev[0]).toMatchObject({ objective: 'scuttle', position: 'scuttle-bot' });
+    expect(s.pits['dragon-pit'].capture).toBeNull();
+  });
+
+  test('an enemy anywhere in the river contests both the pit and the Scuttle', () => {
+    const s = fresh(11);
+    get(s, 'blue', 'jungle').position = 'dragon-pit';
+    get(s, 'red', 'jungle').position = 'scuttle-bot';
+    expect(capture(s)).toEqual([]);
+    expect(s.pits['dragon-pit'].capture).toBeNull();
+  });
+});
+
 describe('pit objectives', () => {
   test('a lone jungler starts a dragon capture, then takes it by staying', () => {
     const s = fresh(11);
+    s.scuttles['scuttle-bot'] = 1e9; // the Scuttle is down: only the Dragon's reward
     expect(s.pits['dragon-pit'].objective).toBe('dragon');
     get(s, 'blue', 'jungle').position = 'dragon-pit';
     let ev = capture(s);
@@ -106,6 +144,7 @@ describe('pit objectives', () => {
 
   test('4 champions take the dragon on arrival', () => {
     const s = fresh(11);
+    s.scuttles['scuttle-bot'] = 1e9; // the Scuttle is down: only the Dragon's reward
     for (const r of ['jungle', 'mid', 'adc', 'support']) get(s, 'blue', r).position = 'dragon-pit';
     capture(s);
     expect(s.objectivesTaken.blue.dragon).toBe(1);

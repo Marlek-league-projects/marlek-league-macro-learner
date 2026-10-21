@@ -71,7 +71,7 @@ export function validateRules(rules: Rules): void {
   const f = rules.fight;
   const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
   if (!finite(f.deathGap) || f.deathGap <= 0) fail('rules.fight', `deathGap = ${String(f.deathGap)} is not a positive number`);
-  for (const key of ['survivorLoss', 'gankExposed', 'gankHpLoss'] as const) {
+  for (const key of ['survivorLoss', 'gankExposed', 'gankHpLoss', 'pressureHpLoss', 'objectiveFocus'] as const) {
     if (!finite(f[key]) || f[key] < 0) fail('rules.fight', `${key} = ${String(f[key])} is not a non-negative number`);
   }
   const share = rules.economy.pressureFarmShare;

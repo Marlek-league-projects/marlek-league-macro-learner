@@ -40,7 +40,7 @@ describe('teaching', () => {
       { kind: 'move', champion: get(s, 'red', 'mid').id, to: 'scuttle-bot' },
       { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'scuttle-bot' },
     ]);
-    const { state, events } = resolveRound(s, d, o, { 'scuttle-bot': { blue: 'fight' } });
+    const { state, events } = resolveRound(s, d, o, { 'river-bot': { blue: 'fight' } });
     const out = explainRound(s, state, events, d, 'blue');
     const e = out.find((x) => x.ruleId === 'outnumbered-death')!;
     expect(e.roundsLost).toBe(1);

@@ -157,7 +157,8 @@ function scoreboard(s: GameState): Scoreboard {
  * enemy ones only where `side` saw them: the enemy was visible at the resolution, or the event's position
  * is in a lane holding an own alive champion, holds one, holds an own champion killed this round, or holds
  * a visible enemy. Contacts (fight, trade, death) always involve both sides, and waves, tower damage,
- * herald launches and taken objectives other than the scuttle are public.
+ * herald launches and taken objectives other than the scuttle are public. HP losses show for own champions and
+ * enemies visible after the round.
  */
 export function eventsFor(events: GameEvent[], after: GameState, data: GameData, side: Side): GameEvent[] {
   const byId = new Map(after.champions.map((c) => [c.id, c]));
@@ -195,6 +196,8 @@ export function eventsFor(events: GameEvent[], after: GameState, data: GameData,
       case 'wardPlaced':
       case 'wardCleared':
         return e.side === side || seen.has(e.position);
+      case 'hpLost':
+        return enemySeen(e.champion);
     }
   });
 }

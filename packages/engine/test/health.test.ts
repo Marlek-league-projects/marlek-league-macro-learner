@@ -34,15 +34,18 @@ describe('health', () => {
     expect(newGame(d, 7).champions.every((c) => c.hp === H.max)).toBe(true);
   });
 
-  test('a lost trade costs tradeLoss, a won one tradeWinnerLoss, then every alive champion regenerates', () => {
+  test('a lost trade costs tradeLoss, a won one tradeWinnerLoss; only champions who lost no HP regenerate', () => {
     const s = lane();
     get(s, 'blue', 'top').hp = 50;
     get(s, 'red', 'top').hp = 60;
     const rt = get(s, 'red', 'top').id;
     const { state } = resolveRound(s, d, ordersWith(s, [{ kind: 'move', champion: rt, to: 'top-lane', stance: 'trade' }]), {});
-    expect(get(state, 'blue', 'top').hp).toBe(50 - H.tradeWinnerLoss + H.regenPerRound);
-    expect(get(state, 'red', 'top').hp).toBe(60 - H.tradeLoss + H.regenPerRound);
+    expect(get(state, 'blue', 'top').hp).toBe(50 - H.tradeWinnerLoss);
+    expect(get(state, 'red', 'top').hp).toBe(60 - H.tradeLoss);
     expect(get(state, 'blue', 'mid').hp).toBe(H.max);
+    get(s, 'blue', 'mid').hp = 50;
+    const unhurt = resolveRound(s, d, ordersWith(s), {}).state;
+    expect(get(unhurt, 'blue', 'mid').hp).toBe(50 + H.regenPerRound);
   });
 
   test('a tied trade costs no HP', () => {
@@ -85,17 +88,19 @@ describe('health', () => {
     expect(events).toContainEqual({ type: 'fled', champion: bt, to: 'top-t1-blue' });
     expect(events.some((e) => e.type === 'trade' && e.winner === 'red')).toBe(true);
     for (const role of ['top', 'jungle']) expect(get(state, 'red', role).hp).toBe(50 + H.regenPerRound);
-    expect(get(state, 'blue', 'top').hp).toBe(50 - d.rules.fight.gankHpLoss + H.regenPerRound);
+    expect(get(state, 'blue', 'top').hp).toBe(50 - d.rules.fight.gankHpLoss);
+    expect(events).toContainEqual({ type: 'hpLost', champion: bt, amount: d.rules.fight.gankHpLoss });
   });
 
   test('health is clamped to 0..max and never kills by itself', () => {
     const s = lane();
     get(s, 'red', 'top').hp = 5;
     const rt = get(s, 'red', 'top').id;
-    const { state } = resolveRound(s, d, ordersWith(s, [{ kind: 'move', champion: rt, to: 'top-lane', stance: 'trade' }]), {});
+    const { state, events } = resolveRound(s, d, ordersWith(s, [{ kind: 'move', champion: rt, to: 'top-lane', stance: 'trade' }]), {});
     const red = get(state, 'red', 'top');
     expect(red.status).toBe('alive');
-    expect(red.hp).toBe(H.regenPerRound);
+    expect(red.hp).toBe(0);
+    expect(events).toContainEqual({ type: 'hpLost', champion: rt, amount: 5 });
     get(s, 'blue', 'mid').hp = H.max - 1;
     const r2 = resolveRound(s, d, ordersWith(s), {});
     expect(get(r2.state, 'blue', 'mid').hp).toBe(H.max);

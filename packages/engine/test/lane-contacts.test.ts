@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
-import { defaultOrders, detectContacts, newGame, resolveRound, validateOrders } from '@lml/engine';
+import { defaultOrders, detectContacts, newGame, resolveRound, roundWindow, validateOrders } from '@lml/engine';
 import type { ChampionState, GameState, Order, Orders } from '@lml/engine/contracts';
 
 const d = loadGameData();
@@ -37,42 +37,78 @@ describe('gank or lane pressure', () => {
     return s;
   }
 
-  test('a 2v1 left by a roaming support is lane pressure: no prompt, nobody dies, the wave is pushed', () => {
+  test('a 2v1 left by a roaming support is prompted lane pressure: the lone laner flees by default', () => {
     const s = roamed();
     const o = ordersWith(s);
-    const c = detectContacts(s, d, o).find((x) => x.position === 'bot-lane')!;
+    const c = detectContacts(s, d, o).find((x) => x.id === 'lane-bot')!;
     expect(c.kind).toBe('pressure');
-    expect(c.auto).toBe(true);
-    expect(c.options).toEqual({ blue: ['farm'], red: ['farm'] });
+    expect(c.auto).toBe(false);
+    expect(c.position).toBe('bot-lane');
+    expect(c.options).toEqual({ blue: ['fight', 'flee'], red: ['fight', 'flee'] });
+    expect(c.defaults).toEqual({ blue: 'fight', red: 'flee' });
     const { state, events } = resolveRound(s, d, o, {});
+    const ra = get(s, 'red', 'adc').id;
+    expect(events).toContainEqual({ type: 'fled', champion: ra, to: 'bot-t1-red' });
+    expect(alive(state, ra)).toBe(true);
+    // Fleeing a side that fights while outnumbered costs gankHpLoss.
+    expect(get(state, 'red', 'adc').hp).toBe(d.rules.health.max - d.rules.fight.gankHpLoss);
+  });
+
+  test('the smaller side away from its tower cannot farm', () => {
+    const s = roamed();
+    expect(() => resolveRound(s, d, ordersWith(s), { 'lane-bot': { red: 'farm' } })).toThrow(/not allowed/);
+  });
+
+  /** Lone red adc on its own T1 against the blue duo. */
+  function underTower(): GameState {
+    const s = setup(10, [
+      ['blue', 'adc', 'bot-lane'],
+      ['blue', 'support', 'bot-lane'],
+      ['red', 'adc', 'bot-t1-red'],
+      ['red', 'support', 'raptors-red'],
+    ]);
+    s.waves.bot = 1;
+    return s;
+  }
+  /** The blue duo stays on the lane middle (instead of following the wave onto the red T1). */
+  const duoStays = (s: GameState): Orders =>
+    ordersWith(s, ['adc', 'support'].map((r) => ({ kind: 'move', champion: get(s, 'blue', r).id, to: 'bot-lane' })));
+
+  test('a lone adc on its T1 against 2 may farm or flee; the fight happens on its tower', () => {
+    const s = underTower();
+    const c = detectContacts(s, d, duoStays(s)).find((x) => x.id === 'lane-bot')!;
+    expect(c.kind).toBe('pressure');
+    expect(c.position).toBe('bot-t1-red');
+    expect(c.positions).toEqual(['bot-lane', 'bot-t1-red']);
+    expect(c.options.red).toEqual(['fight', 'flee', 'farm']);
+    expect(c.options.blue).toEqual(['fight', 'flee']);
+  });
+
+  test('farming under its tower against a fight costs pressureHpLoss and nothing more when the gap is within allInMargin', () => {
+    const s = underTower();
+    const ra = get(s, 'red', 'adc');
+    const before = ra.gold;
+    const strict = { ...d, aiTuning: { ...d.aiTuning, allInMargin: 1_000_000 } };
+    const { state, events } = resolveRound(s, strict, duoStays(s), { 'lane-bot': { red: 'farm' } });
     expect(events.some((e) => e.type === 'fight' || e.type === 'death' || e.type === 'fled')).toBe(false);
-    expect(alive(state, get(s, 'red', 'adc').id)).toBe(true);
-    expect(state.waves.bot).toBe(1);
+    expect(events).toContainEqual({ type: 'hpLost', champion: ra.id, amount: d.rules.fight.pressureHpLoss });
+    const after = get(state, 'red', 'adc');
+    expect([after.status, after.position, after.hp]).toEqual(['alive', 'bot-t1-red', d.rules.health.max - d.rules.fight.pressureHpLoss]);
+    // The bigger side stays on the tower with it; the adc still farms, at the pressure share.
+    expect(get(state, 'blue', 'adc').position).toBe('bot-t1-red');
+    const win = roundWindow(d.rules, s.round);
+    const farm = (d.rules.economy.farmGoldPerMin * win.seconds * d.rules.economy.pressureFarmShare) / 60;
+    const passive = (d.rules.economy.passiveGoldPerMin * win.seconds) / 60;
+    expect(after.gold - before).toBeCloseTo(farm + passive, 6);
   });
 
-  test('the smaller side cannot answer a pressure contact', () => {
-    const s = roamed();
-    expect(() => resolveRound(s, d, ordersWith(s), { 'bot-lane': { red: 'flee' } })).toThrow(/not allowed/);
-  });
-
-  test('pressure kills the lone laner only when the bigger side is All-in and wins by more than allInMargin', () => {
-    const s = roamed();
+  test('farming under its tower dies only to a fight won by more than allInMargin', () => {
+    const s = underTower();
     get(s, 'blue', 'adc').bonusLead += 100_000;
     const ra = get(s, 'red', 'adc').id;
-    const allIn: Order[] = ['adc', 'support'].map((r) => ({
-      kind: 'move', champion: get(s, 'blue', r).id, to: 'bot-lane', stance: 'allin',
-    }));
-    const o = ordersWith(s, allIn);
-    expect(detectContacts(s, d, o).find((x) => x.position === 'bot-lane')!.options.blue).toEqual(['fight']);
-    const won = resolveRound(s, d, o, {});
-    expect(won.events.some((e) => e.type === 'fight' && e.winner === 'blue')).toBe(true);
-    expect(alive(won.state, ra)).toBe(false);
-
-    const strict = { ...d, aiTuning: { ...d.aiTuning, allInMargin: 1_000_000 } };
-    const safe = resolveRound(s, strict, o, {});
-    expect(safe.events.some((e) => e.type === 'fight' || e.type === 'death')).toBe(false);
-    expect(alive(safe.state, ra)).toBe(true);
-    expect(safe.state.waves.bot).toBe(1);
+    const { state, events } = resolveRound(s, d, duoStays(s), { 'lane-bot': { red: 'farm' } });
+    expect(events.some((e) => e.type === 'fight' && e.winner === 'blue' && e.position === 'bot-t1-red')).toBe(true);
+    expect(alive(state, ra)).toBe(false);
   });
 
   test('a laner returning to its own lane is not a ganker: the 2v1 stays lane pressure', () => {
@@ -85,9 +121,9 @@ describe('gank or lane pressure', () => {
     s.waves.bot = 0;
     const back: Order = { kind: 'move', champion: get(s, 'blue', 'support').id, to: 'bot-lane' };
     validateOrders(s, d, 'blue', ordersWith(s, [back]).blue);
-    const c = detectContacts(s, d, ordersWith(s, [back])).find((x) => x.position === 'bot-lane')!;
+    const c = detectContacts(s, d, ordersWith(s, [back])).find((x) => x.id === 'lane-bot')!;
     expect(c.kind).toBe('pressure');
-    expect(c.auto).toBe(true);
+    expect(c.auto).toBe(false);
   });
 
   test('a jungler arriving into the lane is a gank, prompted as before', () => {
@@ -156,9 +192,9 @@ describe('stances', () => {
     expect(alive(state, rt.id)).toBe(true);
     expect(state.waves.top).toBe(1);
     expect(get(state, 'blue', 'top').bonusLead).toBe(bt.bonusLead + d.rules.economy.tradeLead);
-    const { max, tradeLoss, tradeWinnerLoss, regenPerRound } = d.rules.health;
-    expect(get(state, 'red', 'top').hp).toBe(max - tradeLoss + regenPerRound);
-    expect(get(state, 'blue', 'top').hp).toBe(Math.min(max, max - tradeWinnerLoss + regenPerRound));
+    const { max, tradeLoss, tradeWinnerLoss } = d.rules.health;
+    expect(get(state, 'red', 'top').hp).toBe(max - tradeLoss);
+    expect(get(state, 'blue', 'top').hp).toBe(max - tradeWinnerLoss);
   });
 
   test('Push plays like Farm in an even lane contact: never all-in, and a Push loser against All-in survives', () => {
@@ -222,7 +258,7 @@ describe('stances', () => {
     expect(alive(state, get(s, 'red', 'adc').id)).toBe(false);
     const rs = get(state, 'red', 'support');
     expect(rs.status).toBe('alive');
-    expect(rs.hp).toBe(d.rules.health.max - d.rules.fight.survivorLoss + d.rules.health.regenPerRound);
+    expect(rs.hp).toBe(d.rules.health.max - d.rules.fight.survivorLoss);
   });
 
   test('2v2: a Farm adc whose All-in support loses the fight to a Trade duo survives; the support dies', () => {
@@ -241,7 +277,7 @@ describe('stances', () => {
     expect(events.some((e) => e.type === 'fight' && e.winner === 'red')).toBe(true);
     const ba = get(state, 'blue', 'adc');
     expect(ba.status).toBe('alive');
-    expect(ba.hp).toBe(d.rules.health.max - d.rules.fight.survivorLoss + d.rules.health.regenPerRound);
+    expect(ba.hp).toBe(d.rules.health.max - d.rules.fight.survivorLoss);
     expect(events.some((e) => e.type === 'death' && e.champion === ba.id)).toBe(false);
     expect(alive(state, get(s, 'blue', 'support').id)).toBe(false);
     expect(alive(state, get(s, 'red', 'adc').id) && alive(state, get(s, 'red', 'support').id)).toBe(true);

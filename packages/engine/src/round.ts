@@ -66,9 +66,23 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
 
   // 5. contacts
   const stage = roundWindow(data.rules, s.round).stage;
+  const { fight: F } = data.rules;
   const fighters = new Set<string>();
+  /** Fled, retreated (a fight's surviving losers) or caught in a fight while recalling: no action this round. */
+  const forfeited = new Set<string>();
+  /** Lost HP this round: no regeneration at its end. */
+  const hurt = new Set<string>();
   const tradeWinners: Partial<Record<Lane, Side | null>> = {};
-  const ganked = new Set<Lane>();
+  /** Lanes whose uneven presence is not lane pressure: only a smaller side staying to farm farms at a reduced share. */
+  const noPressure = new Set<Lane>();
+  const loseHp = (id: string, amount: number): void => {
+    const c = byId(id);
+    const before = c.hp;
+    changeHp(c, data.rules, -amount);
+    hurt.add(id);
+    if (before > c.hp) events.push({ type: 'hpLost', champion: id, amount: before - c.hp });
+  };
+  /** A tied fight: everyone goes back to where it stood (and acts there if it has a step left). */
   const goBack = (ids: string[]): void => {
     for (const id of ids) byId(id).position = byId(id).previous;
   };
@@ -78,13 +92,12 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
    */
   const settle = (winner: Side, losers: string[], eligible: string[], gap: number, winners: string[], ganked: Side | null): void => {
     const victims = fightVictims(s, data, eligible, gap);
-    const { survivorLoss, gankHpLoss } = data.rules.fight;
     for (const id of losers) {
-      if (!victims.includes(id) && other(winner) !== ganked) changeHp(byId(id), data.rules, -survivorLoss);
+      if (!victims.includes(id) && other(winner) !== ganked) loseHp(id, F.survivorLoss);
     }
     if (ganked) {
       for (const id of ganked === winner ? winners : losers) {
-        if (!victims.includes(id)) changeHp(byId(id), data.rules, -gankHpLoss);
+        if (!victims.includes(id)) loseHp(id, F.gankHpLoss);
       }
     }
     applyKill(s, data, victims, winners, events);
@@ -93,63 +106,91 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   };
   /**
    * Flee movement: back to the previous position, or one step toward the base for a champion who did not move (or
-   * just spawned here) and has nowhere to go back to. Dead champions stay where they are.
+   * just spawned here) and has nowhere to go back to. Dead champions stay where they are. Either way, no action.
    */
   const retreat = (ids: string[]): void => {
     for (const id of ids) {
       const c = byId(id);
       if (c.status !== 'alive') continue;
+      forfeited.add(id);
       c.position = c.previous === c.position ? retreatStep(data, c.side, c.position) : c.previous;
       events.push({ type: 'fled', champion: id, to: c.position });
     }
   };
+  /** Champions staying in a prompted lane contact meet where the fight happens. */
+  const pullIn = (ids: string[], position: string): void => {
+    for (const id of ids) {
+      const c = byId(id);
+      if (c.position === position) continue;
+      events.push({ type: 'moved', champion: id, from: c.position, to: position, acted: false });
+      c.position = position;
+    }
+  };
   for (const contact of contacts) {
     const choice = resolveChoice(contact, choices);
-    const contactLane = data.graph.positions[contact.position]!.lane;
-    if (contact.kind === 'gank' && contactLane) ganked.add(contactLane);
+    const lane = data.graph.positions[contact.position]!.lane ?? null;
     const ids: Record<Side, string[]> = { blue: contact.blue, red: contact.red };
+    const n: Record<Side, number> = { blue: contact.blue.length, red: contact.red.length };
+    const smaller: Side | null = n.blue < n.red ? 'blue' : n.red < n.blue ? 'red' : null;
     const defender = gankedSide(contact);
     const fleeing = SIDES.filter((side) => choice[side] === 'flee');
+    if (lane && !contact.auto) {
+      // Without a flee, both sides meet where the fight happens.
+      if (fleeing.length === 0) for (const side of SIDES) pullIn(ids[side], contact.position);
+      if (!(smaller && choice[smaller] === 'farm' && choice[other(smaller)] !== 'flee')) noPressure.add(lane);
+    }
     if (fleeing.length > 0) {
       for (const side of fleeing) retreat(ids[side]);
-      // Fleeing a gank the gankers committed to still costs HP.
-      if (defender && fleeing.length === 1 && fleeing[0] === defender) {
-        for (const id of ids[defender]) changeHp(byId(id), data.rules, -data.rules.fight.gankHpLoss);
-      }
-      // In lane, the side that stayed (to trade or fight) wins the trade.
-      const lane = data.graph.positions[contact.position]!.lane;
-      if (fleeing.length === 1 && lane) {
-        const winner = other(fleeing[0]!);
-        tradeWinners[lane] = winner;
-        events.push({ type: 'trade', position: contact.position, lane, winner });
+      if (fleeing.length === 1) {
+        const fled = fleeing[0]!;
+        const stayed = other(fled);
+        // Fleeing a side that commits to fight while outnumbered still costs HP.
+        if (n[fled] < n[stayed] && choice[stayed] === 'fight') for (const id of ids[fled]) loseHp(id, F.gankHpLoss);
+        // In lane, the side that stayed wins the trade.
+        if (lane) {
+          tradeWinners[lane] = stayed;
+          events.push({ type: 'trade', position: contact.position, lane, winner: stayed });
+        }
       }
       continue;
     }
-    if (contact.kind === 'pressure') {
-      // The lone side only farms: it can die only to an All-in won by more than `aiTuning.allInMargin`.
-      const bigger: Side = contact.blue.length > contact.red.length ? 'blue' : 'red';
-      if (choice[bigger] !== 'fight') continue;
-      const { winner, scores } = resolveFight(s, data, contact.position, contact.blue, contact.red, stage);
-      const gap = scores[bigger] - scores[other(bigger)];
-      if (winner !== bigger || gap <= data.aiTuning.allInMargin) continue;
-      events.push({ type: 'fight', position: contact.position, blue: contact.blue, red: contact.red, winner, scores });
-      for (const id of [...contact.blue, ...contact.red]) fighters.add(id);
-      settle(winner, ids[other(winner)], ids[other(winner)], gap, ids[winner], null);
+    if (!contact.auto && smaller && choice[smaller] === 'farm') {
+      // The smaller side stays under its tower to farm: it dies only to a fight won by more than
+      // `aiTuning.allInMargin`, otherwise it only loses `fight.pressureHpLoss`.
+      const bigger = other(smaller);
+      const { winner, scores } = resolveFight(s, data, contact.position, contact.blue, contact.red, stage, defender);
+      const gap = scores[bigger] - scores[smaller];
+      if (winner === bigger && gap > data.aiTuning.allInMargin) {
+        events.push({ type: 'fight', position: contact.position, blue: contact.blue, red: contact.red, winner, scores });
+        for (const id of [...contact.blue, ...contact.red]) fighters.add(id);
+        settle(winner, ids[smaller], ids[smaller], gap, ids[bigger], defender);
+      } else {
+        for (const id of ids[smaller]) loseHp(id, F.pressureHpLoss);
+      }
+      continue;
+    }
+    const focusing = SIDES.filter((side) => choice[side] === 'objective');
+    if (focusing.length === 2) {
+      // A race for the river objective: the higher fight score keeps taking it and the other side leaves, nobody
+      // dies or loses HP. On a tie both stay and contest it.
+      const { winner } = resolveFight(s, data, contact.position, contact.blue, contact.red, stage);
+      if (winner) retreat(ids[other(winner)]);
       continue;
     }
     // Farm vs farm has no effect: the lane falls back to the fight-score push.
     if (choice.blue === 'farm' && choice.red === 'farm') continue;
     // A fight with deaths needs both sides on Trade or All-in and at least one All-in: Farm plays safe in an even
-    // lane, so Farm against All-in is only a trade (prompted contacts never offer Farm).
+    // lane, so Farm against All-in is only a trade.
     const allIn = SIDES.some((side) => choice[side] === 'fight') && SIDES.every((side) => choice[side] !== 'farm');
-    const { winner, scores } = resolveFight(s, data, contact.position, contact.blue, contact.red, stage, defender);
+    // A side that keeps taking the objective against a fight scores `fight.objectiveFocus` of its strength.
+    const focus = Object.fromEntries(focusing.map((side) => [side, F.objectiveFocus]));
+    const { winner, scores } = resolveFight(s, data, contact.position, contact.blue, contact.red, stage, defender, focus);
     if (!allIn) {
-      const lane = data.graph.positions[contact.position]!.lane!;
-      tradeWinners[lane] = winner;
-      events.push({ type: 'trade', position: contact.position, lane, winner });
+      tradeWinners[lane!] = winner;
+      events.push({ type: 'trade', position: contact.position, lane: lane!, winner });
       if (winner !== null) {
-        for (const id of ids[winner]) changeHp(byId(id), data.rules, -data.rules.health.tradeWinnerLoss);
-        for (const id of ids[other(winner)]) changeHp(byId(id), data.rules, -data.rules.health.tradeLoss);
+        for (const id of ids[winner]) loseHp(id, data.rules.health.tradeWinnerLoss);
+        for (const id of ids[other(winner)]) loseHp(id, data.rules.health.tradeLoss);
       }
       continue;
     }
@@ -166,20 +207,31 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     }
   }
 
-  // 6. recalls not interrupted by a fight
+  // 6. recalls not interrupted by a fight; an interrupted recall forfeits the action
+  const recalled = new Set<string>();
   for (const { c, o } of steps) {
-    if (o.kind === 'recall' && c.status === 'alive' && !fighters.has(c.id)) completeRecall(s, data, c, events);
+    if (o.kind !== 'recall' || c.status !== 'alive') continue;
+    if (fighters.has(c.id)) forfeited.add(c.id);
+    else {
+      completeRecall(s, data, c, events);
+      recalled.add(c.id);
+    }
   }
 
   // 7-9. herald, camps, objectives, lanes
   launchHeralds(s, data, orders, events);
-  // Only a champion with a step left where it stands acts: clears its camp, takes its objective, farms its wave.
+  // Only a champion with a step left where it stands, who did not flee, retreat or have its recall interrupted, acts:
+  // clears its camp, takes its objective, farms its wave.
   const acting = new Set(
-    s.champions.filter((c) => c.status === 'alive' && canAct(stepsTo(c, c.previous, c.position), budget)).map((c) => c.id),
+    s.champions
+      .filter((c) => c.status === 'alive' && !forfeited.has(c.id) && canAct(stepsTo(c, c.previous, c.position), budget))
+      .map((c) => c.id),
   );
+  // `moved.acted` tells the result after contacts (a completed recall is the action).
+  for (const e of events) if (e.type === 'moved') e.acted = acting.has(e.champion) || recalled.has(e.champion);
   clearCamps(s, data, acting, events);
   captureObjectives(s, data, events, acting);
-  updateLanes(s, data, tradeWinners, events, ganked, acting);
+  updateLanes(s, data, tradeWinners, events, noPressure, acting);
 
   // 10. new wards
   for (const { c, o } of steps) {
@@ -195,7 +247,10 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   updateVision(s, data);
 
   // 12. health regeneration, then next round; `rngState` is carried over untouched for the AI
-  for (const c of s.champions) if (c.status === 'alive') changeHp(c, data.rules, data.rules.health.regenPerRound);
+  // A champion who lost HP this round does not regenerate.
+  for (const c of s.champions) {
+    if (c.status === 'alive' && !hurt.has(c.id)) changeHp(c, data.rules, data.rules.health.regenPerRound);
+  }
   s.round += 1;
   finishIfOver(s, data);
   if (!s.over) advanceRespawns(s, data);

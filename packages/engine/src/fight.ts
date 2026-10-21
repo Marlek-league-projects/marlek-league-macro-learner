@@ -66,7 +66,10 @@ export function gankModifier(state: GameState, data: GameData, position: string,
   return laneExposure(state, data, ganked, lane) > 0 ? -data.rules.fight.gankExposed : 0;
 }
 
-/** `ganked` is the defending side of a gank contact, whose score gets `gankModifier`. */
+/**
+ * `ganked` is the defending side of a gank contact, whose score gets `gankModifier`. `focus` multiplies a side's score
+ * (`fight.objectiveFocus` for a side that keeps taking a contested objective).
+ */
 export function resolveFight(
   state: GameState,
   data: GameData,
@@ -75,11 +78,12 @@ export function resolveFight(
   red: string[],
   stage: Stage,
   ganked: Side | null = null,
+  focus: Partial<Record<Side, number>> = {},
 ): { winner: Side | null; scores: Record<Side, number> } {
   const towerFor = towerOwner(state, data, position);
   const scores: Record<Side, number> = {
-    blue: fightScore(state, data, 'blue', blue, red, stage, towerFor),
-    red: fightScore(state, data, 'red', red, blue, stage, towerFor),
+    blue: fightScore(state, data, 'blue', blue, red, stage, towerFor) * (focus.blue ?? 1),
+    red: fightScore(state, data, 'red', red, blue, stage, towerFor) * (focus.red ?? 1),
   };
   if (ganked) scores[ganked] += gankModifier(state, data, position, ganked);
   const diff = scores.blue - scores.red;

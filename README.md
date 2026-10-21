@@ -65,26 +65,38 @@ The longer a round, the farther a token can move during it. Objective timers cha
 
 ## Fights
 
-**Contact.** A contact happens when enemy champions end the round on the same position. Only the arrival position counts, so champions who cross paths during the round don't meet.
+**Contact.** A contact happens when enemy champions end the round in the same **zone**. Only the arrival position counts, so champions who cross paths during the round between two zones don't meet. The zones are:
 
-When a contact happens, resolution pauses and each player involved chooses to **fight** or **flee**, with a default already selected. Against the AI, the AI answers for its side. A round therefore has two steps: give the orders, then answer the contacts.
+- a **lane**: its towers (T1 to T3 of both sides) and its middle;
+- a **river**: the top one is the top Scuttle and the Baron pit, the bottom one the bottom Scuttle and the Dragon pit;
+- each **jungle camp** on its own.
 
-| Situation | Default choice |
-|---|---|
-| Even numbers in lane (1v1, 2v2) | **Farm** (play the lane normally). See *Lane contacts* below. |
-| Ganked (an enemy **arrives** in your lane this round from elsewhere and outnumbers you; a laner coming back to its own lane is not a ganker) | **Flee** |
-| Outnumbered without a gank (e.g. the enemy support roamed away, so it is 2v1) | No prompt: **lane pressure** (see below) |
-| The ganker | Asked to choose: commit to the fight or not |
-| Neutral objective with an enemy already there | Asked to choose: fight or flee |
+Bases are never contacts.
 
-- **Flee**: the champion survives and goes back to its previous position. On an objective, it gives the objective up. *(design call)* A champion who did not move this round (or just spawned there) retreats one step toward its base instead: along its lane to the next own tower (T1 → T2 → T3 → base), elsewhere to the neighbouring position closest to its base. It no longer defends the tile it left.
+**Standard laning** (even numbers in a lane, and all of them home laners of that lane: 1v1 tops, 2v2 bot duos) resolves automatically from the stances (see *Lane contacts* below). Every other zone with both sides present pauses the resolution, and each player involved chooses to **fight** or **flee**, with a default already selected: the smaller side flees, otherwise it fights. Against the AI, the AI answers for its side. A round therefore has two steps: give the orders, then answer the contacts.
+
+| Situation | Kind | Default choice |
+|---|---|---|
+| Even numbers in lane, all home laners | Lane trade (automatic) | Each side's **stance**. See *Lane contacts* below. |
+| Ganked (an enemy **arrives** in your lane this round from elsewhere and outnumbers you; a laner coming back to its own lane is not a ganker) | Gank | **Flee** (the gankers: **fight**) |
+| Outnumbered in lane without a gank (e.g. the enemy support roamed away, so it is 2v1) | Lane pressure | **Flee** (the bigger side: **fight**) |
+| Anything else in a lane (e.g. both junglers join a 1v1) | Skirmish | Smaller side flees, otherwise fight |
+| Both sides in a river | Objective | Smaller side flees, otherwise fight. See *Neutral objectives*. |
+| An enemy camp | Invade | The invader can only fight |
+
+**Where the fight happens.** On the position of the smaller side (the one with most of its champions if they are spread), or with even numbers on the zone position holding the most champions; remaining ties go to the lowest position id. In a lane, when nobody flees, every champion of the contact is moved onto that position, and a standing tower there counts for its defenders. *(design call)* Automatic lane trades and river contacts move nobody: in a river, each champion stays on the pit or the Scuttle it arrived on.
+
+**Staying under your tower.** In a lane, a smaller side whose champions all stand on their own standing tower may also choose **farm**: it stays and farms at `economy.pressureFarmShare` (half) of a normal round. If the bigger side fights, each of them loses `fight.pressureHpLoss` (10) HP, and they die only if the bigger side wins by more than `aiTuning.allInMargin`.
+
+- **Flee**: the champion survives and goes back to its previous position. On an objective, it gives the objective up. *(design call)* A champion who did not move this round (or just spawned there) retreats one step toward its base instead: along its lane to the next own tower (T1 → T2 → T3 → base), elsewhere to the neighbouring position closest to its base. It no longer defends the tile it left. A champion who flees or retreats **forfeits its action** this round: no camp, no Scuttle or objective, no farm. So does a champion whose recall a fight interrupted.
+- An outnumbered side that flees a side that fights loses `fight.gankHpLoss` HP.
 - **Fight**: the winner takes the objective or the kill. Losers **die**.
 - If both sides flee, nobody takes the objective and it stays up for the next round. If one side flees and the other fights, the fighting side takes it without a fight.
 - *(design call)* In lane, if one side flees and the other trades or fights, the side that stayed wins the trade (wave and lead).
 
-**Lane pressure without a gank.** When a lane is uneven and nobody arrived from elsewhere (for example someone left it, or a laner walked back to its own lane), nothing is asked. The bigger side pushes the wave and hits the tower (plates). In any uneven lane without a gank, the smaller side farms at a reduced share of a normal round's gold and XP (`economy.pressureFarmShare`, half). It only dies if the bigger side's posture is All-in and it has enough advantage.
+**Lane pressure without a gank.** When a lane is uneven and nobody arrived from elsewhere (for example someone left it, or a laner walked back to its own lane), the contact is prompted like a gank, but the ganked side's exposure plays no part. The bigger side pushes the wave and hits the tower (plates). A smaller side that stays to farm under its tower farms at a reduced share (see *Staying under your tower*).
 
-**Lane stance.** Each laner has a persistent **stance**, set once in its actions and kept until changed: **Farm** (default), **Trade** or **All-in**. Even lane contacts resolve automatically from both stances, with no prompt each round. The game only asks for a choice on real events: a gank, a contested objective, an invade.
+**Lane stance.** Each laner has a persistent **stance**, set once in its actions and kept until changed: **Farm** (default), **Trade** or **All-in**. Even lane contacts resolve automatically from both stances, with no prompt each round. The game only asks for a choice outside standard laning: a gank, an outnumbered lane, a skirmish, a contested river, an invade.
 
 **Laners follow their wave.** A laner with no order stays in its lane on Farm (safe), and follows its lane's wave automatically: it stands where the wave is (in front of its tower, in the middle, or in front of the enemy tower) and farms.
 
@@ -119,6 +131,8 @@ Game stages for matchups, skirmish and teamfight: *really early, early, mid, mid
 - **The side with the higher score wins.** The **score gap** sets how many champions die on the losing side (`fight.deathGap` per death, data): a small gap can kill nobody, a large one kills everyone. The most wounded die first. Every losing survivor loses HP. Winners gain gold and XP for each kill. Losers who survive a fight retreat (like a flee), leaving the spot to the winners.
 - **Ganks and lane position.** A ganked laner's position on its wave matters: pushed toward the enemy tower it is exposed (bonus to the gankers), in the middle it is neutral, under its own tower it is protected (the tower already helps the defenders). A gank that kills nobody still costs the ganked champions HP.
 - **On an exact tie**, nobody dies and both sides go back to their previous position.
+
+**HP is visible.** Every HP loss shows in the log (yours, and the enemies you see after the round). A champion who lost HP this round does not regenerate at its end.
 
 ## Lanes and towers
 
@@ -160,6 +174,12 @@ Tower damage bonuses stack: Voidgrubs plus Baron gives ×3. The Herald launch is
 - **Dragon, Voidgrubs, Herald and Baron take time.** You arrive on the pit one round and take the objective at the end of the next round, as long as you stay there. With **4 or more champions** on the pit, Dragon, Voidgrubs and Herald are taken on arrival. Baron always takes the extra round, even with 5 champions. In between, the enemy has a round to contest it. The Scuttle Crab is taken on arrival.
 - Voidgrubs, Herald and Baron follow their real spawn timers from the current patch, stored in data. They share the Baron pit, each one replacing the previous.
 - There is no Dragon Soul bonus. Each Dragon simply adds team lead.
+- **The river is one grouped fight.** A champion with a step left on a pit starts or continues its objective. When the pit objective is taken, the river's Scuttle is taken in the same round if it is up, shared by the same champions. A champion on the Scuttle takes only the Scuttle and never starts the pit objective. Any enemy anywhere in the river contests both.
+- **A contested river** offers each side **fight**, **flee**, and **keep taking the objective** (only to a side with a champion acting on the pit or the Scuttle):
+  - *objective* against *flee*: the objective (and the Scuttle) proceeds;
+  - *objective* against *fight*: a fight where the objective side's score is multiplied by `fight.objectiveFocus` (0.8); if it still wins, it takes the objective this round as well as the kills;
+  - *objective* against *objective*: a race. The higher fight score keeps taking it and the other side leaves; nobody dies or loses HP. On a tie, both stay and nobody takes it.
+  - A champion arriving on its last step (no action left) cannot choose the objective, but still fights.
 - Jungle camps respawn on their real timers and give gold and XP to whoever clears them: one camp per round, the one the champion stands on with a step left (see [Movement](#movement)). `clearSpeed` no longer lets a jungler clear a second camp on the way.
 
 ## Lead, gold and recall

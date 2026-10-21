@@ -63,7 +63,7 @@ describe('graded deaths in a 2v2 All-in', () => {
     expect(deaths(events)).toHaveLength(0);
     for (const id of red) {
       expect(byId(state, id).status).toBe('alive');
-      expect(byId(state, id).hp).toBe(H.max - W.survivorLoss + H.regenPerRound);
+      expect(byId(state, id).hp).toBe(H.max - W.survivorLoss);
     }
   });
 
@@ -74,7 +74,7 @@ describe('graded deaths in a 2v2 All-in', () => {
     expect(deaths(events)).toHaveLength(1);
     expect(state.kills.blue - s.kills.blue).toBe(1);
     const survivor = red.find((id) => byId(state, id).status === 'alive')!;
-    expect(byId(state, survivor).hp).toBe(H.max - W.survivorLoss + H.regenPerRound);
+    expect(byId(state, survivor).hp).toBe(H.max - W.survivorLoss);
   });
 
   test('a large gap kills every loser', () => {
@@ -129,7 +129,7 @@ describe('ganks and lane position', () => {
     const red = [get(s, 'red', 'top').id, get(s, 'red', 'jungle').id].sort();
     return { s, o, blue, red };
   }
-  const fight: ContactChoices = { 'top-lane': { blue: 'fight' } };
+  const fight: ContactChoices = { 'lane-top': { blue: 'fight' } };
 
   test('a ganked side pushed toward the enemy tower is exposed; middle and own tower are neutral', () => {
     const score = (wave: -1 | 0 | 1) => {
@@ -179,14 +179,14 @@ describe('ganks and lane position', () => {
     const { state, events } = resolveRound(s, d, o, fight);
     expect(events.some((e) => e.type === 'fight' && e.winner === 'red')).toBe(true);
     expect(events.some((e) => e.type === 'death')).toBe(false);
-    expect(get(state, 'blue', 'top').hp).toBe(H.max - W.gankHpLoss + H.regenPerRound);
+    expect(get(state, 'blue', 'top').hp).toBe(H.max - W.gankHpLoss);
   });
 
   test('fleeing a committed gank still costs gankHpLoss; nothing if the ganker backs off too', () => {
     const { s, o } = gank(0);
-    const fled = resolveRound(s, d, o, { 'top-lane': { blue: 'flee' } }).state;
-    expect(get(fled, 'blue', 'top').hp).toBe(H.max - W.gankHpLoss + H.regenPerRound);
-    const both = resolveRound(s, d, o, { 'top-lane': { blue: 'flee', red: 'flee' } }).state;
+    const fled = resolveRound(s, d, o, { 'lane-top': { blue: 'flee' } }).state;
+    expect(get(fled, 'blue', 'top').hp).toBe(H.max - W.gankHpLoss);
+    const both = resolveRound(s, d, o, { 'lane-top': { blue: 'flee', red: 'flee' } }).state;
     expect(get(both, 'blue', 'top').hp).toBe(H.max);
   });
 });
@@ -206,7 +206,7 @@ describe('surviving losers retreat like a flee', () => {
       { kind: 'move', champion: bj.id, to: 'dragon-pit' },
       { kind: 'move', champion: rj.id, to: 'dragon-pit' },
     ]);
-    const { state, events } = resolveRound(s, d, o, { 'dragon-pit': { blue: 'fight', red: 'fight' } });
+    const { state, events } = resolveRound(s, d, o, { 'river-bot': { blue: 'fight', red: 'fight' } });
     expect(events).toContainEqual(expect.objectContaining({ type: 'fight', position: 'dragon-pit', winner: 'blue' }));
     expect(events.some((e) => e.type === 'death')).toBe(false);
     expect(byId(state, rj.id)).toMatchObject({ status: 'alive', position: 'raptors-red' });
@@ -249,9 +249,9 @@ describe('surviving losers retreat like a flee', () => {
     expect(events.some((e) => e.type === 'death')).toBe(false);
     for (const id of ids('red')) expect(byId(state, id)).toMatchObject({ status: 'alive', position: 'bot-t1-red' });
     for (const id of ids('blue')) expect(byId(state, id).position).toBe('bot-lane');
-    // Next round the winners step onto the enemy T1, which the losers now hold alone or not at all.
+    // Next round the winners step onto the enemy T1, which the losers left (a lane zone would meet them anywhere in it).
     const hp = state.towers['bot-t1-red']!;
-    const red = ids('red').map((id) => ({ kind: 'move' as const, champion: id, to: 'bot-t2-red' }));
+    const red = ids('red').map((id) => ({ kind: 'move' as const, champion: id, to: 'gromp-red' }));
     const blue = ids('blue').map((id) => ({ kind: 'move' as const, champion: id, to: 'bot-t1-red' }));
     const next = resolveRound(state, d, ordersWith(state, [...red, ...blue]), {});
     expect(next.state.towers['bot-t1-red']!).toBeLessThan(hp);

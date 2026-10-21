@@ -14,4 +14,6 @@ export type GameEvent =
   | { type: 'objectiveStarted' | 'objectiveTaken'; objective: ObjectiveId; side: Side; position: string; champions: string[] }
   | { type: 'campCleared'; camp: string; champion: string }
   | { type: 'wardPlaced' | 'wardCleared'; side: Side; position: string }
-  | { type: 'heraldLaunched'; tower: string; side: Side };
+  | { type: 'heraldLaunched'; tower: string; side: Side }
+  /** HP actually lost (after clamping at 0). */
+  | { type: 'hpLost'; champion: string; amount: number };

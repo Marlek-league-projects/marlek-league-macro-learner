@@ -83,8 +83,15 @@ export interface Rules {
     survivorLoss: number;
     /** Fight-score penalty of a ganked side whose lane wave is pushed toward the enemy tower. */
     gankExposed: number;
-    /** HP lost by each surviving ganked champion (replaces `survivorLoss` for them, never added to it). */
+    /**
+     * HP lost by each surviving ganked champion (replaces `survivorLoss` for them, never added to it), and by each
+     * champion of an outnumbered side fleeing a side that fights.
+     */
     gankHpLoss: number;
+    /** HP lost by each champion of a smaller side farming under its tower when the bigger side fights without killing. */
+    pressureHpLoss: number;
+    /** Fight-score multiplier of a side that keeps taking a contested river objective against a side that fights. */
+    objectiveFocus: number;
   };
   /** Champion health: trades cost it, it regenerates each round, recall and respawn restore it; it never kills. */
   health: {

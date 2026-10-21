@@ -77,7 +77,7 @@ export const CONTACT_LABEL: Record<ContactKind, string> = {
   skirmish: 'Escarmouche',
 };
 
-const CHOICE_LABEL = { farm: 'Farmer', fight: 'Combattre', flee: 'Fuir', trade: 'Trade' } as const;
+const CHOICE_LABEL = { farm: 'Farmer', fight: 'Combattre', flee: 'Fuir', trade: 'Trade', objective: "Continuer l'objectif" } as const;
 
 /** Button label of a choice: the fight is an "All-in" on a lane contact. */
 export function choiceLabel(kind: ContactKind, choice: Choice): string {
@@ -128,6 +128,8 @@ export function eventText(e: GameEvent, data: GameData): string {
       return `Ward ${SIDE_LABEL[e.side].toLowerCase()} détruite à ${at(e.position)}`;
     case 'heraldLaunched':
       return `Herald lancé sur ${at(e.tower)}`;
+    case 'hpLost':
+      return `${name(e.champion)} perd ${num(e.amount)} PV`;
   }
 }
 
