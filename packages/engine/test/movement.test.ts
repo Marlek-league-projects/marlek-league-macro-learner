@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
-import { defaultOrders, newGame, reachable, spawnPoints, validateOrders } from '@lml/engine';
+import { bestVia, defaultOrders, newGame, reachable, spawnPoints, validateOrders } from '@lml/engine';
 import type { ChampionState, GameState, Order } from '@lml/engine/contracts';
 
 const d = loadGameData();
@@ -43,6 +43,27 @@ describe('validateOrders', () => {
     const mv = (via: string): Order => ({ kind: 'move', champion: j.id, to: 'krugs-blue', via });
     expect(() => validateOrders(s, d, 'blue', orders(s, [mv('redbuff-blue')]))).not.toThrow();
     expect(() => validateOrders(s, d, 'blue', orders(s, [mv('mid-lane')]))).toThrow(/via/);
+  });
+  test('bestVia prefers a lane position over the river for wolves to krugs', () => {
+    const s = fresh();
+    const j = get(s, 'blue', 'jungle');
+    j.position = 'wolves-blue';
+    expect(bestVia(s, d, j.id, 'krugs-blue')).toBe('mid-t1-blue');
+    expect(bestVia(s, d, j.id, 'wolves-blue')).toBeUndefined();
+    expect(() => validateOrders(s, d, 'blue', orders(s, [{ kind: 'move', champion: j.id, to: 'krugs-blue', via: 'mid-t1-blue' }]))).not.toThrow();
+  });
+  test('recall ward and unward share the move limits', () => {
+    const s = fresh();
+    const blue = s.champions.filter((c) => c.side === 'blue');
+    const rw = (c: ChampionState, ward: 'from' | 'to'): Order => ({ kind: 'recall', champion: c.id, to: c.position, ward });
+    expect(() => validateOrders(s, d, 'blue', orders(s, blue.slice(0, 3).map((c) => rw(c, 'to'))))).not.toThrow();
+    expect(() => validateOrders(s, d, 'blue', orders(s, blue.slice(0, 4).map((c) => rw(c, 'to'))))).toThrow(/wards/);
+    const ru = (c: ChampionState): Order => ({ kind: 'recall', champion: c.id, to: c.position, unward: 'to' });
+    const jg = get(s, 'blue', 'jungle');
+    expect(() => validateOrders(s, d, 'blue', orders(s, [ru(jg)]))).not.toThrow();
+    expect(() => validateOrders(s, d, 'blue', orders(s, [ru(jg), ru(get(s, 'blue', 'support'))]))).toThrow(/unward/);
+    expect(() => validateOrders(s, d, 'blue', orders(s, [ru(get(s, 'blue', 'top'))]))).toThrow(/unward/);
+    expect(() => validateOrders(s, d, 'blue', orders(s, [{ kind: 'recall', champion: jg.id, ward: 'to' }]))).toThrow(/step/);
   });
   test('one order each', () => {
     const s = fresh();

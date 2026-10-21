@@ -29,6 +29,8 @@ export interface GameEngine {
   reachable(state: GameState, data: GameData, championId: string): Record<string, number>;
   /** True when a step between two positions changes lane (which ends the move). */
   isLaneChange(data: GameData, from: string, to: string): boolean;
+  /** Intermediate step of a 2-step move: lane position, else camp, else river. */
+  bestVia(state: GameState, data: GameData, championId: string, to: string): string | undefined;
   spawnPoints(state: GameState, data: GameData, championId: string): string[];
   validateOrders(state: GameState, data: GameData, side: Side, orders: Order[]): void;
   detectContacts(state: GameState, data: GameData, orders: Orders): Contact[];

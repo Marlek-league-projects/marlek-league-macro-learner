@@ -45,6 +45,19 @@ describe('store', () => {
     expect(store.reachableForSelected()['krugs-blue']).toBeDefined();
   });
 
+  test('recall orders take ward and unward on the start or the step', () => {
+    const store = started();
+    const j = blue(store, 'jungle');
+    store.setRecall(j.id);
+    store.setWard(j.id, 'to');
+    store.setUnward(j.id, 'from');
+    expect(store.pending.value[j.id]).toMatchObject({ kind: 'recall', ward: 'to', unward: 'from' });
+    store.setUnward(j.id, null);
+    store.setWard(j.id, null);
+    const o = store.pending.value[j.id]!;
+    expect('ward' in o || 'unward' in o).toBe(false);
+  });
+
   test('unreachable move throws /reach/', () => {
     const store = started();
     expect(() => store.setMove(blue(store, 'top').id, 'base-blue')).toThrow(/reach/);

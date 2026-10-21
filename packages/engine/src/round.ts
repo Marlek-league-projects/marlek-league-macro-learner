@@ -34,8 +34,8 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
 
   // 3. unwards, on the target position before moving
   for (const { c, o } of steps) {
-    if (o.kind !== 'move' || !o.unward) continue;
-    const at = o.unward === 'from' ? c.position : o.to;
+    if (o.kind === 'spawn' || !o.unward) continue;
+    const at = o.unward === 'from' ? c.position : o.to!;
     const enemy = other(c.side);
     for (const w of s.wards.filter((x) => x.side === enemy && x.position === at)) {
       events.push({ type: 'wardCleared', side: enemy, position: at });
