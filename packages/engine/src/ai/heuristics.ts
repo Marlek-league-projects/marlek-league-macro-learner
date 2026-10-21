@@ -1,6 +1,6 @@
 import { MISTAKE_IDS } from '@lml/data';
 import type { AiProfile, GameData, Lane, MistakeId, ObjectiveId, Role, Side } from '@lml/data/contracts';
-import type { ChampionState, Choice, Contact, EnemyInfo, Order, PlayerView, Rng, Stance } from '../contracts';
+import type { ChampionState, Choice, Contact, EnemyInfo, GameState, Order, PlayerView, Rng, Stance } from '../contracts';
 import { resolveFight } from '../fight';
 import { movesFor, reachableFrom, spawnPointsFor } from '../movement';
 import type { PitId } from '../objectives';
@@ -35,6 +35,8 @@ interface Ctx {
   gank: { lane: Lane; target: string } | null;
   /** The profile's `waveSacrifice`: laners may rotate when `rotationPays`. */
   waveSacrifice: boolean;
+  /** `stateFromView(view)`, built on first use for predicted fights. */
+  state?: GameState;
 }
 
 const LANES: Lane[] = ['top', 'mid', 'bot'];
@@ -210,22 +212,42 @@ function rotationPays(ctx: Ctx, c: ChampionState, pit: PitId, objective: Objecti
   return ours >= rule.minChampions && ours > theirs;
 }
 
+/**
+ * The known enemies within a jungler's move of `pit` beat the group `c` would fight with there (itself and the alive
+ * allies within a jungler's move), by the predicted fight `contactChoice` uses: walking in would only end in a flee.
+ */
+function pitLost(ctx: Ctx, c: ChampionState, pit: PitId): boolean {
+  const { data, view } = ctx;
+  const near = (pos: string): boolean => dist(data, pos, pit) <= data.rules.moves.jungler;
+  const theirs = view.enemies.filter((e) => known(ctx, e) && near(e.position)).map((e) => e.id);
+  if (theirs.length === 0) return false;
+  const ours = view.allies.filter((a) => a.status === 'alive' && (a.id === c.id || near(a.position))).map((a) => a.id);
+  ctx.state ??= stateFromView(view, data);
+  const [blue, red] = ctx.side === 'blue' ? [ours, theirs] : [theirs, ours];
+  return resolveFight(ctx.state, data, pit, blue, red, roundWindow(data.rules, view.round).stage).winner !== ctx.side;
+}
+
 /** The view's round starts before `aiTuning.laningPhaseUntil`. */
 function inLaningPhase(ctx: Ctx): boolean {
   return roundWindow(ctx.data.rules, ctx.view.round).start < ctx.data.aiTuning.laningPhaseUntil;
 }
 
-/** `pit` is on the laner's half of the map (mid, equally far from both pits, has both). */
-function ownHalf(ctx: Ctx, c: ChampionState, pit: PitId): boolean {
-  const h = c.role === 'jungle' ? null : half(ctx.data, laneMid(ctx.data, HOME_LANE[c.role]));
-  return h === null || h === pit;
+/**
+ * A paying rotation a laner may take in the laning phase: top and bot to the pit on their half of the map (a wave
+ * sacrifice is allowed); mid, equally far from both pits, only with lane priority (its wave even or pushed).
+ */
+function laningRotation(ctx: Ctx, c: ChampionState, pit: PitId): boolean {
+  if (c.role === 'jungle') return true;
+  const lane = HOME_LANE[c.role];
+  const h = half(ctx.data, laneMid(ctx.data, lane));
+  return h === null ? ourWave(ctx.view, lane) >= 0 : h === pit;
 }
 
 /**
  * Objective setup: to the pit one round before spawn (or while up), for the objective's roles with lane priority
  * (`rotateWithoutPriority` drops that check), or for any laner whose rotation pays, wave sacrificed if needed.
- * In the laning phase a laner only leaves its wave for a paying rotation to a pit on its half of the map, or with
- * `rotateWithoutPriority`.
+ * In the laning phase a laner only leaves its wave for a paying rotation allowed by `laningRotation`, or with
+ * `rotateWithoutPriority`. A pit whose known enemies would win the fight there (`pitLost`) is skipped.
  */
 function objectives(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, o: Order, x?: Extra) => void): void {
   for (const pit of PITS) {
@@ -240,8 +262,8 @@ function objectives(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: numb
       roles.includes(c.role) &&
       able >= ctx.data.rules.objectives[t.objective].minChampions &&
       (m.has('rotateWithoutPriority') || (!held && ourWave(ctx.view, lane) >= 0));
-    const pays = !assigned && (!held || ownHalf(ctx, c, pit)) && rotationPays(ctx, c, pit, t.objective);
-    if (!assigned && !pays) continue;
+    const pays = !assigned && (!held || laningRotation(ctx, c, pit)) && rotationPays(ctx, c, pit, t.objective);
+    if ((!assigned && !pays) || pitLost(ctx, c, pit)) continue;
     add(ctx.data.aiTuning.priorities.objective, moveTo(c, step(ctx, c, pit)), pays ? { committed: true } : undefined);
   }
 }
@@ -455,7 +477,7 @@ export function assignWards(ctx: Ctx, orders: Order[], mistakes: Mistakes): Orde
 /**
  * Lane stances from the predicted fight on each laner's destination, with what `view.side` knows: its laners
  * heading into that lane against the known enemies there. All-in above `aiTuning.allInMargin`, Trade above
- * `tradeMargin`, otherwise (or with no known enemy there, or when the move leaves the home lane) Farm. Set on the
+ * `tradeMargin`, otherwise (or with no known enemy there, when the move leaves the home lane, or on a recall) Farm. Set on the
  * order only when it changes.
  */
 export function assignStances(ctx: Ctx, orders: Order[]): Order[] {
@@ -465,10 +487,10 @@ export function assignStances(ctx: Ctx, orders: Order[]): Order[] {
   const { allInMargin, tradeMargin } = data.aiTuning;
   return orders.map((o) => {
     const c = view.allies.find((a) => a.id === o.champion)!;
-    if (o.kind !== 'move' || c.role === 'jungle') return o;
+    if (o.kind === 'spawn' || c.role === 'jungle') return o;
     const lane = HOME_LANE[c.role];
-    // Leaving the home lane drops back to Farm, so no All-in is left behind for the return.
-    if (laneOf(data, o.to) !== lane) return c.stance === 'farm' ? o : { ...o, stance: 'farm' };
+    // Leaving the home lane (a recall too) drops back to Farm, so no All-in is left behind for the return.
+    if (o.kind === 'recall' || laneOf(data, o.to) !== lane) return c.stance === 'farm' ? o : { ...o, stance: 'farm' };
     const allies = orders.flatMap((x) => {
       const a = view.allies.find((y) => y.id === x.champion)!;
       const laner = a.role !== 'jungle' && HOME_LANE[a.role] === lane;

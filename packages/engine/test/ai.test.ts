@@ -125,6 +125,30 @@ describe('aiOrders', () => {
     expect(orderOf(orders, get(s, 'blue', 'jungle').id)).not.toMatchObject({ to: 'dragon-pit' });
   });
 
+  test('a pit held by a known enemy group that beats ours is skipped; with no enemy seen there it is set up', () => {
+    const jungleSetsUp = (enemiesAtPit: boolean): boolean => {
+      const s = newGame(d, 7);
+      s.round = 10; // Dragon spawns next round
+      s.waves.bot = 1;
+      place(s, 'blue', 'jungle', 'raptors-blue');
+      // Top and mid start within a jungler's move of the pit: away, the jungler would fight alone.
+      for (const role of ['top', 'mid', 'adc', 'support']) get(s, 'blue', role).status = 'respawning';
+      if (enemiesAtPit) {
+        for (const role of ['jungle', 'adc', 'support']) {
+          place(s, 'red', role, 'dragon-pit');
+          s.lastSeen.blue[get(s, 'red', role).id] = { position: 'dragon-pit', round: 9 };
+        }
+      }
+      const view = viewFor(s, d, 'blue');
+      const none = new Map(view.allies.map((a) => [a.id, new Set<(typeof MISTAKE_IDS)[number]>()]));
+      const per = planCandidates(makeContext(view, d, true), none, createRng(0));
+      const i = view.allies.filter((c) => c.status !== 'dead').findIndex((c) => c.role === 'jungle');
+      return per[i]!.some((x) => x.score === d.aiTuning.priorities.objective);
+    };
+    expect(jungleSetsUp(false)).toBe(true);
+    expect(jungleSetsUp(true)).toBe(false);
+  });
+
   /**
    * Round 10, Dragon spawning next round, blue mid on its T1 with its wave crashing in. Blue jungler and adc are
    * near the pit (the support is dead): 2 against the red bot duo just seen in bot lane, 3 with the mid. The red
@@ -150,9 +174,16 @@ describe('aiOrders', () => {
     return orderOf(orders, get(s, 'blue', 'mid').id);
   };
 
-  test('challenger mid sacrifices its wave to rotate to a dragon where its side has the numbers', () => {
+  test('challenger mid sacrifices its wave to rotate to a dragon where its side has the numbers, after the laning phase', () => {
     expect(d.rules.objectives.dragon.value).toBeGreaterThan(d.aiTuning.waveSacrificeCost);
-    const o = midOrder(sacrificeScenario());
+    // Laning phase: the mid rotates only with priority, and its wave is crashing in.
+    const laning = midOrder(sacrificeScenario());
+    expect(laning.kind === 'move' && d.graph.positions[laning.to]!.lane).toBe('mid');
+    const late = sacrificeScenario();
+    late.round = 28; // 910–970 s
+    late.pits['dragon-pit'].nextSpawn = 1000; // spawns next round
+    for (const role of ['adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 27;
+    const o = midOrder(late);
     expect(o.kind).toBe('move');
     const to = (o as Extract<Order, { kind: 'move' }>).to;
     expect(d.graph.distance(to, 'dragon-pit')).toBe(1);
@@ -372,6 +403,9 @@ describe('laning phase', () => {
     late.round = 28; // 910–970 s
     late.pits['dragon-pit'].nextSpawn = 1000; // spawns next round
     for (const role of ['jungle', 'adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 27;
+    // The red group just seen at the pit would win the fight there: no rotation into it.
+    expect(adcRotates(late, 'diamond', onlyMistake())).toBe(false);
+    for (const role of ['jungle', 'adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 20;
     expect(adcOrder(late, 'diamond', onlyMistake())).toMatchObject({ kind: 'move', to: 'bot-lane' });
     expect(adcRotates(late, 'diamond', onlyMistake())).toBe(true);
   });
@@ -386,6 +420,23 @@ describe('laning phase', () => {
     const top = orderOf(orders, get(s, 'blue', 'top').id);
     expect(top.kind === 'move' && d.graph.positions[top.to]!.lane).toBe('top');
     expect(towardDragon(orderOf(orders, get(s, 'blue', 'mid').id), 'mid-t1-blue')).toBe(true);
+  });
+
+  test('in the laning phase the mid laner rotates only with priority: no wave sacrifice', () => {
+    const midRotates = (wave: -1 | 0 | 1): boolean => {
+      const s = newGame(d, 7);
+      s.round = 10; // Dragon spawns next round; no enemy seen, the rotation gives the numbers
+      s.waves.mid = wave;
+      place(s, 'blue', 'jungle', 'raptors-blue');
+      const view = viewFor(s, d, 'blue');
+      const rng = onlyMistake();
+      const per = planCandidates(makeContext(view, d, true), rollMistakes(view, profile('diamond'), rng), rng);
+      const i = view.allies.findIndex((c) => c.role === 'mid');
+      return per[i]![0]!.score === d.aiTuning.priorities.objective;
+    };
+    expect(midRotates(0)).toBe(true);
+    expect(midRotates(1)).toBe(true);
+    expect(midRotates(-1)).toBe(false);
   });
 
   test('a laner rotating to a pit walks the lane, not through a camp, when both routes are as short', () => {
@@ -407,6 +458,7 @@ describe('laning phase', () => {
   test('rotateWithoutPriority still breaks the laning-phase rule', () => {
     const s = dragonWithPriority();
     s.waves.bot = -1;
+    for (const role of ['jungle', 'adc', 'support']) s.lastSeen.blue[get(s, 'red', role).id] = null; // no group to fear
     expect(adcRotates(s, 'iron', onlyMistake('rotateWithoutPriority'))).toBe(true);
   });
 
@@ -490,6 +542,26 @@ test('AI stance: a laner whose move leaves its home lane goes back to Farm', () 
   const ctx = makeContext(view, d, false);
   const orders = defaultOrders(s, d, 'red').map((o) => (o.champion === rt.id ? { kind: 'move' as const, champion: rt.id, to: 'scuttle-top' } : o));
   expect(orderOf(assignStances(ctx, orders), rt.id)).toEqual({ kind: 'move', champion: rt.id, to: 'scuttle-top', stance: 'farm' });
+});
+
+test('AI stance: a recalling laner goes back to Farm, with or without a step first', () => {
+  const s = newGame(d, 7);
+  s.round = 10;
+  place(s, 'red', 'top', 'top-lane');
+  const rt = get(s, 'red', 'top');
+  rt.stance = 'allin';
+  const ctx = makeContext(viewFor(s, d, 'red'), d, false);
+  for (const recall of [
+    { kind: 'recall' as const, champion: rt.id, to: 'top-t1-red' },
+    { kind: 'recall' as const, champion: rt.id },
+  ]) {
+    const orders = defaultOrders(s, d, 'red').map((o) => (o.champion === rt.id ? recall : o));
+    validateOrders(s, d, 'red', orders);
+    expect(orderOf(assignStances(ctx, orders), rt.id)).toEqual({ ...recall, stance: 'farm' });
+  }
+  rt.stance = 'farm';
+  const farm = defaultOrders(s, d, 'red').map((o) => (o.champion === rt.id ? { kind: 'recall' as const, champion: rt.id } : o));
+  expect(orderOf(assignStances(makeContext(viewFor(s, d, 'red'), d, false), farm), rt.id)).toEqual({ kind: 'recall', champion: rt.id });
 });
 
 describe('AI recall', () => {
