@@ -65,10 +65,16 @@ export interface Store {
   reset(): void;
   select(id: string | null): void;
   reachableForSelected(): Record<string, number>;
+  /** Steps every champion may take this round; arriving on the last one leaves no action. */
+  stepBudget(): number;
+  /** The path the engine walks for an own champion's move to `to`, both ends included. */
+  routeOf(champion: string, to: string): string[];
+  /** A move to `to` can come before a recall: it leaves a step of the budget for the recall. */
+  recallStep(champion: string, to: string): boolean;
   setMove(champion: string, to: string): void;
   setWard(champion: string, spot: WardSpot | null): void;
   setUnward(champion: string, spot: 'from' | 'to' | null): void;
-  /** Recalls; after a pending 1-step move the champion walks there first (recall `to`). */
+  /** Recalls; after a pending move that leaves a step (`recallStep`) the champion walks there first (recall `to`). */
   setRecall(champion: string): void;
   /** Sets the champion's lane stance on its order (the pending one, else its default order). */
   setStance(champion: string, stance: Stance): void;
@@ -150,28 +156,11 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     return c;
   };
 
-  /** Up by the end of the round as far as the player knows (its view's camp timers, never the hidden state). */
-  const campAlive = (id: string): boolean => {
-    const s = current();
-    return (view.value?.camps[id] ?? 0) <= engine.roundWindow(data.rules, s.round).end;
-  };
+  const budget = (): number => engine.stepBudget(data.rules, current().round);
 
-  /** First intermediate step of a shortest path to a 2-step target; fast clearers prefer an alive own camp. */
-  const viaFor = (id: string, to: string): string | undefined => {
-    const c = champion(id);
-    const { graph, rules } = data;
-    const best = engine.bestVia(current(), data, id, to);
-    if (best === undefined) return undefined;
-    const mids = (graph.adj[c.position] ?? []).filter((n) => n !== `base-${ENEMY}` && graph.distance(n, to) === 1 && !engine.isLaneChange(data, c.position, n));
-    const fast = c.role === 'jungle' && (data.champions[id]?.clearSpeed ?? 0) >= rules.camps.fastClearAt;
-    if (fast) {
-      const camp = mids.find((n) => {
-        const p = graph.positions[n];
-        return p?.kind === 'camp' && p.side === PLAYER && campAlive(n);
-      });
-      if (camp) return camp;
-    }
-    return best;
+  const recallStep = (id: string, to: string): boolean => {
+    const n = engine.reachable(current(), data, id)[to];
+    return n !== undefined && n > 0 && n < budget();
   };
 
   const existingMove = (id: string): Extract<Order, { kind: 'move' }> | null => {
@@ -291,9 +280,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
 
     setMove(id, to) {
       const prev = existingMove(id);
-      const via = viaFor(id, to);
       const order: Order = { kind: 'move', champion: id, to };
-      if (via !== undefined) order.via = via;
       if (prev?.ward !== undefined) order.ward = prev.ward;
       if (prev?.unward !== undefined) order.unward = prev.unward;
       if (prev?.launchHerald) order.launchHerald = true;
@@ -334,7 +321,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       if (prev?.kind === 'recall') return;
       const order: Extract<Order, { kind: 'recall' }> = { kind: 'recall', champion: id };
       if (prev?.kind === 'move') {
-        const step = data.graph.distance(champion(id).position, prev.to) === 1;
+        const step = recallStep(id, prev.to);
         if (prev.ward === 'from' || (prev.ward === 'to' && step)) order.ward = prev.ward;
         if (prev.unward !== undefined && (step || prev.unward === 'from')) order.unward = prev.unward;
         if (step) order.to = prev.to;
@@ -428,6 +415,20 @@ export function createStore(data: GameData, engine: GameEngine): Store {
 
     estimateEnemy(enemy) {
       return engine.estimateEnemy(view.value ?? engine.viewFor(current(), data, PLAYER), data, enemy);
+    },
+
+    stepBudget() {
+      return budget();
+    },
+
+    routeOf(id, to) {
+      const c = champion(id);
+      return engine.route(data, c.position, to, c.side);
+    },
+
+    recallStep(id, to) {
+      champion(id);
+      return recallStep(id, to);
     },
 
     spawnPointsFor(id) {

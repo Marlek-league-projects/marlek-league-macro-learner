@@ -2,7 +2,8 @@ import type { Lane, ObjectiveId, Side } from '@lml/data/contracts';
 import type { WavePos } from './state';
 
 export type GameEvent =
-  | { type: 'moved'; champion: string; from: string; to: string }
+  /** `acted`: the move left a step for an action at `to` (clear its camp, take its objective, farm its wave). */
+  | { type: 'moved'; champion: string; from: string; to: string; acted: boolean }
   | { type: 'fled'; champion: string; to: string }
   | { type: 'fight'; position: string; blue: string[]; red: string[]; winner: Side | null; scores: Record<Side, number> }
   | { type: 'trade'; position: string; lane: Lane; winner: Side | null }

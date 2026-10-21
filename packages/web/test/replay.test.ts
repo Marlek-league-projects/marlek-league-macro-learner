@@ -28,8 +28,8 @@ describe('buildReplay', () => {
     const before = opening();
     const after = moved(moved(before, 'Fiora', 'top-lane'), 'LeeSin', 'gromp-blue');
     const events: GameEvent[] = [
-      { type: 'moved', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane' },
-      { type: 'moved', champion: 'LeeSin', from: 'bluebuff-blue', to: 'gromp-blue' },
+      { type: 'moved', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane', acted: true },
+      { type: 'moved', champion: 'LeeSin', from: 'bluebuff-blue', to: 'gromp-blue', acted: true },
     ];
     expect(buildReplay(before, after, events)).toEqual([
       { kind: 'move', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane' },
@@ -50,8 +50,8 @@ describe('buildReplay', () => {
     const before = opening();
     const after = moved(before, 'Kindred', 'gromp-red');
     const events: GameEvent[] = [
-      { type: 'moved', champion: 'Kindred', from: 'bluebuff-red', to: 'gromp-red' },
-      { type: 'moved', champion: 'Garen', from: 'top-t1-red', to: 'top-lane' },
+      { type: 'moved', champion: 'Kindred', from: 'bluebuff-red', to: 'gromp-red', acted: true },
+      { type: 'moved', champion: 'Garen', from: 'top-t1-red', to: 'top-lane', acted: true },
     ];
     expect(buildReplay(before, after, events)).toEqual([
       { kind: 'move', champion: 'Kindred', from: 'bluebuff-red', to: 'gromp-red' },
@@ -63,7 +63,7 @@ describe('buildReplay', () => {
     const after = moved(before, 'Fiora', 'top-lane');
     after.allies.find((c) => c.id === 'Fiora')!.status = 'dead';
     const events: GameEvent[] = [
-      { type: 'moved', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane' },
+      { type: 'moved', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane', acted: true },
       { type: 'death', champion: 'Fiora', position: 'top-lane', respawnRound: 4 },
       { type: 'fight', position: 'top-lane', blue: ['Fiora'], red: ['Garen'], winner: 'red', scores: { blue: 1, red: 2 } },
     ];
@@ -88,7 +88,7 @@ describe('buildReplay', () => {
     const before = opening();
     const after = structuredClone(before);
     const events: GameEvent[] = [
-      { type: 'moved', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane' },
+      { type: 'moved', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane', acted: true },
       { type: 'fight', position: 'top-lane', blue: ['Fiora'], red: ['Garen'], winner: null, scores: { blue: 1, red: 1 } },
     ];
     expect(buildReplay(before, after, events).map((s) => s.kind === 'move' ? `${s.from}>${s.to}` : s.kind)).toEqual([
@@ -117,7 +117,7 @@ describe('timeline', () => {
   test('first moves slide before the fight flash, deaths and labels come after', () => {
     const before = opening();
     const steps = buildReplay(before, before, [
-      { type: 'moved', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane' },
+      { type: 'moved', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane', acted: true },
       { type: 'fight', position: 'top-lane', blue: ['Fiora'], red: ['Garen'], winner: null, scores: { blue: 1, red: 1 } },
     ]);
     const [slide, fight, back] = steps.map((_, i) => stepWindow(steps, i));
@@ -128,7 +128,7 @@ describe('timeline', () => {
   test('tokens slide from their old position to the new one', () => {
     const before = opening();
     const steps = buildReplay(before, moved(before, 'Fiora', 'top-lane'), [
-      { type: 'moved', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane' },
+      { type: 'moved', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane', acted: true },
     ]);
     const at = (t: number) => tokensAt(before, steps, t).find((x) => x.champion === 'Fiora')!;
     expect(at(0)).toMatchObject({ from: 'top-t1-blue', to: 'top-t1-blue', f: 0, opacity: 1 });
@@ -142,7 +142,7 @@ describe('timeline', () => {
     after.enemies.find((e) => e.id === 'Garen')!.visible = true;
     after.enemies.find((e) => e.id === 'Garen')!.position = 'top-lane';
     const steps = buildReplay(before, after, [
-      { type: 'moved', champion: 'Garen', from: 'top-t1-red', to: 'top-lane' },
+      { type: 'moved', champion: 'Garen', from: 'top-t1-red', to: 'top-lane', acted: true },
       { type: 'death', champion: 'Fiora', position: 'top-t1-blue', respawnRound: 4 },
     ]);
     const fiora = (t: number) => tokensAt(before, steps, t).find((x) => x.champion === 'Fiora')!;

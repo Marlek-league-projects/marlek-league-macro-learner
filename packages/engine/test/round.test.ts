@@ -226,7 +226,7 @@ describe('resolveRound', () => {
     const o = ordersWith(s, [
       { kind: 'move', champion: get(s, 'blue', 'top').id, to: 'top-t3-blue' },
       { kind: 'move', champion: get(s, 'red', 'top').id, to: 'top-t3-blue' },
-      { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'top-t3-blue', via: 'top-t2-blue' },
+      { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'top-t3-blue' },
       { kind: 'move', champion: get(s, 'red', 'mid').id, to: 'raptors-blue' },
       { kind: 'move', champion: get(s, 'red', 'support').id, to: 'raptors-blue' },
     ]);
@@ -355,5 +355,38 @@ describe('resolveRound', () => {
     const cleared = run(true);
     expect(cleared.events).toContainEqual({ type: 'wardCleared', side: 'red', position: 'raptors-blue' });
     expect(cleared.state.lastSeen.red[bjId(cleared.state)]?.round ?? null).not.toBe(4);
+  });
+});
+
+describe('an action needs a step left on arrival', () => {
+  test('a jungler arriving on a camp 2 steps away (budget 2) does not clear it, and clears it next round by staying', () => {
+    const s = setup(2, [['blue', 'jungle', 'gromp-blue']]);
+    const bj = get(s, 'blue', 'jungle').id;
+    const first = resolveRound(s, d, ordersWith(s, [{ kind: 'move', champion: bj, to: 'wolves-blue' }]), {});
+    expect(first.events).toContainEqual({ type: 'moved', champion: bj, from: 'gromp-blue', to: 'wolves-blue', acted: false });
+    expect(get(first.state, 'blue', 'jungle').position).toBe('wolves-blue');
+    expect(first.events.some((e) => e.type === 'campCleared' && e.camp === 'wolves-blue')).toBe(false);
+    expect(first.state.camps['wolves-blue']).toBe(d.rules.camps.firstSpawn);
+
+    const second = resolveRound(first.state, d, ordersWith(first.state), {});
+    expect(second.events).toContainEqual({ type: 'campCleared', camp: 'wolves-blue', champion: bj });
+  });
+
+  test('a laner arriving in its lane on its last step gets no farm; one step less farms', () => {
+    const farmOf = (from: string): number => {
+      const s = setup(4, [
+        ['blue', 'top', from],
+        ['red', 'top', 'top-t2-red'],
+      ]);
+      s.waves.top = -1;
+      const bt = get(s, 'blue', 'top');
+      const before = bt.gold;
+      const { state, events } = resolveRound(s, d, ordersWith(s, [{ kind: 'move', champion: bt.id, to: 'top-lane' }]), {});
+      expect(events.some((e) => e.type === 'fight' || e.type === 'trade')).toBe(false);
+      const passive = (d.rules.economy.passiveGoldPerMin * roundWindow(d.rules, 4).seconds) / 60;
+      return get(state, 'blue', 'top').gold - before - passive;
+    };
+    expect(farmOf('top-t2-blue')).toBe(0);
+    expect(farmOf('top-t1-blue')).toBeGreaterThan(0);
   });
 });

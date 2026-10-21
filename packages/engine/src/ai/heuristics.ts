@@ -3,7 +3,7 @@ import type { AiProfile, GameData, Lane, MistakeId, ObjectiveId, Role, Side } fr
 import type { ChampionState, Choice, Contact, EnemyInfo, GameState, Order, PlayerView, Rng, Stance } from '../contracts';
 import { gankedSide } from '../contacts';
 import { resolveFight } from '../fight';
-import { movesFor, reachableFrom, spawnPointsFor } from '../movement';
+import { reachableFrom, spawnPointsFor, stepBudget } from '../movement';
 import type { PitId } from '../objectives';
 import { roundWindow } from '../time';
 import { other, ourWave, PITS, pitTiming } from './evaluate';
@@ -94,8 +94,11 @@ function front(ctx: Ctx, side: Side, lane: Lane): string | null {
   return ctx.data.graph.towers(side, lane).find((t) => (ctx.view.towers[t] ?? 0) > 0) ?? null;
 }
 
+/** Steps every champion may take in the view's round. */
+const budget = (ctx: Ctx): number => stepBudget(ctx.data.rules, ctx.view.round);
+
 function reach(ctx: Ctx, c: ChampionState): Record<string, number> {
-  return reachableFrom(ctx.data, c.position, movesFor(c, ctx.data.rules), c.side, c.role);
+  return reachableFrom(ctx.data, c.position, budget(ctx), c.side);
 }
 
 /**
@@ -200,13 +203,13 @@ function herald(ctx: Ctx, c: ChampionState): Order {
 /**
  * A laner leaving its lane for `pit` pays (only for profiles with `waveSacrifice`): the objective is worth more than `aiTuning.waveSacrificeCost` (the wave
  * it gives up) and the champion's arrival gives its side the numbers there. Allies count, and known enemies (seen
- * within `aiTuning.knownRounds`) count against, when within a jungler's move of the pit; the laner must be too.
+ * within `aiTuning.knownRounds`) count against, when within a round's step budget of the pit; the laner must be too.
  */
 function rotationPays(ctx: Ctx, c: ChampionState, pit: PitId, objective: ObjectiveId): boolean {
   const { data } = ctx;
   const rule = data.rules.objectives[objective];
   if (!ctx.waveSacrifice || c.role === 'jungle' || rule.value <= data.aiTuning.waveSacrificeCost) return false;
-  const near = (pos: string): boolean => dist(data, pos, pit) <= data.rules.moves.jungler;
+  const near = (pos: string): boolean => dist(data, pos, pit) <= budget(ctx);
   if (!near(c.position)) return false;
   const ours = ctx.view.allies.filter((a) => a.status === 'alive' && near(a.position)).length;
   const theirs = ctx.view.enemies.filter((e) => known(ctx, e) && near(e.position)).length;
@@ -214,12 +217,12 @@ function rotationPays(ctx: Ctx, c: ChampionState, pit: PitId, objective: Objecti
 }
 
 /**
- * The known enemies within a jungler's move of `pit` beat the group `c` would fight with there (itself and the alive
- * allies within a jungler's move), by the predicted fight `contactChoice` uses: walking in would only end in a flee.
+ * The known enemies within a round's step budget of `pit` beat the group `c` would fight with there (itself and the alive
+ * allies within a round's step budget), by the predicted fight `contactChoice` uses: walking in would only end in a flee.
  */
 function pitLost(ctx: Ctx, c: ChampionState, pit: PitId): boolean {
   const { data, view } = ctx;
-  const near = (pos: string): boolean => dist(data, pos, pit) <= data.rules.moves.jungler;
+  const near = (pos: string): boolean => dist(data, pos, pit) <= budget(ctx);
   const theirs = view.enemies.filter((e) => known(ctx, e) && near(e.position)).map((e) => e.id);
   if (theirs.length === 0) return false;
   const ours = view.allies.filter((a) => a.status === 'alive' && (a.id === c.id || near(a.position))).map((a) => a.id);
@@ -305,7 +308,7 @@ function pushSafe(ctx: Ctx, lane: Lane, m: Set<MistakeId>): boolean {
   if (m.has('greed')) return true;
   const target = front(ctx, ctx.enemy, lane);
   const jg = ctx.jungler;
-  return target !== null && known(ctx, jg) && dist(ctx.data, jg.position, target) > ctx.data.rules.moves.jungler;
+  return target !== null && known(ctx, jg) && dist(ctx.data, jg.position, target) > budget(ctx);
 }
 
 /**
@@ -326,7 +329,7 @@ function conversion(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: numb
   const fought = laners.every(
     (e) =>
       !e.visible && e.position !== null && e.lastSeenRound === view.round - 2 && laneOf(data, e.position) === lane &&
-      watchers.some((a) => dist(data, a.previous, e.position!) <= movesFor(a, data.rules)),
+      watchers.some((a) => dist(data, a.previous, e.position!) <= budget(ctx)),
   );
   if (laners.length === 0 || !fought) return;
   add(data.aiTuning.priorities.convert, m.has('noConversion') ? home(ctx, c) : moveTo(c, step(ctx, c, target)));
@@ -340,7 +343,7 @@ function laning(ctx: Ctx, c: ChampionState, lane: Lane, m: Set<MistakeId>, add: 
   const mid = laneMid(data, lane);
   const own = front(ctx, ctx.side, lane) ?? mid;
   const jg = ctx.jungler;
-  const threatened = !m.has('ignoreJungler') && known(ctx, jg) && dist(data, jg.position, mid) <= data.rules.moves.jungler;
+  const threatened = !m.has('ignoreJungler') && known(ctx, jg) && dist(data, jg.position, mid) <= budget(ctx);
   let spot: string;
   if (wave === 1 && enemyFront && pushSafe(ctx, lane, m)) spot = enemyFront;
   else if (wave === 1 && !threatened) spot = mid;
@@ -363,7 +366,7 @@ function jungling(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number
     const mid = laneMid(data, lane);
     if (!m.has('ignoreJungler') && jgKnown) {
       const h = half(data, jg.position);
-      if ((h !== null && h === half(data, mid)) || dist(data, jg.position, mid) <= data.rules.moves.jungler) continue;
+      if ((h !== null && h === half(data, mid)) || dist(data, jg.position, mid) <= budget(ctx)) continue;
     }
     const inLane = (pos: string | null): boolean => pos !== null && laneOf(data, pos) === lane;
     const enemies = view.enemies.filter((e) => e.visible && inLane(e.position));

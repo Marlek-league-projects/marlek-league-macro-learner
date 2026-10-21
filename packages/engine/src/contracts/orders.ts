@@ -8,7 +8,6 @@ export type Order =
       kind: 'move';
       champion: string;
       to: string;
-      via?: string;
       ward?: WardSpot;
       unward?: 'from' | 'to';
       launchHerald?: boolean;
@@ -18,7 +17,10 @@ export type Order =
   | {
       kind: 'recall';
       champion: string;
-      /** A position at most 1 step away to move to first; the recall happens there unless caught in a fight. `ward`/`unward` 'to' need it. */
+      /**
+       * A position to move to first, at most the round's step budget minus 1 away (the recall is the action); the
+       * recall happens there unless caught in a fight. `ward`/`unward` 'to' need it.
+       */
       to?: string;
       ward?: 'from' | 'to';
       unward?: 'from' | 'to';

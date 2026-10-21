@@ -10,6 +10,7 @@ import {
   newGame,
   resolveRound,
   roundWindow,
+  stepBudget,
   validateOrders,
   viewFor,
 } from '@lml/engine';
@@ -243,7 +244,7 @@ describe('aiOrders', () => {
     const s = vanishedLaner(0, 'top-lane');
     s.lastSeen.blue[get(s, 'red', 'jungle').id] = { position: 'bot-t2-red', round: 9 };
     place(s, 'red', 'jungle', 'bot-t2-red');
-    expect(d.graph.distance('bot-t2-red', 'top-t1-red')).toBeGreaterThan(d.rules.moves.jungler);
+    expect(d.graph.distance('bot-t2-red', 'top-t1-red')).toBeGreaterThan(stepBudget(d.rules, s.round));
     const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
     expect(orderOf(orders, get(s, 'blue', 'top').id)).toMatchObject({ kind: 'move', to: 'top-t1-red' });
   });
@@ -415,7 +416,7 @@ describe('laning phase', () => {
     s.round = 10; // Dragon spawns next round; no enemy seen, the rotation gives the numbers
     s.waves.mid = 1; // blue mid has priority
     place(s, 'blue', 'jungle', 'raptors-blue');
-    expect(d.graph.distance('top-t1-blue', 'dragon-pit')).toBeLessThanOrEqual(d.rules.moves.jungler);
+    expect(d.graph.distance('top-t1-blue', 'dragon-pit')).toBeLessThanOrEqual(stepBudget(d.rules, s.round));
     const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('diamond'), onlyMistake());
     validateOrders(s, d, 'blue', orders);
     const top = orderOf(orders, get(s, 'blue', 'top').id);
@@ -538,6 +539,8 @@ describe('AI lane stances', () => {
     place(s, 'red', 'top', 'top-lane');
     get(s, 'red', 'top').bonusLead += 100_000;
     s.lastSeen.red[get(s, 'blue', 'top').id] = { position: 'top-lane', round: 9 };
+    // The red jungler, 2 steps from the lane middle, ganks the blue top there and the red top joins it.
+    place(s, 'red', 'jungle', 'raptors-red');
     const bj = get(s, 'blue', 'jungle');
     if (jungler) {
       place(s, 'blue', 'jungle', jungler);

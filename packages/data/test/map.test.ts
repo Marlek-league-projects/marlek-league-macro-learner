@@ -59,24 +59,30 @@ test('laner reach from a lane T1 includes the nearby scuttle', () => {
   ] as const)
     expect(g.adj[t1]).toContain(scuttle);
 });
-test('every scuttle and pit reaches all 12 camps in 1', () => {
-  const camps = Object.values(g.positions).filter((p) => p.kind === 'camp');
-  expect(camps).toHaveLength(12);
-  for (const river of ['scuttle-top', 'scuttle-bot', 'baron-pit', 'dragon-pit'])
-    for (const camp of camps) expect(g.distance(river, camp.id)).toBe(1);
+test('98 undirected edges, every one mirrored', () => {
+  const edges = new Set<string>();
+  for (const [a, ns] of Object.entries(g.adj)) for (const b of ns) edges.add([a, b].sort().join('|'));
+  expect(edges.size).toBe(98);
+  for (const e of edges) {
+    const [a, b] = e.split('|') as [string, string];
+    expect(g.adj[mirrorId(a)]).toContain(mirrorId(b));
+  }
 });
 
-test('a laner goes from either T1 of its lane to the other in one move, in top, mid and bot', () => {
-  for (const lane of ['top', 'mid', 'bot']) {
-    expect(g.distance(`${lane}-t1-blue`, `${lane}-t1-red`)).toBe(1);
-    expect(g.distance(`${lane}-t1-red`, `${lane}-t1-blue`)).toBe(1);
-  }
-  for (const [a, ns] of Object.entries(g.adj)) for (const b of ns) expect(g.adj[mirrorId(a)]).toContain(mirrorId(b));
+test('no lane T1 links to the enemy T1 of its lane', () => {
+  for (const lane of ['top', 'mid', 'bot']) expect(g.adj[`${lane}-t1-blue`]).not.toContain(`${lane}-t1-red`);
 });
 
-test('pits are reachable from the same positions as their Scuttle', () => {
-  for (const [scuttle, pit] of [['scuttle-top', 'baron-pit'], ['scuttle-bot', 'dragon-pit']] as const) {
-    expect(g.adj[scuttle]).toContain(pit);
-    for (const n of g.adj[scuttle]!) if (n !== pit) expect(g.distance(n, pit)).toBe(1);
-  }
+test('each river position links the lanes and camps of the brief, on both sides', () => {
+  const sorted = (id: string): string[] => [...g.adj[id]!].sort();
+  expect(sorted('scuttle-top')).toEqual(
+    ['baron-pit', 'bluebuff-blue', 'gromp-blue', 'krugs-red', 'mid-lane', 'mid-t1-blue', 'mid-t1-red', 'raptors-red',
+      'redbuff-red', 'top-lane', 'top-t1-blue', 'top-t1-red', 'wolves-blue'].sort(),
+  );
+  expect(sorted('baron-pit')).toEqual(
+    ['bluebuff-blue', 'mid-lane', 'mid-t1-blue', 'mid-t1-red', 'redbuff-red', 'scuttle-top', 'top-lane', 'top-t1-blue',
+      'top-t1-red'].sort(),
+  );
+  expect(sorted('scuttle-bot')).toEqual(sorted('scuttle-top').map(mirrorId).sort());
+  expect(sorted('dragon-pit')).toEqual(sorted('baron-pit').map(mirrorId).sort());
 });

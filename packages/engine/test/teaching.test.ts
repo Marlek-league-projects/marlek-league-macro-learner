@@ -132,7 +132,7 @@ describe('teaching', () => {
     b.waves.mid = -1;
     b.scuttlesSeen.blue['scuttle-bot'] = 10_000;
     const bm = get(b, 'blue', 'mid').id;
-    const moved: GameEvent = { type: 'moved', champion: bm, from: 'mid-t1-blue', to: 'scuttle-bot' };
+    const moved: GameEvent = { type: 'moved', champion: bm, from: 'mid-t1-blue', to: 'scuttle-bot', acted: true };
     const take: GameEvent = { type: 'objectiveTaken', objective: 'scuttle', side: 'red', position: 'scuttle-bot', champions: [] };
     const fledBack = structuredClone(b);
     expect(ids(explainRound(b, fledBack, [moved, take], d, 'blue'))).toContain('left-lane-without-priority');

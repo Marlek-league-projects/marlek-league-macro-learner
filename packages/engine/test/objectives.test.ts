@@ -24,9 +24,11 @@ function nextRound(s: GameState): void {
   s.round += 1;
   spawnObjectives(s, d);
 }
-const capture = (s: GameState): GameEvent[] => {
+/** Every alive champion acts (has a step left where it stands). */
+const everyone = (s: GameState): Set<string> => new Set(s.champions.filter((c) => c.status === 'alive').map((c) => c.id));
+const capture = (s: GameState, acting = everyone(s)): GameEvent[] => {
   const ev: GameEvent[] = [];
-  captureObjectives(s, d, ev);
+  captureObjectives(s, d, ev, acting);
   return ev;
 };
 
@@ -55,6 +57,25 @@ describe('pit objectives', () => {
       nextSpawn: roundWindow(d.rules, 12).end + d.rules.objectives.dragon.respawn!,
       capture: null,
     });
+  });
+
+  test('a champion with no step left neither starts nor continues a capture, but still contests it', () => {
+    const s = fresh(11);
+    const bj = get(s, 'blue', 'jungle');
+    bj.position = 'dragon-pit';
+    expect(capture(s, new Set())).toEqual([]);
+    expect(s.pits['dragon-pit'].capture).toBeNull();
+    capture(s);
+    expect(s.pits['dragon-pit'].capture).toEqual({ side: 'blue', startedRound: 11 });
+    nextRound(s);
+    capture(s, new Set());
+    expect(s.objectivesTaken.blue.dragon).toBeUndefined();
+    expect(s.pits['dragon-pit'].capture).toBeNull();
+    // A red champion arriving with no step left still blocks the blue capture.
+    const rj = get(s, 'red', 'jungle');
+    rj.position = 'dragon-pit';
+    capture(s, new Set([bj.id]));
+    expect(s.pits['dragon-pit'].capture).toBeNull();
   });
 
   test('red arriving while blue flees resets the capture', () => {
@@ -192,6 +213,13 @@ describe('scuttles', () => {
     expect(ev).toContainEqual({ type: 'objectiveTaken', objective: 'scuttle', side: 'red', position: 'scuttle-bot', champions: [jg.id] });
   });
 
+  test('scuttle is not taken by a champion with no step left', () => {
+    const s = fresh(7);
+    get(s, 'red', 'jungle').position = 'scuttle-bot';
+    expect(capture(s, new Set())).toEqual([]);
+    expect(s.objectivesTaken.red.scuttle).toBeUndefined();
+  });
+
   test('scuttle is not taken before it spawns', () => {
     const s = fresh(5);
     get(s, 'blue', 'jungle').position = 'scuttle-top';
@@ -202,30 +230,29 @@ describe('scuttles', () => {
 });
 
 describe('camps', () => {
-  const clear = (s: GameState, via: Record<string, string | undefined>, data = d): GameEvent[] => {
+  const clear = (s: GameState, acting = everyone(s)): GameEvent[] => {
     const ev: GameEvent[] = [];
-    clearCamps(s, data, via, ev);
+    clearCamps(s, d, acting, ev);
     return ev;
   };
 
-  /** Game data where `id` has the given clearSpeed (the shared data is left untouched). */
-  const withClearSpeed = (id: string, clearSpeed: number): GameData =>
-    ({ ...d, champions: { ...d.champions, [id]: { ...d.champions[id]!, clearSpeed } } });
-
-  test('fast jungler clears the via camp and the arrival camp', () => {
+  test('an acting jungler clears the camp it stands on', () => {
     const s = fresh(2);
     const jg = get(s, 'blue', 'jungle');
     jg.position = 'krugs-blue';
-    const ev = clear(s, { [jg.id]: 'redbuff-blue' }, withClearSpeed(jg.id, 8));
-    expect(ev).toEqual([
-      { type: 'campCleared', camp: 'redbuff-blue', champion: jg.id },
-      { type: 'campCleared', camp: 'krugs-blue', champion: jg.id },
-    ]);
-    const end = roundWindow(d.rules, 2).end;
-    expect(s.camps['redbuff-blue']).toBe(end + d.rules.camps.buffRespawn);
-    expect(s.camps['krugs-blue']).toBe(end + d.rules.camps.smallRespawn);
-    expect(jg.gold).toBe(d.rules.camps.buffGold + d.rules.camps.smallGold);
-    expect(jg.xp).toBe(d.rules.camps.buffXp + d.rules.camps.smallXp);
+    expect(clear(s)).toEqual([{ type: 'campCleared', camp: 'krugs-blue', champion: jg.id }]);
+    expect(s.camps['krugs-blue']).toBe(roundWindow(d.rules, 2).end + d.rules.camps.smallRespawn);
+    expect(jg.gold).toBe(d.rules.camps.smallGold);
+    expect(jg.xp).toBe(d.rules.camps.smallXp);
+  });
+
+  test('a champion with no step left on the camp does not clear it', () => {
+    const s = fresh(2);
+    const jg = get(s, 'blue', 'jungle');
+    jg.position = 'krugs-blue';
+    expect(clear(s, new Set())).toEqual([]);
+    expect(s.camps['krugs-blue']).toBe(d.rules.camps.firstSpawn);
+    expect(jg.gold).toBe(0);
   });
 
   test('a jungler who clears all 6 own camps, its start buff included, reaches level 4', () => {
@@ -236,28 +263,19 @@ describe('camps', () => {
     for (const camp of ['bluebuff-blue', 'gromp-blue', 'wolves-blue', 'raptors-blue', 'redbuff-blue', 'krugs-blue']) {
       if (camp === start) continue;
       jg.position = camp;
-      clear(s, {});
+      clear(s);
     }
     expect(jg.xp).toBe(2 * d.rules.camps.buffXp + 4 * d.rules.camps.smallXp);
     expect(level(jg.xp, d.rules)).toBeGreaterThanOrEqual(4);
-  });
-
-  test('slow jungler clears only the arrival camp', () => {
-    const s = fresh(2);
-    const jg = get(s, 'blue', 'jungle');
-    jg.position = 'krugs-blue';
-    const ev = clear(s, { [jg.id]: 'redbuff-blue' }, withClearSpeed(jg.id, 5));
-    expect(ev).toEqual([{ type: 'campCleared', camp: 'krugs-blue', champion: jg.id }]);
-    expect(s.camps['redbuff-blue']).toBe(d.rules.camps.firstSpawn);
   });
 
   test('a camp that has not respawned is not cleared again', () => {
     const s = fresh(2);
     const jg = get(s, 'blue', 'jungle');
     jg.position = 'gromp-blue';
-    clear(s, {});
+    clear(s);
     s.round = 3;
-    const ev = clear(s, {});
+    const ev = clear(s);
     expect(ev).toEqual([]);
     expect(jg.gold).toBe(d.rules.camps.smallGold);
   });
@@ -266,7 +284,7 @@ describe('camps', () => {
     const s = fresh(2);
     const mid = get(s, 'red', 'mid');
     mid.position = 'raptors-blue';
-    const ev = clear(s, {});
+    const ev = clear(s);
     expect(ev).toEqual([{ type: 'campCleared', camp: 'raptors-blue', champion: mid.id }]);
   });
 });

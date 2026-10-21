@@ -63,12 +63,6 @@ function presentAt(state: GameState, position: string): Record<Side, ChampionSta
   return { blue: here.filter((c) => c.side === 'blue'), red: here.filter((c) => c.side === 'red') };
 }
 
-/** The only side present with at least `min` champions, or null. */
-function soleTaker(present: Record<Side, ChampionState[]>, min: number): Side | null {
-  const sides = SIDES.filter((s) => present[s].length > 0);
-  return sides.length === 1 && present[sides[0]!].length >= min ? sides[0]! : null;
-}
-
 function reward(state: GameState, data: GameData, objective: ObjectiveId, side: Side, takers: ChampionState[]): void {
   const { buffs, objectives } = data.rules;
   const rule = objectives[objective];
@@ -106,18 +100,29 @@ function takePit(state: GameState, data: GameData, id: PitId, pit: PitState, sid
   pit.nextSpawn = rule.respawn !== null ? roundWindow(data.rules, state.round).end + rule.respawn : rule.despawnAt;
 }
 
-/** End of round: scuttles taken on arrival, pit objectives captured or their capture reset. */
-export function captureObjectives(state: GameState, data: GameData, events: GameEvent[]): void {
+/**
+ * End of round: scuttles taken, pit objectives started, captured or their capture reset. Only `acting` champions
+ * (a step left on arrival) take a Scuttle or start or continue a pit objective; any alive enemy there contests it.
+ */
+export function captureObjectives(state: GameState, data: GameData, events: GameEvent[], acting: ReadonlySet<string>): void {
   const { rules } = data;
   const end = roundWindow(rules, state.round).end;
+  /** The only side present, with at least `min` acting champions there: those champions take it. */
+  const takersAt = (position: string, min: number): { side: Side; takers: ChampionState[] } | null => {
+    const present = presentAt(state, position);
+    const sides = SIDES.filter((s) => present[s].length > 0);
+    if (sides.length !== 1) return null;
+    const side = sides[0]!;
+    const takers = present[side].filter((c) => acting.has(c.id));
+    return takers.length >= min ? { side, takers } : null;
+  };
 
   for (const id of Object.keys(SCUTTLE_PIT) as ScuttleId[]) {
     if (state.scuttles[id] > end) continue;
     const rule = rules.objectives.scuttle;
-    const present = presentAt(state, id);
-    const side = soleTaker(present, rule.minChampions);
-    if (!side) continue;
-    const takers = present[side];
+    const taken = takersAt(id, rule.minChampions);
+    if (!taken) continue;
+    const { side, takers } = taken;
     reward(state, data, 'scuttle', side, takers);
     state.scuttles[id] = end + (rule.respawn ?? Infinity);
     const wardAt = SCUTTLE_PIT[id];
@@ -133,13 +138,12 @@ export function captureObjectives(state: GameState, data: GameData, events: Game
       continue;
     }
     const rule = rules.objectives[pit.objective];
-    const present = presentAt(state, id);
-    const side = soleTaker(present, rule.minChampions);
-    if (!side) {
+    const taken = takersAt(id, rule.minChampions);
+    if (!taken) {
       pit.capture = null;
       continue;
     }
-    const takers = present[side];
+    const { side, takers } = taken;
     const instant = !rule.extraRound || (rule.instantAt !== null && takers.length >= rule.instantAt);
     const held = pit.capture?.side === side && pit.capture.startedRound === state.round - 1;
     if (instant || held) {
@@ -151,19 +155,10 @@ export function captureObjectives(state: GameState, data: GameData, events: Game
   }
 }
 
-/**
- * Clears jungle camps: the arrival camp of any alive champion, and the `via` camp of a jungler
- * fast enough (`clearSpeed >= camps.fastClearAt`).
- */
-export function clearCamps(
-  state: GameState,
-  data: GameData,
-  viaById: Record<string, string | undefined>,
-  events: GameEvent[],
-): void {
+/** Clears jungle camps: the camp each `acting` alive champion (a step left on arrival) stands on. */
+export function clearCamps(state: GameState, data: GameData, acting: ReadonlySet<string>, events: GameEvent[]): void {
   const { rules, graph } = data;
   const end = roundWindow(rules, state.round).end;
-  const isCamp = (pos: string | undefined): pos is string => !!pos && graph.positions[pos]?.kind === 'camp';
 
   const clear = (camp: string, c: ChampionState): void => {
     if (!(camp in state.camps) || state.camps[camp]! > end) return;
@@ -177,14 +172,9 @@ export function clearCamps(
 
   // Junglers first, then by id, so a shared camp goes to a deterministic clearer.
   const order = [...state.champions]
-    .filter((c) => c.status === 'alive')
+    .filter((c) => c.status === 'alive' && acting.has(c.id))
     .sort((a, b) => Number(b.role === 'jungle') - Number(a.role === 'jungle') || a.id.localeCompare(b.id));
-  for (const c of order) {
-    const via = viaById[c.id];
-    const fast = (data.champions[c.id]?.clearSpeed ?? 0) >= rules.camps.fastClearAt;
-    if (c.role === 'jungle' && fast && isCamp(via)) clear(via, c);
-    if (isCamp(c.position)) clear(c.position, c);
-  }
+  for (const c of order) if (graph.positions[c.position]?.kind === 'camp') clear(c.position, c);
 }
 
 /**

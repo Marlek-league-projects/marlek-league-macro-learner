@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { loadGameData } from '@lml/data';
-import { bestVia, defaultOrders, newGame, reachable, spawnPoints, validateOrders } from '@lml/engine';
+import { loadGameData, mirrorId } from '@lml/data';
+import { canAct, defaultOrders, newGame, reachable, reachableFrom, roundWindow, route, spawnPoints, stepBudget, validateOrders } from '@lml/engine';
 import type { ChampionState, GameState, Order } from '@lml/engine/contracts';
 
 const d = loadGameData();
@@ -14,43 +14,104 @@ function orders(s: GameState, over: Order[] = []): Order[] {
   return base.map((o) => over.find((x) => x.champion === o.champion) ?? o);
 }
 
-describe('reachable', () => {
-  test('laner reaches adjacent tower only', () => {
-    const s = fresh();
-    const mid = get(s, 'blue', 'mid');
-    mid.position = 'mid-t1-blue';
-    const r = reachable(s, d, mid.id);
-    expect(r['mid-t1-blue']).toBe(0);
-    expect(r['top-t1-blue']).toBe(1);
-    expect(r['top-lane']).toBeUndefined();
-    expect(r['base-red']).toBeUndefined();
+describe('step budget', () => {
+  /** First round of the 1-based `phase`. */
+  const firstRoundOf = (phase: number): number => {
+    for (let r = 1; ; r++) if (roundWindow(d.rules, r).phase === phase - 1) return r;
+  };
+  test('2 steps in round 1, 3 in phase 3 and 4 in phase 5', () => {
+    expect(stepBudget(d.rules, 1)).toBe(2);
+    expect(stepBudget(d.rules, firstRoundOf(3))).toBe(3);
+    expect(stepBudget(d.rules, firstRoundOf(5))).toBe(4);
   });
-  test('jungler reaches two steps', () => {
+  test('an action needs a step left: staying acts, arriving on the last step does not', () => {
+    expect(canAct(0, 2)).toBe(true);
+    expect(canAct(1, 2)).toBe(true);
+    expect(canAct(2, 2)).toBe(false);
+  });
+});
+
+describe('reach with budget 2', () => {
+  const reach = (from: string, side: 'blue' | 'red' = 'blue'): Record<string, number> => reachableFrom(d, from, 2, side);
+  const acting = (from: string): string[] =>
+    Object.entries(reach(from)).filter(([, n]) => n > 0 && canAct(n, 2)).map(([p]) => p).sort();
+
+  test('top-t1-blue acts on its lane neighbours, the top river and its outer camps; top-t1-red is arrival-only', () => {
+    expect(acting('top-t1-blue')).toEqual(
+      ['baron-pit', 'bluebuff-blue', 'gromp-blue', 'mid-t1-blue', 'scuttle-top', 'top-lane', 'top-t2-blue'],
+    );
+    expect(reach('top-t1-blue')['top-t1-red']).toBe(2);
+  });
+  test('krugs-blue acts on scuttle-bot; dragon-pit is arrival-only', () => {
+    expect(reach('krugs-blue')['scuttle-bot']).toBe(1);
+    expect(reach('krugs-blue')['dragon-pit']).toBe(2);
+  });
+  test('mid-lane acts on both pits and both scuttles', () => {
+    for (const p of ['baron-pit', 'dragon-pit', 'scuttle-top', 'scuttle-bot']) expect(reach('mid-lane')[p]).toBe(1);
+  });
+  test('no position reaches the enemy base, whatever the budget', () => {
+    for (const p of Object.keys(d.graph.positions).filter((x) => !x.startsWith('base-'))) {
+      expect(reachableFrom(d, p, 2, 'blue')['base-red']).toBeUndefined();
+      expect(reachableFrom(d, p, 4, 'blue')['base-red']).toBeUndefined();
+      expect(reachableFrom(d, p, 4, 'red')['base-blue']).toBeUndefined();
+    }
+  });
+  test('red reaches the mirror of what blue reaches', () => {
+    for (const p of Object.keys(d.graph.positions)) {
+      for (const budget of [2, 3, 4]) {
+        const blue = reachableFrom(d, p, budget, 'blue');
+        const red = reachableFrom(d, mirrorId(p), budget, 'red');
+        expect(Object.fromEntries(Object.entries(blue).map(([k, v]) => [mirrorId(k), v]))).toEqual(red);
+      }
+    }
+  });
+  test('reachable uses the round budget for every role', () => {
     const s = fresh();
-    const j = get(s, 'blue', 'jungle');
-    j.position = 'raptors-blue';
-    const r = reachable(s, d, j.id);
-    expect(r['krugs-blue']).toBeDefined();
-    expect(r['bluebuff-red']).toBeDefined();
+    for (const c of s.champions.filter((x) => x.side === 'blue')) {
+      expect(reachable(s, d, c.id)).toEqual(reachableFrom(d, c.position, 2, 'blue'));
+    }
+  });
+});
+
+describe('route', () => {
+  test('a shortest path, both ends included, preferring a lane position over a camp or the river', () => {
+    // krugs-blue to dragon-pit is 2 steps through bot-t1-blue, mid-t1-blue, redbuff-blue or scuttle-bot.
+    expect(route(d, 'krugs-blue', 'dragon-pit', 'blue')).toEqual(['krugs-blue', 'bot-t1-blue', 'dragon-pit']);
+    expect(route(d, 'krugs-red', 'baron-pit', 'red')).toEqual(['krugs-red', 'top-t1-red', 'baron-pit']);
+    expect(route(d, 'wolves-blue', 'wolves-blue', 'blue')).toEqual(['wolves-blue']);
+  });
+  test('red walks the mirror of the blue route', () => {
+    const ids = Object.keys(d.graph.positions).filter((p) => !p.startsWith('base-'));
+    for (const from of ids) {
+      for (const to of ids) {
+        expect(route(d, mirrorId(from), mirrorId(to), 'red')).toEqual(route(d, from, to, 'blue').map(mirrorId));
+      }
+    }
+  });
+  test('changing lane ends the move: the route only changes lane on its last step', () => {
+    expect(route(d, 'top-t1-blue', 'bot-t1-blue', 'blue')).toEqual(['top-t1-blue', 'baron-pit', 'mid-t1-blue', 'bot-t1-blue']);
+  });
+  test('never through the enemy base', () => {
+    expect(() => route(d, 'top-t3-red', 'base-red', 'blue')).toThrow(/no route/);
   });
 });
 
 describe('validateOrders', () => {
-  test('via', () => {
+  test('a move beyond the budget is rejected', () => {
     const s = fresh();
     const j = get(s, 'blue', 'jungle');
     j.position = 'raptors-blue';
-    const mv = (via: string): Order => ({ kind: 'move', champion: j.id, to: 'krugs-blue', via });
-    expect(() => validateOrders(s, d, 'blue', orders(s, [mv('redbuff-blue')]))).not.toThrow();
-    expect(() => validateOrders(s, d, 'blue', orders(s, [mv('mid-lane')]))).toThrow(/via/);
+    const mv = (to: string): Order => ({ kind: 'move', champion: j.id, to });
+    expect(() => validateOrders(s, d, 'blue', orders(s, [mv('krugs-blue')]))).not.toThrow();
+    expect(() => validateOrders(s, d, 'blue', orders(s, [mv('top-t2-blue')]))).toThrow(/reach/);
   });
-  test('bestVia prefers a lane position over the river for wolves to krugs', () => {
+  test('a recall step leaves a step for the recall: 2 steps with budget 2 is rejected', () => {
     const s = fresh();
-    const j = get(s, 'blue', 'jungle');
-    j.position = 'wolves-blue';
-    expect(bestVia(s, d, j.id, 'krugs-blue')).toBe('mid-t1-blue');
-    expect(bestVia(s, d, j.id, 'wolves-blue')).toBeUndefined();
-    expect(() => validateOrders(s, d, 'blue', orders(s, [{ kind: 'move', champion: j.id, to: 'krugs-blue', via: 'mid-t1-blue' }]))).not.toThrow();
+    const top = get(s, 'blue', 'top');
+    top.position = 'top-lane';
+    const rc = (to: string): Order => ({ kind: 'recall', champion: top.id, to });
+    expect(() => validateOrders(s, d, 'blue', orders(s, [rc('top-t1-blue')]))).not.toThrow();
+    expect(() => validateOrders(s, d, 'blue', orders(s, [rc('top-t2-blue')]))).toThrow(/recall step/);
   });
   test('recall ward and unward share the move limits', () => {
     const s = fresh();
@@ -160,64 +221,6 @@ describe('defaultOrders and spawn validation', () => {
   });
 });
 
-describe('jungler objective reach', () => {
-  const OBJECTIVES = ['scuttle-top', 'scuttle-bot', 'baron-pit', 'dragon-pit'];
-  const camps = Object.values(d.graph.positions).filter((p) => p.kind === 'camp');
-  test('a jungler on any camp reaches both scuttles and both pits', () => {
-    expect(camps).toHaveLength(12);
-    for (const camp of camps) {
-      const s = fresh();
-      const j = get(s, 'blue', 'jungle');
-      j.position = camp.id;
-      const r = reachable(s, d, j.id);
-      for (const o of OBJECTIVES) expect(r[o]).toBeLessThanOrEqual(2);
-      validateOrders(s, d, 'blue', orders(s, [{ kind: 'move', champion: j.id, to: 'dragon-pit' }]));
-    }
-  });
-  test('a laner standing on a camp gets no bonus', () => {
-    const s = fresh();
-    const top = get(s, 'blue', 'top');
-    top.position = 'gromp-blue';
-    // Every camp links to every river objective, so cut gromp's dragon link to see the bonus alone.
-    const adj = { ...d.graph.adj, 'gromp-blue': d.graph.adj['gromp-blue']!.filter((x) => x !== 'dragon-pit') };
-    expect(reachable(s, { ...d, graph: { ...d.graph, adj } }, top.id)['dragon-pit']).toBeUndefined();
-  });
-  test('the bonus needs a camp: a jungler in lane gets none', () => {
-    const s = fresh();
-    const j = get(s, 'blue', 'jungle');
-    j.position = 'top-t3-blue';
-    expect(reachable(s, d, j.id)['dragon-pit']).toBeUndefined();
-  });
-  test('mid T1 reaches both pits in 1 move, like both Scuttles', () => {
-    const s = fresh();
-    const mid = get(s, 'blue', 'mid');
-    mid.position = 'mid-t1-blue';
-    const r = reachable(s, d, mid.id);
-    expect(r['baron-pit']).toBe(1);
-    expect(r['dragon-pit']).toBe(1);
-  });
-  test('the bonus distance is the move budget', () => {
-    const s = fresh();
-    const j = get(s, 'blue', 'jungle');
-    j.position = 'gromp-blue';
-    const one = { ...d, rules: { ...d.rules, moves: { ...d.rules.moves, jungler: 1 } } };
-    const r = reachable(s, one, j.id);
-    for (const o of OBJECTIVES) expect(r[o]).toBe(1);
-    expect(Math.max(...Object.values(r))).toBe(1);
-  });
-  test('the flag turns the bonus off', () => {
-    const s = fresh();
-    const j = get(s, 'blue', 'jungle');
-    j.position = 'gromp-blue';
-    // Every camp links to every river objective, so cut gromp's dragon link to see the bonus alone.
-    const adj = { ...d.graph.adj, 'gromp-blue': d.graph.adj['gromp-blue']!.filter((n) => n !== 'dragon-pit') };
-    const cut = { ...d, graph: { ...d.graph, adj }, rules: { ...d.rules, moves: { ...d.rules.moves, jungler: 1 } } };
-    expect(reachable(s, cut, j.id)['dragon-pit']).toBe(1);
-    const off = { ...cut, rules: { ...cut.rules, moves: { ...cut.rules.moves, junglerObjectiveReach: false } } };
-    expect(reachable(s, off, j.id)['dragon-pit']).toBeUndefined();
-  });
-});
-
 describe('laners follow their wave', () => {
   const target = (s: GameState, side: string, role: string): string => {
     const c = get(s, side, role);
@@ -275,24 +278,9 @@ describe('changing lane ends the move', () => {
     const r = reachable(s, d, j.id);
     expect(r['mid-t1-blue']).toBe(1);
     expect(r['bot-t1-blue']).toBeUndefined();
+    expect(() => validateOrders(s, d, 'blue', orders(s, [{ kind: 'move', champion: j.id, to: 'bot-t1-blue' }]))).toThrow(/reach/);
   });
-  test('mid laner still reaches top-t1', () => {
-    const s = fresh();
-    const mid = get(s, 'blue', 'mid');
-    mid.position = 'mid-t1-blue';
-    expect(reachable(s, d, mid.id)['top-t1-blue']).toBe(1);
-  });
-  test('via a lane change is rejected, even to a reachable target', () => {
-    const s = fresh();
-    const j = get(s, 'blue', 'jungle');
-    j.position = 'top-t1-blue';
-    expect(() => validateOrders(s, d, 'blue', orders(s, [{ kind: 'move', champion: j.id, to: 'bot-t1-blue', via: 'mid-t1-blue' }]))).toThrow();
-  });
-  test('jungler still goes raptors to krugs', () => {
-    const s = fresh();
-    const j = get(s, 'blue', 'jungle');
-    j.position = 'raptors-blue';
-    const r = reachable(s, d, j.id);
-    expect(r['krugs-blue']).toBeDefined();
+  test('the river is no lane: from scuttle-top the move goes on past mid-t1-blue', () => {
+    expect(reachableFrom(d, 'scuttle-top', 2, 'blue')['bot-t1-blue']).toBe(2);
   });
 });

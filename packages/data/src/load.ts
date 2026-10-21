@@ -50,7 +50,6 @@ function checkPerStage(section: string, value: readonly number[]): void {
 
 export function validateRules(rules: Rules): void {
   const { phases } = rules;
-  if (typeof rules.moves.junglerObjectiveReach !== 'boolean') fail('rules.moves', 'junglerObjectiveReach must be a boolean');
   if (phases.length === 0) fail('rules.phases', 'no phases');
   phases.forEach((p, i) => {
     if (p.roundSeconds <= 0 || (p.end - p.start) % p.roundSeconds !== 0 || p.end <= p.start) {
@@ -61,6 +60,12 @@ export function validateRules(rules: Rules): void {
       fail('rules.phases', `gap between "${prev.name}" (ends ${prev.end}) and "${p.name}" (starts ${p.start})`);
     }
   });
+  for (const p of phases) {
+    const budget = rules.moves?.budgetBySeconds?.[String(p.roundSeconds)];
+    if (typeof budget !== 'number' || !Number.isInteger(budget) || budget < 1) {
+      fail('rules.moves', `budgetBySeconds has no positive integer step budget for ${p.roundSeconds}s rounds`);
+    }
+  }
   checkPerStage('rules.towers.pushDamage', rules.towers.pushDamage);
   checkPerStage('rules.fight.numbers', rules.fight.numbers);
   const f = rules.fight;
@@ -182,7 +187,8 @@ export function matchupAdvantage(data: GameData, a: string, b: string, stage: St
 }
 
 export function loadGameData(): GameData {
-  const rules = rulesJson as Rules;
+  // The JSON has fixed `moves.budgetBySeconds` keys where Rules has any round length: `validateRules` checks it.
+  const rules = rulesJson as unknown as Rules;
   const aiProfiles = aiProfilesJson as AiProfile[];
   const aiTuning = aiTuningJson as AiTuning;
   const { rules: teaching, objectiveNames } = teachingJson as TeachingData;

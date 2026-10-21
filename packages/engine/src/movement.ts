@@ -1,13 +1,24 @@
+import { mirrorId } from '@lml/data';
 import type { GameData, Lane, Role, Rules, Side } from '@lml/data/contracts';
 import type { ChampionState, GameState, Order, PlayerView, Stance } from './contracts';
 import { frontTower } from './lanes';
+import { roundWindow } from './time';
 
 const LANES: Lane[] = ['top', 'mid', 'bot'];
 export const HOME_LANE: Record<Exclude<Role, 'jungle'>, Lane> = { top: 'top', mid: 'mid', adc: 'bot', support: 'bot' };
 const STANCES: Stance[] = ['push', 'farm', 'trade', 'allin'];
 
-export function movesFor(c: ChampionState, rules: Rules): number {
-  return c.role === 'jungle' ? rules.moves.jungler : rules.moves.laner;
+/** Steps every champion may take in `round`: `moves.budgetBySeconds` for that round's length. */
+export function stepBudget(rules: Rules, round: number): number {
+  const seconds = roundWindow(rules, round).seconds;
+  const budget = rules.moves.budgetBySeconds[String(seconds)];
+  if (budget === undefined) throw new Error(`no step budget for ${seconds}s rounds`);
+  return budget;
+}
+
+/** An action (clear a camp, take an objective, farm the wave, recall) costs a step: it needs one left on arrival. */
+export function canAct(distance: number, budget: number): boolean {
+  return distance < budget;
 }
 
 const enemyBase = (side: Side): string => `base-${side === 'blue' ? 'red' : 'blue'}`;
@@ -21,7 +32,7 @@ function find(state: GameState, championId: string): ChampionState {
 /** Position to distance for everything the champion can reach this round, incl. its own position (0). */
 export function reachable(state: GameState, data: GameData, championId: string): Record<string, number> {
   const c = find(state, championId);
-  return reachableFrom(data, c.position, movesFor(c, data.rules), c.side, c.role);
+  return reachableFrom(data, c.position, stepBudget(data.rules, state.round), c.side);
 }
 
 /** True when a step from `a` to `b` goes between two lane positions (tower or lane middle) of different lanes. */
@@ -32,40 +43,70 @@ export function isLaneChange(data: GameData, a: string, b: string): boolean {
   return !!pa && !!pb && onLane(pa) && onLane(pb) && pa.lane !== undefined && pb.lane !== undefined && pa.lane !== pb.lane;
 }
 
-/** Positions a jungler standing on a camp reaches within its whole move budget whatever the graph says. */
-const OBJECTIVE_POSITIONS = ['scuttle-top', 'scuttle-bot', 'baron-pit', 'dragon-pit'];
-
 /**
- * Position to distance within `moves` steps of `position` for a `side` champion (the enemy base is off limits).
- * A jungler on a camp (`moves.junglerObjectiveReach`) also reaches every objective position, at distance
- * `moves` at most: the bonus costs the whole budget. Changing lane ends the move (see `isLaneChange`).
+ * Walks the graph from `position` for a `side` champion (the enemy base is off limits), at most `budget` steps.
+ * `arrival`: shortest distance to every position reached. `onward`: distance at which a position can be left again;
+ * changing lane ends the move (see `isLaneChange`), so a position reached that way is not left from there.
  */
-export function reachableFrom(
-  data: GameData,
-  position: string,
-  moves: number,
-  side: Side,
-  role?: Role,
-): Record<string, number> {
+function walk(data: GameData, position: string, budget: number, side: Side): { arrival: Record<string, number>; onward: Record<string, number> } {
   const banned = enemyBase(side);
-  const dist: Record<string, number> = { [position]: 0 };
+  const arrival: Record<string, number> = { [position]: 0 };
+  const onward: Record<string, number> = { [position]: 0 };
   const queue = [position];
   for (let i = 0; i < queue.length; i++) {
     const cur = queue[i]!;
-    if (dist[cur]! >= moves) continue;
+    const d = onward[cur]! + 1;
+    if (d > budget) continue;
     for (const n of data.graph.adj[cur] ?? []) {
-      if (n === banned || dist[n] !== undefined) continue;
-      dist[n] = dist[cur]! + 1;
-      // Changing lane ends the move: the arrival position is reached but never expanded.
-      if (!isLaneChange(data, cur, n)) queue.push(n);
+      if (n === banned) continue;
+      if (arrival[n] === undefined) arrival[n] = d;
+      if (onward[n] === undefined && !isLaneChange(data, cur, n)) {
+        onward[n] = d;
+        queue.push(n);
+      }
     }
   }
-  if (role === 'jungle' && data.rules.moves.junglerObjectiveReach && data.graph.positions[position]?.kind === 'camp') {
-    for (const o of OBJECTIVE_POSITIONS) {
-      if (dist[o] === undefined || dist[o]! > moves) dist[o] = moves;
+  return { arrival, onward };
+}
+
+/** Position to distance within `budget` steps of `position` for a `side` champion (see `walk`). */
+export function reachableFrom(data: GameData, position: string, budget: number, side: Side): Record<string, number> {
+  return walk(data, position, budget, side).arrival;
+}
+
+/** Route preference between shortest paths: a lane position, then a camp, then the river (and anything else). */
+const rank = (data: GameData, id: string): number => {
+  const kind = data.graph.positions[id]?.kind;
+  return kind === 'tower' || kind === 'laneMid' ? 0 : kind === 'camp' ? 1 : 2;
+};
+
+/**
+ * The deterministic shortest path a `side` champion walks from `from` to `to`, both ends included, under the
+ * movement rules (enemy base off limits, changing lane ends the move). Between shortest paths each step prefers a
+ * lane position, then a camp, then the river, then the lower id (seen from blue: red takes the mirror of blue's
+ * route). Throws when `to` cannot be reached.
+ */
+export function route(data: GameData, from: string, to: string, side: Side): string[] {
+  const { arrival, onward } = walk(data, from, Infinity, side);
+  const length = arrival[to];
+  if (length === undefined) throw new Error(`no route from ${from} to ${to}`);
+  const id = (p: string): string => (side === 'blue' ? p : mirrorId(p));
+  const dead = new Set<string>();
+  /** The preferred rest of the path from `cur`, left at step `i`, or null. */
+  const rest = (cur: string, i: number): string[] | null => {
+    if (i === length - 1) return (data.graph.adj[cur] ?? []).includes(to) ? [to] : null;
+    if (dead.has(cur)) return null;
+    const next = (data.graph.adj[cur] ?? [])
+      .filter((n) => n !== to && onward[n] === i + 1 && !isLaneChange(data, cur, n))
+      .sort((a, b) => rank(data, a) - rank(data, b) || id(a).localeCompare(id(b)));
+    for (const n of next) {
+      const tail = rest(n, i + 1);
+      if (tail) return [n, ...tail];
     }
-  }
-  return dist;
+    dead.add(cur);
+    return null;
+  };
+  return length === 0 ? [from] : [from, ...rest(from, 0)!];
 }
 
 /** Where a respawning champion may re-enter: front standing tower per lane, or own camps for the jungler. */
@@ -110,24 +151,6 @@ export function retreatStep(data: GameData, side: Side, position: string): strin
   return best !== undefined && graph.distance(best, base) < graph.distance(position, base) ? best : position;
 }
 
-const rank = (data: GameData, id: string): number => {
-  const kind = data.graph.positions[id]?.kind;
-  return kind === 'tower' || kind === 'laneMid' ? 0 : kind === 'camp' ? 1 : 2;
-};
-
-/**
- * The intermediate step of a 2-step move (undefined when `to` is not exactly 2 steps away). Among the valid
- * ones a lane position (tower, lane middle) beats a camp, which beats a river position (scuttle, pit); ties by id.
- */
-export function bestVia(state: GameState, data: GameData, championId: string, to: string): string | undefined {
-  const c = find(state, championId);
-  const { graph } = data;
-  if (graph.distance(c.position, to) !== 2) return undefined;
-  return (graph.adj[c.position] ?? [])
-    .filter((n) => n !== enemyBase(c.side) && graph.distance(n, to) === 1 && !isLaneChange(data, c.position, n))
-    .sort((a, b) => rank(data, a) - rank(data, b) || a.localeCompare(b))[0];
-}
-
 function fail(champion: string, reason: string): never {
   throw new Error(`${champion}: ${reason}`);
 }
@@ -153,24 +176,14 @@ function validateOne(state: GameState, data: GameData, c: ChampionState, o: Orde
       if (!rules.wards.unwardRoles.includes(c.role)) fail(c.id, `${c.role} cannot unward`);
       if (o.unward === 'to' && o.to === undefined) fail(c.id, 'recall unward at the step needs a step position');
     }
-    // The step before a recall is 1 move for everyone, never into the enemy base.
-    if (o.to !== undefined && reachableFrom(data, c.position, 1, c.side)[o.to] === undefined) {
-      fail(c.id, `recall step to ${o.to} is out of range`);
-    }
+    // The recall is the action: its step leaves it a step of the budget, never into the enemy base.
+    const stepReach = reachableFrom(data, c.position, stepBudget(rules, state.round) - 1, c.side);
+    if (o.to !== undefined && stepReach[o.to] === undefined) fail(c.id, `recall step to ${o.to} is out of range`);
     return;
   }
 
   const reach = reachable(state, data, c.id);
   if (reach[o.to] === undefined) fail(c.id, `cannot reach ${o.to}`);
-  if (o.via !== undefined) {
-    if (!graph.positions[o.via] || o.via === enemyBase(c.side)) fail(c.id, `invalid via ${o.via}`);
-    if (o.via !== c.position && o.via !== o.to && isLaneChange(data, c.position, o.via)) {
-      fail(c.id, `via ${o.via} changes lane, which ends the move`);
-    }
-    if (graph.distance(c.position, o.via) + graph.distance(o.via, o.to) > movesFor(c, rules)) {
-      fail(c.id, `via ${o.via} is out of range`);
-    }
-  }
   if (o.ward !== undefined) {
     ctx.wards++;
     if (typeof o.ward === 'object') {
@@ -225,18 +238,19 @@ function wavePosition(state: GameState, data: GameData, lane: Lane): string {
 }
 
 /**
- * A laner standing in its own lane follows the wave: to the wave position when reachable this round, else one
- * step along the lane toward it. Anywhere else (and for the jungler) the champion stays put.
+ * A laner standing in its own lane follows the wave: to the wave position when it can farm there this round
+ * (`canAct`), else as close to it along the lane as it can while still farming. Anywhere else (and for the
+ * jungler) the champion stays put.
  */
 function followWave(state: GameState, data: GameData, c: ChampionState): string {
   if (c.role === 'jungle') return c.position;
   const lane = HOME_LANE[c.role];
   if (data.graph.positions[c.position]?.lane !== lane) return c.position;
   const target = wavePosition(state, data, lane);
+  const budget = stepBudget(data.rules, state.round);
   const reach = reachable(state, data, c.id);
-  if (reach[target] !== undefined) return target;
-  const inLane = Object.keys(reach).filter((p) => data.graph.positions[p]?.lane === lane);
-  return inLane.sort(
+  const farming = Object.keys(reach).filter((p) => canAct(reach[p]!, budget) && data.graph.positions[p]?.lane === lane);
+  return farming.sort(
     (a, b) => data.graph.distance(a, target) - data.graph.distance(b, target) || (a < b ? -1 : a > b ? 1 : 0),
   )[0]!;
 }

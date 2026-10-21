@@ -100,7 +100,8 @@ export function lanePressure(state: GameState, data: GameData, lane: Lane): Side
  * Mutates `state`: waves, tower hp, gold, xp and trade lead for one round. A lane in `tradeWinners` had a trade
  * contact this round (null: tied); otherwise even laners push by fight score. An uneven lane with both sides
  * present and no gank this round (not in `ganked`) is under pressure: the smaller side farms at
- * `economy.pressureFarmShare`.
+ * `economy.pressureFarmShare`. Only `acting` champions (a step left on arrival; all of them when omitted) farm: a
+ * laner arriving in its lane on its last step still counts for the wave and the towers, but gets no farm.
  */
 export function updateLanes(
   state: GameState,
@@ -108,6 +109,7 @@ export function updateLanes(
   tradeWinners: Partial<Record<Lane, Side | null>>,
   events: GameEvent[],
   ganked: ReadonlySet<Lane> = new Set(),
+  acting?: ReadonlySet<string>,
 ): void {
   const { rules } = data;
   const win = roundWindow(rules, state.round);
@@ -166,7 +168,8 @@ export function updateLanes(
     const underPressure = nb > 0 && nr > 0 && nb !== nr && !ganked.has(lane);
     const pressured: Side | null = underPressure ? (nb < nr ? 'blue' : 'red') : null;
     for (const side of ['blue', 'red'] as Side[]) {
-      const here = present[side];
+      const standing = present[side];
+      const here = acting ? standing.filter((c) => acting.has(c.id)) : standing;
       const carries = here.filter((c) => c.role !== 'support');
       const share = side === pressured ? rules.economy.pressureFarmShare : 1;
       const gold = (rules.economy.farmGoldPerMin * win.seconds * share) / 60;
@@ -179,7 +182,7 @@ export function updateLanes(
       const supportXp = duo ? duoXp : soloXp * rules.economy.supportShare;
       for (const c of here) if (c.role === 'support') grant(c, gold * rules.economy.supportShare, supportXp);
       // 6. trade winner lead
-      if (winner === side) for (const c of here) c.bonusLead += rules.economy.tradeLead;
+      if (winner === side) for (const c of standing) c.bonusLead += rules.economy.tradeLead;
     }
   }
 

@@ -234,7 +234,7 @@ describe('eventsFor', () => {
     s.round = 4;
     const rm = get(s, 'red', 'mid').id;
     const { state, events } = resolveRound(s, d, ordersWith(s, [{ kind: 'move', champion: rm, to: 'mid-lane' }]), {});
-    expect(eventsFor(events, state, d, 'blue')).toContainEqual({ type: 'moved', champion: rm, from: 'mid-t1-red', to: 'mid-lane' });
+    expect(eventsFor(events, state, d, 'blue')).toContainEqual({ type: 'moved', champion: rm, from: 'mid-t1-red', to: 'mid-lane', acted: true });
   });
 });
 

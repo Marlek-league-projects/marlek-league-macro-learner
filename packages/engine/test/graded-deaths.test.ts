@@ -193,8 +193,9 @@ describe('ganks and lane position', () => {
 
 describe('surviving losers retreat like a flee', () => {
   test('a Dragon fight won with a small gap: the losers leave, the winners start the capture', () => {
+    // redbuff-blue is 1 step from the pit, so blue has a step left to start the capture.
     const s = setup([
-      ['blue', 'jungle', 'raptors-blue'],
+      ['blue', 'jungle', 'redbuff-blue'],
       ['red', 'jungle', 'raptors-red'],
     ]);
     s.round = 11; // Dragon is up

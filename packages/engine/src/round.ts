@@ -4,7 +4,7 @@ import { detectContacts, gankedSide, playsSafe, resolveChoice } from './contacts
 import { advanceRespawns, applyKill, changeHp, completeRecall, finishIfOver } from './economy';
 import { fightVictims, resolveFight } from './fight';
 import { updateLanes } from './lanes';
-import { retreatStep, validateOrders } from './movement';
+import { canAct, reachableFrom, retreatStep, stepBudget, validateOrders } from './movement';
 import { captureObjectives, clearCamps, launchHeralds, spawnObjectives } from './objectives';
 import { roundWindow } from './time';
 import { updateVision } from './vision';
@@ -45,6 +45,9 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
 
   // 4. moves and spawns; contacts come from the input state, where only ordered champions are on the map
   const contacts = detectContacts(state, data, orders);
+  const budget = stepBudget(data.rules, s.round);
+  /** Steps from `from` to `to` this round (`budget` when out of reach: no action left). */
+  const stepsTo = (c: ChampionState, from: string, to: string): number => reachableFrom(data, from, budget, c.side)[to] ?? budget;
   for (const c of s.champions) if (c.status !== 'respawning') c.previous = c.position;
   for (const { c, o } of steps) {
     if (o.stance !== undefined) c.stance = o.stance;
@@ -53,9 +56,10 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
       c.previous = o.to;
       c.status = 'alive';
       c.respawnRound = null;
-      events.push({ type: 'moved', champion: c.id, from: `base-${c.side}`, to: o.to });
+      events.push({ type: 'moved', champion: c.id, from: `base-${c.side}`, to: o.to, acted: true });
     } else if (o.to !== undefined && o.to !== c.position) {
-      events.push({ type: 'moved', champion: c.id, from: c.position, to: o.to });
+      const acted = canAct(stepsTo(c, c.position, o.to), budget);
+      events.push({ type: 'moved', champion: c.id, from: c.position, to: o.to, acted });
       c.position = o.to;
     }
   }
@@ -169,13 +173,13 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
 
   // 7-9. herald, camps, objectives, lanes
   launchHeralds(s, data, orders, events);
-  const viaById: Record<string, string | undefined> = {};
-  for (const { c, o } of steps) {
-    if (o.kind === 'move' && o.via && c.position === o.to) viaById[c.id] = o.via;
-  }
-  clearCamps(s, data, viaById, events);
-  captureObjectives(s, data, events);
-  updateLanes(s, data, tradeWinners, events, ganked);
+  // Only a champion with a step left where it stands acts: clears its camp, takes its objective, farms its wave.
+  const acting = new Set(
+    s.champions.filter((c) => c.status === 'alive' && canAct(stepsTo(c, c.previous, c.position), budget)).map((c) => c.id),
+  );
+  clearCamps(s, data, acting, events);
+  captureObjectives(s, data, events, acting);
+  updateLanes(s, data, tradeWinners, events, ganked, acting);
 
   // 10. new wards
   for (const { c, o } of steps) {

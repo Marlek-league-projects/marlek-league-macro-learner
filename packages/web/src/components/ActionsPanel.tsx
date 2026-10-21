@@ -197,7 +197,7 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
     );
   }
 
-  const moves = c.role === 'jungle' ? data.rules.moves.jungler : data.rules.moves.laner;
+  const moves = store.stepBudget();
   const move = order?.kind === 'move' ? order : null;
   const recall = order?.kind === 'recall' ? order : null;
   const ward = move?.ward ?? recall?.ward;
@@ -208,7 +208,7 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
   const target = data.graph.positions[move?.to ?? c.position];
   const heraldTarget = c.hasHerald && target?.kind === 'tower' && target.side !== c.side;
   const stance = (move ?? recall)?.stance ?? c.stance;
-  const stepThenRecall = recall?.to !== undefined || (move !== null && data.graph.distance(c.position, move.to) === 1);
+  const stepThenRecall = recall?.to !== undefined || (move !== null && store.recallStep(c.id, move.to));
 
   return (
     <>

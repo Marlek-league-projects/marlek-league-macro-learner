@@ -26,7 +26,8 @@ export interface ObjectiveRule {
 
 export interface Rules {
   phases: Phase[];
-  moves: { laner: number; jungler: number; junglerObjectiveReach: boolean };
+  /** Step budget of every champion per round, by the round's length in seconds (`Phase.roundSeconds`). */
+  moves: { budgetBySeconds: Record<string, number> };
   wards: { perRound: number; unwardPerRound: number; unwardRoles: Role[] };
   towers: {
     hp: number;

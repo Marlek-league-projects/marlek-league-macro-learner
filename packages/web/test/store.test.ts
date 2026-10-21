@@ -85,42 +85,33 @@ describe('store', () => {
     expect(() => store.setMove(blue(store, 'top').id, 'dragon-pit')).toThrow(/reach/);
   });
 
-  test('a 2-step move gets a via on a shortest path', () => {
+  test('a move is stored without a route; routeOf gives the engine route, both ends included', () => {
     const store = started();
-    const top = blue(store, 'jungle');
-    store.select(top.id);
-    const two = Object.entries(store.reachableForSelected()).find(([, d]) => d === 2)![0];
-    store.setMove(top.id, two);
-    const order = store.pending.value[top.id]!;
-    expect(order.kind === 'move' && order.via).toBeTruthy();
-    const via = (order as { via: string }).via;
-    expect(data.graph.distance(top.position, via) + data.graph.distance(via, two)).toBe(2);
+    const j = blue(store, 'jungle');
+    store.select(j.id);
+    const two = Object.entries(store.reachableForSelected()).find(([, n]) => n === 2)![0];
+    store.setMove(j.id, two);
+    expect(store.pending.value[j.id]).toEqual({ kind: 'move', champion: j.id, to: two });
+    const path = store.routeOf(j.id, two);
+    expect(path).toHaveLength(3);
+    expect([path[0], path[2]]).toEqual([j.position, two]);
+    expect(store.stepBudget()).toBe(2);
   });
 
-  test('a fast clearer routes via an own camp that is up by the end of the round, like the engine', () => {
-    const store = started(5); // Kindred (fast clearer) starts on redbuff-blue
-    const play = (): void => {
-      store.confirmRound();
-      store.confirmContacts();
-      store.next();
-    };
+  test('a recall keeps a pending move as its step only when the move leaves a step for the recall', () => {
+    const store = started();
     const j = blue(store, 'jungle');
-    expect([j.position, (data.champions[j.id]?.clearSpeed ?? 0) >= data.rules.camps.fastClearAt]).toEqual(['redbuff-blue', true]);
-    play(); // round 1 clears redbuff, back at 110 + buffRespawn = 410
-    store.setMove(j.id, 'raptors-blue');
-    play();
-    while (store.view.value!.round < 15) {
-      // The enemy jungler may kill the idle one meanwhile, or beat it off the camp: back to raptors again.
-      if (blue(store, 'jungle').status === 'respawning') store.setSpawn(j.id, 'raptors-blue');
-      else if (blue(store, 'jungle').position !== 'raptors-blue') store.setMove(j.id, 'raptors-blue');
-      play();
-    }
-    expect(blue(store, 'jungle').position).toBe('raptors-blue');
-    const w = store.roundWindow();
-    const back = store.view.value!.camps['redbuff-blue']!;
-    expect(back > w.start && back <= w.end).toBe(true);
-    store.setMove(j.id, 'bot-t1-blue'); // via mid-t1-blue or redbuff-blue
-    expect(store.pending.value[j.id]).toMatchObject({ kind: 'move', to: 'bot-t1-blue', via: 'redbuff-blue' });
+    store.select(j.id);
+    const reach = Object.entries(store.reachableForSelected());
+    const one = reach.find(([, n]) => n === 1)![0];
+    const two = reach.find(([, n]) => n === 2)![0];
+    expect([store.recallStep(j.id, one), store.recallStep(j.id, two)]).toEqual([true, false]);
+    store.setMove(j.id, one);
+    store.setRecall(j.id);
+    expect(store.pending.value[j.id]).toEqual({ kind: 'recall', champion: j.id, to: one });
+    store.setMove(j.id, two);
+    store.setRecall(j.id);
+    expect(store.pending.value[j.id]).toEqual({ kind: 'recall', champion: j.id });
   });
 
   test('fourth ward throws /wards/', () => {

@@ -292,7 +292,7 @@ describe('move then recall', () => {
     const s = setup(10, [['blue', 'top', 'top-lane']]);
     const bt = get(s, 'blue', 'top').id;
     const { state, events } = resolveRound(s, d, ordersWith(s, [{ kind: 'recall', champion: bt, to: 'top-t1-blue' }]), {});
-    expect(events).toContainEqual({ type: 'moved', champion: bt, from: 'top-lane', to: 'top-t1-blue' });
+    expect(events).toContainEqual({ type: 'moved', champion: bt, from: 'top-lane', to: 'top-t1-blue', acted: true });
     expect(events).toContainEqual(expect.objectContaining({ type: 'recall', champion: bt }));
     const after = get(state, 'blue', 'top');
     expect([after.status, after.position]).toEqual(['respawning', 'top-t1-blue']);

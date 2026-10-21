@@ -285,7 +285,7 @@ export function MapView({ store }: { store: Store }) {
     if (!o || o.kind === 'recall') return [];
     const from = o.kind === 'spawn' ? `base-${c.side}` : c.position;
     if (o.to === from) return [];
-    const path = [from, ...(o.kind === 'move' && o.via ? [o.via] : []), o.to].map((id) => positions[id]);
+    const path = (o.kind === 'move' ? store.routeOf(c.id, o.to) : [from, o.to]).map((id) => positions[id]);
     if (path.some((p) => !p)) return [];
     const points = path.map((p) => `${p!.x},${p!.y}`).join(' ');
     return [<polyline key={c.id} class="arrow" points={points} marker-end="url(#arr)" />];

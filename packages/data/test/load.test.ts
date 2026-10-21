@@ -42,6 +42,14 @@ test('validateRules rejects non-divisible phase and bad PerStage', () => {
   expect(() => validateRules(b)).toThrow(/fight\.numbers/);
 });
 
+test('validateRules rejects a round length with no step budget', () => {
+  const r = structuredClone(data.rules);
+  delete r.moves.budgetBySeconds['40'];
+  expect(() => validateRules(r)).toThrow(/rules\.moves.*40s/);
+  r.moves.budgetBySeconds['40'] = 0;
+  expect(() => validateRules(r)).toThrow(/rules\.moves.*40s/);
+});
+
 test('validateRules rejects a pressureFarmShare outside 0..1', () => {
   const r = structuredClone(data.rules);
   r.economy.pressureFarmShare = 1.5;

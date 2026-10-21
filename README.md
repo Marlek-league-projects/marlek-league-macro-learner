@@ -160,7 +160,7 @@ Tower damage bonuses stack: Voidgrubs plus Baron gives ×3. The Herald launch is
 - **Dragon, Voidgrubs, Herald and Baron take time.** You arrive on the pit one round and take the objective at the end of the next round, as long as you stay there. With **4 or more champions** on the pit, Dragon, Voidgrubs and Herald are taken on arrival. Baron always takes the extra round, even with 5 champions. In between, the enemy has a round to contest it. The Scuttle Crab is taken on arrival.
 - Voidgrubs, Herald and Baron follow their real spawn timers from the current patch, stored in data. They share the Baron pit, each one replacing the previous.
 - There is no Dragon Soul bonus. Each Dragon simply adds team lead.
-- Jungle camps respawn on their real timers and give gold and XP to whoever clears them. `clearSpeed` sets how many camps a jungler can clear in one round.
+- Jungle camps respawn on their real timers and give gold and XP to whoever clears them: one camp per round, the one the champion stands on with a step left (see [Movement](#movement)). `clearSpeed` no longer lets a jungler clear a second camp on the way.
 
 ## Lead, gold and recall
 
@@ -181,26 +181,26 @@ Recalling is how you **cash in** your advantage. A champion sitting on a lot of 
 
 ## Movement
 
-The map positions form a graph, and a move is one step on it. Starting values:
+The map positions form a graph, and a move is a walk of a few steps on it. Starting values:
 
-- **Laners**: 1 move per round. Going from a lane to another lane, or to a Scuttle, counts as 1 move.
-- **Junglers**: 2 moves per round. For example, Raptors → Krugs, Raptors → mid lane, or Raptors → enemy Blue Buff.
-- **Changing lane ends the move**: going from one lane to another (e.g. mid T1 → top T1) is 1 move, and the champion stops there for the round.
-- **Along a lane**: a laner can go from the enemy T1 back to its own T1 (or forward) in one move.
-- **Lane to Scuttle**: from the T1s or the middle of a lane, the nearest Scuttle is 1 move away (top → top Scuttle, bot → bottom Scuttle, mid → both).
-- **Pits**: the Baron pit and the Dragon pit are reachable from exactly the same positions as their nearby Scuttle.
-- **River to jungle**: from a river position (both Scuttles and both pits), any jungle camp on either side is 1 move away.
-- **Crossing your own jungle**: from the top-side camps to the bot-side camps (e.g. Wolves → Krugs) the path goes through the mid T1 (2 moves), not through the river.
-- **Ganks from the outer camps**: an outer camp is 1 move from its nearby lane (Gromp and Blue Buff → top lane, Krugs and Red Buff → bot lane on the blue side, and the mirror on the red side), so a jungler can gank from there in one round.
-- **Neutral objectives** *(jungler rule, not map links)*: a jungler standing on any jungle camp can reach both Scuttles, the Dragon pit and the Baron pit in one round. Laners get no such shortcut. Data flag `rules.moves.junglerObjectiveReach`.
+- **Step budget**: every champion, laner or jungler, has the same number of steps per round, set by the round's length: 2 steps in 20 s rounds, 3 in 40 s rounds, 4 in 1 min rounds (`rules.moves.budgetBySeconds`; cap the 1 min value at 3 if it feels too mobile).
+- **An action costs a step**: clearing a camp, taking a Scuttle, starting or continuing a pit objective, farming your lane's wave, and recalling all need a step left once you arrive. Staying where you are always leaves one.
+- **Arrival only**: a position reached on the last step of the budget is reached, but nothing is done there that round. The champion still fights or flees there, and acts the next round by staying. For example, with 2 steps, a jungler going Gromp → Wolves arrives without clearing Wolves, and a laner arriving in its lane on its last step gets no farm that round.
+- **Changing lane ends the move**: going from one lane to another (mid T1 → top or bot T1) is 1 step, and the champion stops there for the round.
+- **Along a lane**: T3 – T2 – T1 – lane middle – enemy T1, one step each. There is no shortcut from a T1 to the enemy T1.
+- **Lane to river**: the top Scuttle and the Baron pit are 1 step from the top T1s, the top lane middle, the mid lane middle and the blue mid T1 (and the red mid T1, by symmetry); the Scuttle and the pit are 1 step from each other. The bottom side mirrors it. So the mid lane middle reaches both Scuttles and both pits, and so does each mid T1.
+- **River to jungle**: the top Scuttle is 1 step from blue Gromp, Blue Buff and Wolves, and from red Raptors, Red Buff and Krugs; the Baron pit is 1 step from blue Blue Buff and red Red Buff. The bottom side mirrors it.
+- **Your own jungle**: Gromp – Blue Buff – Wolves and Raptors – Red Buff – Krugs. Crossing from one side to the other (e.g. Wolves → Krugs) goes through the mid T1.
+- **Jungle to lanes**: Gromp → top T2 and T1, Blue Buff → top T1, Wolves → mid T2 and T1, Raptors → mid T1, Krugs → mid T1, bot T2 and T1, Red Buff → bot T1 (the red side mirrors it), so a jungler ganks its nearby lane from an outer camp.
+- **Route**: a move is drawn and resolved along a shortest path. Among equal ones, each step prefers a lane position, then a camp, then the river.
 
-- **Camps and Scuttle** are taken by ending the move on their position. **Pit objectives** (Dragon, Voidgrubs, Herald, Baron) take one extra round, unless 4 or more champions are on them (except Baron, which always takes the extra round) (see [Neutral objectives](#neutral-objectives)).
-- **Recall** can follow a move of **1 step** in the same round (and can place or clear a ward on the way, like a move) (for example, step back under your tower, then recall). The champion recalls from where it ends, if it is not caught in a fight there, and respawns at a base position the next round, so a recall costs 1 round.
+- **Pit objectives** (Dragon, Voidgrubs, Herald, Baron) take one extra round, unless 4 or more champions are on them (except Baron, which always takes the extra round) (see [Neutral objectives](#neutral-objectives)).
+- **Recall** is the action: it can follow a move that leaves a step of the budget (at most 1 step in 20 s rounds), and can place or clear a ward on the way, like a move (for example, step back under your tower, then recall). The champion recalls from where it ends, if it is not caught in a fight there, and respawns at a base position the next round, so a recall costs 1 round. Placing a ward is free: it costs no step.
 - **Bases** are two more positions (Base blue and Base red), which brings the total to 39. *(design call)* A champion who respawns after death or recall picks a starting point: a laner picks the frontmost standing tower of the lane they choose, and a jungler picks a camp on their own side.
 
 **Sacrificing a wave.** Leaving a lane while the wave crashes under your own tower costs the wave (gold, XP, possibly plates), but it can be the right play when it gives your team the numbers on a neutral objective. Teaching mode doesn't call this a mistake when the champion went to an objective that was up, about to spawn, or taken that round. It explains the trade-off instead, and higher AI ranks make this sacrifice when the objective is worth more than the wave.
 
-These values live in data files and are a starting point, to be tuned through playtesting. That includes whether longer rounds give more moves.
+These values live in data files and are a starting point, to be tuned through playtesting.
 
 ## Vision
 
