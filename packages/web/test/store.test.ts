@@ -110,8 +110,9 @@ describe('store', () => {
     store.setMove(j.id, 'raptors-blue');
     play();
     while (store.view.value!.round < 15) {
-      // The enemy jungler may kill the idle one meanwhile: respawn on raptors again.
+      // The enemy jungler may kill the idle one meanwhile, or beat it off the camp: back to raptors again.
       if (blue(store, 'jungle').status === 'respawning') store.setSpawn(j.id, 'raptors-blue');
+      else if (blue(store, 'jungle').position !== 'raptors-blue') store.setMove(j.id, 'raptors-blue');
       play();
     }
     expect(blue(store, 'jungle').position).toBe('raptors-blue');

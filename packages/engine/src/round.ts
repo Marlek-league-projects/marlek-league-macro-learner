@@ -84,6 +84,20 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
       }
     }
     applyKill(s, data, victims, winners, events);
+    // Surviving losers leave the spot to the winners, like a flee.
+    retreat(losers);
+  };
+  /**
+   * Flee movement: back to the previous position, or one step toward the base for a champion who did not move (or
+   * just spawned here) and has nowhere to go back to. Dead champions stay where they are.
+   */
+  const retreat = (ids: string[]): void => {
+    for (const id of ids) {
+      const c = byId(id);
+      if (c.status !== 'alive') continue;
+      c.position = c.previous === c.position ? retreatStep(data, c.side, c.position) : c.previous;
+      events.push({ type: 'fled', champion: id, to: c.position });
+    }
   };
   for (const contact of contacts) {
     const choice = resolveChoice(contact, choices);
@@ -93,14 +107,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     const defender = gankedSide(contact);
     const fleeing = SIDES.filter((side) => choice[side] === 'flee');
     if (fleeing.length > 0) {
-      for (const side of fleeing) {
-        // A champion who did not move (or just spawned here) has nowhere to go back to: it retreats one step.
-        for (const id of ids[side]) {
-          const c = byId(id);
-          c.position = c.previous === c.position ? retreatStep(data, c.side, c.position) : c.previous;
-        }
-        for (const id of ids[side]) events.push({ type: 'fled', champion: id, to: byId(id).position });
-      }
+      for (const side of fleeing) retreat(ids[side]);
       // Fleeing a gank the gankers committed to still costs HP.
       if (defender && fleeing.length === 1 && fleeing[0] === defender) {
         for (const id of ids[defender]) changeHp(byId(id), data.rules, -data.rules.fight.gankHpLoss);

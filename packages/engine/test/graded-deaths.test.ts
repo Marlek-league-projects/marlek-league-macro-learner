@@ -190,3 +190,69 @@ describe('ganks and lane position', () => {
     expect(get(both, 'blue', 'top').hp).toBe(H.max);
   });
 });
+
+describe('surviving losers retreat like a flee', () => {
+  test('a Dragon fight won with a small gap: the losers leave, the winners start the capture', () => {
+    const s = setup([
+      ['blue', 'jungle', 'raptors-blue'],
+      ['red', 'jungle', 'raptors-red'],
+    ]);
+    s.round = 11; // Dragon is up
+    const bj = get(s, 'blue', 'jungle');
+    const rj = get(s, 'red', 'jungle');
+    setGap(s, bj, 'dragon-pit', [bj.id], [rj.id], W.deathGap * 0.5);
+    const o = ordersWith(s, [
+      { kind: 'move', champion: bj.id, to: 'dragon-pit' },
+      { kind: 'move', champion: rj.id, to: 'dragon-pit' },
+    ]);
+    const { state, events } = resolveRound(s, d, o, { 'dragon-pit': { blue: 'fight', red: 'fight' } });
+    expect(events).toContainEqual(expect.objectContaining({ type: 'fight', position: 'dragon-pit', winner: 'blue' }));
+    expect(events.some((e) => e.type === 'death')).toBe(false);
+    expect(byId(state, rj.id)).toMatchObject({ status: 'alive', position: 'raptors-red' });
+    expect(events).toContainEqual({ type: 'fled', champion: rj.id, to: 'raptors-red' });
+    expect(byId(state, bj.id).position).toBe('dragon-pit');
+    expect(state.pits['dragon-pit'].capture).toEqual({ side: 'blue', startedRound: s.round });
+    expect(events).toContainEqual(expect.objectContaining({ type: 'objectiveStarted', objective: 'dragon', side: 'blue' }));
+  });
+
+  test('an invade lost without a death: the invader leaves the camp', () => {
+    const s = setup([
+      ['blue', 'jungle', 'dragon-pit'],
+      ['red', 'jungle', 'krugs-red'],
+    ]);
+    const bj = get(s, 'blue', 'jungle');
+    const rj = get(s, 'red', 'jungle');
+    setGap(s, bj, 'krugs-red', [bj.id], [rj.id], -W.deathGap * 0.5);
+    const o = ordersWith(s, [
+      { kind: 'move', champion: bj.id, to: 'krugs-red' },
+      { kind: 'move', champion: rj.id, to: 'krugs-red' },
+    ]);
+    const { state, events } = resolveRound(s, d, o, { 'krugs-red': { blue: 'fight', red: 'fight' } });
+    expect(events).toContainEqual(expect.objectContaining({ type: 'fight', position: 'krugs-red', winner: 'red' }));
+    expect(byId(state, bj.id)).toMatchObject({ status: 'alive', position: 'dragon-pit' });
+    expect(byId(state, rj.id).position).toBe('krugs-red');
+  });
+
+  test('an even-lane All-in lost without a death: the losers retreat one step, and the tower can be hit next round', () => {
+    const s = setup([
+      ['blue', 'adc', 'bot-lane'],
+      ['blue', 'support', 'bot-lane'],
+      ['red', 'adc', 'bot-lane'],
+      ['red', 'support', 'bot-lane'],
+    ]);
+    s.waves.bot = 0;
+    for (const c of s.champions) if (c.role === 'adc' || c.role === 'support') c.stance = 'allin';
+    const ids = (side: string) => ['adc', 'support'].map((r) => get(s, side, r).id).sort();
+    setGap(s, get(s, 'blue', 'adc'), 'bot-lane', ids('blue'), ids('red'), W.deathGap * 0.5);
+    const { state, events } = resolveRound(s, d, ordersWith(s), {});
+    expect(events.some((e) => e.type === 'death')).toBe(false);
+    for (const id of ids('red')) expect(byId(state, id)).toMatchObject({ status: 'alive', position: 'bot-t1-red' });
+    for (const id of ids('blue')) expect(byId(state, id).position).toBe('bot-lane');
+    // Next round the winners step onto the enemy T1, which the losers now hold alone or not at all.
+    const hp = state.towers['bot-t1-red']!;
+    const red = ids('red').map((id) => ({ kind: 'move' as const, champion: id, to: 'bot-t2-red' }));
+    const blue = ids('blue').map((id) => ({ kind: 'move' as const, champion: id, to: 'bot-t1-red' }));
+    const next = resolveRound(state, d, ordersWith(state, [...red, ...blue]), {});
+    expect(next.state.towers['bot-t1-red']!).toBeLessThan(hp);
+  });
+});

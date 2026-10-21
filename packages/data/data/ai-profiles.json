@@ -56,7 +56,7 @@
     "mistakes": {
       "greed": 0.32,
       "objectiveTiming": 0.32,
-      "pointlessPlay": 0.32,
+      "pointlessPlay": 0.25,
       "chasingKills": 0.32,
       "rotateWithoutPriority": 0.256,
       "badRecall": 0.256,

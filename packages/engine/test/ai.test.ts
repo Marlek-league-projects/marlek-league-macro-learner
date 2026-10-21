@@ -532,8 +532,8 @@ describe('AI lane stances', () => {
     expect(stanceOf(-100_000, 'farm').stance).toBeUndefined();
   });
 
-  /** Red top with lane pressure under Trade; the blue jungler seen last round at `jungler` (null: never seen). */
-  function pushOf(jungler: string | null): Order {
+  /** Red top with lane pressure under Trade; the blue jungler seen at `jungler` in round `seen` (null: never seen). */
+  function pushOf(jungler: string | null, seen = 9): Order {
     const s = newGame(d, 7);
     s.round = 10;
     s.waves.top = 0;
@@ -545,7 +545,7 @@ describe('AI lane stances', () => {
     const bj = get(s, 'blue', 'jungle');
     if (jungler) {
       place(s, 'blue', 'jungle', jungler);
-      s.lastSeen.red[bj.id] = { position: jungler, round: 9 };
+      s.lastSeen.red[bj.id] = { position: jungler, round: seen };
     }
     const tuning = tuned(1_000_000, 1_000_000);
     const orders = aiOrders(viewFor(s, tuning, 'red'), tuning, profile('iron'), stubRng(() => 0.99));
@@ -562,6 +562,11 @@ describe('AI lane stances', () => {
     expect(d.graph.distance('scuttle-top', 'top-lane')).toBeLessThanOrEqual(d.aiTuning.pushJunglerDistance);
     expect(pushOf('scuttle-top').stance).toBeUndefined();
     expect(pushOf(null).stance).toBeUndefined();
+  });
+
+  test('a jungler last seen far away but longer ago than knownRounds is still a threat', () => {
+    expect(pushOf('dragon-pit', 10 - d.aiTuning.knownRounds).stance).toBe('push');
+    expect(pushOf('dragon-pit', 9 - d.aiTuning.knownRounds).stance).toBeUndefined();
   });
 });
 

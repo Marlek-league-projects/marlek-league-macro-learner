@@ -116,7 +116,7 @@ Game stages for matchups, skirmish and teamfight: *really early, early, mid, mid
 
 **How the factors combine** *(design call, to tune in playtest)*. Each side gets a fight score, which is a weighted sum. Numbers carry by far the biggest weight, and that weight is highest in early game. Lead, matchup and skirmish or teamfight strength come after. In a fight with more than one champion per side, each matchup term is the average over the opposing champions that have a matchup row. All weights live in data.
 
-- **The side with the higher score wins.** The **score gap** sets how many champions die on the losing side (`fight.deathGap` per death, data): a small gap can kill nobody, a large one kills everyone. The most wounded die first. Every losing survivor loses HP. Winners gain gold and XP for each kill.
+- **The side with the higher score wins.** The **score gap** sets how many champions die on the losing side (`fight.deathGap` per death, data): a small gap can kill nobody, a large one kills everyone. The most wounded die first. Every losing survivor loses HP. Winners gain gold and XP for each kill. Losers who survive a fight retreat (like a flee), leaving the spot to the winners.
 - **Ganks and lane position.** A ganked laner's position on its wave matters: pushed toward the enemy tower it is exposed (bonus to the gankers), in the middle it is neutral, under its own tower it is protected (the tower already helps the defenders). A gank that kills nobody still costs the ganked champions HP.
 - **On an exact tie**, nobody dies and both sides go back to their previous position.
 
