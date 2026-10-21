@@ -6,7 +6,11 @@ import { dec, OBJECTIVE_LABEL } from './components/format';
 export type ReplayStep =
   | { kind: 'move'; champion: string; from: string; to: string }
   | { kind: 'fight' | 'objective' | 'camp' | 'tower'; position: string; label: string }
-  | { kind: 'death'; position: string; label: string; champion: string };
+  | { kind: 'death'; position: string; label: string; champion: string }
+  /** The recall icon shows on the token where its move ended, then the token fades out. */
+  | { kind: 'recall'; champion: string; position: string }
+  /** An own ward saw `champion` pass: its eye pulses and a ghost of the enemy flashes there. */
+  | { kind: 'spotted'; champion: string; position: string; to: string | null };
 
 /** One champion token at a moment of the replay: `f` of the way from `from` to `to`. */
 export interface ReplayToken {
@@ -28,6 +32,8 @@ const MOVE_WINDOWS: Array<[number, number]> = [[0, 0.4], [0.6, 0.8], [0.8, 0.95]
 const FIGHT_WINDOW: [number, number] = [0.4, 0.6];
 const DEATH_WINDOW: [number, number] = [0.6, 0.8];
 const LABEL_WINDOW: [number, number] = [0.8, 1];
+const RECALL_WINDOW: [number, number] = [0.6, 1];
+const SPOT_WINDOW: [number, number] = [0.15, 0.55];
 
 /** Where each champion stands on the map in a view (null: not on it, or not seen). */
 function startPositions(v: PlayerView): Map<string, string | null> {
@@ -44,12 +50,14 @@ const enemySeen = (v: PlayerView, id: string): boolean => v.enemies.some((e) => 
 
 /**
  * The replay of one round, in play order: first moves, fights, retreats (flights and drawn fights going
- * back) with deaths, then objective, camp and tower labels. Enemies move only while seen before or after.
+ * back) with deaths and recalls, then objective, camp and tower labels. Ward spottings flash during the moves.
+ * Enemies move only while seen before or after; a recalled token fades where its move ended.
  */
 export function buildReplay(before: PlayerView, after: PlayerView, events: GameEvent[]): ReplayStep[] {
   const shown = (id: string): boolean => isAlly(before, id) || enemySeen(before, id) || enemySeen(after, id);
   const at = startPositions(before);
   const moves = new Map<string, number>();
+  const recalled = new Set<string>();
   const ranked: Array<{ rank: number; step: ReplayStep }> = [];
   const move = (champion: string, from: string, to: string): void => {
     const n = moves.get(champion) ?? 0;
@@ -77,6 +85,17 @@ export function buildReplay(before: PlayerView, after: PlayerView, events: GameE
       case 'objectiveTaken':
         ranked.push({ rank: 3, step: { kind: 'objective', position: e.position, label: OBJECTIVE_LABEL[e.objective] } });
         break;
+      case 'recall': {
+        const where = at.get(e.champion);
+        if (shown(e.champion) && where) {
+          recalled.add(e.champion);
+          ranked.push({ rank: 2, step: { kind: 'recall', champion: e.champion, position: where } });
+        }
+        break;
+      }
+      case 'wardSpotted':
+        ranked.push({ rank: 0, step: { kind: 'spotted', champion: e.champion, position: e.position, to: e.to } });
+        break;
       case 'campCleared':
         ranked.push({ rank: 3, step: { kind: 'camp', position: e.camp, label: 'Camp nettoyé' } });
         break;
@@ -90,12 +109,14 @@ export function buildReplay(before: PlayerView, after: PlayerView, events: GameE
   }
 
   // Fighters of a drawn fight go back without an event: slide the seen ones to where they ended.
+  // A recalled token stays where it recalled and fades there.
   const end = startPositions(after);
   for (const c of after.allies) {
     const last = at.get(c.id);
-    if (c.status === 'alive' && last && last !== c.position) move(c.id, last, c.position);
+    if (c.status === 'alive' && !recalled.has(c.id) && last && last !== c.position) move(c.id, last, c.position);
   }
   for (const e of after.enemies) {
+    if (recalled.has(e.id)) continue;
     const last = at.get(e.id);
     const now = end.get(e.id);
     if (now && last && last !== now) move(e.id, last, now);
@@ -116,12 +137,16 @@ export function stepWindow(steps: ReplayStep[], i: number): [number, number] {
       return FIGHT_WINDOW;
     case 'death':
       return DEATH_WINDOW;
+    case 'recall':
+      return RECALL_WINDOW;
+    case 'spotted':
+      return SPOT_WINDOW;
     default:
       return LABEL_WINDOW;
   }
 }
 
-const progress = ([a, b]: [number, number], t: number): number => Math.min(1, Math.max(0, (t - a) / (b - a)));
+export const progress = ([a, b]: [number, number], t: number): number => Math.min(1, Math.max(0, (t - a) / (b - a)));
 
 /** Every token on the map at fraction `t` of the replay, starting from the `before` view. */
 export function tokensAt(before: PlayerView, steps: ReplayStep[], t: number): ReplayToken[] {
@@ -155,7 +180,7 @@ export function tokensAt(before: PlayerView, steps: ReplayStep[], t: number): Re
     }
     for (let i = 0; i < steps.length; i++) {
       const s = steps[i]!;
-      if (s.kind === 'death' && s.champion === champion) opacity = 1 - progress(stepWindow(steps, i), t);
+      if ((s.kind === 'death' || s.kind === 'recall') && s.champion === champion) opacity = 1 - progress(stepWindow(steps, i), t);
     }
     if (from === null || to === null) {
       // Unseen at the start: shows up at the start of its first seen move.

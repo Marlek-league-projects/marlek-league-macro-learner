@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { Store } from '../store';
 import { buildReplay, parseReplayAt, REPLAY_MS, stepWindow, tokensAt, type ReplayToken } from '../replay';
-import { championImage, championName, roleIcon } from './format';
+import { championImage, championName, recallIcon, roleIcon } from './format';
 import { PAWN_SPREAD } from './map-marks';
 
 
-/** Plays the last round on the map: tokens slide, fights flash, the dead fade out, labels pop. */
+/**
+ * Plays the last round on the map: tokens slide, fights flash, the dead fade out, recalled tokens show the recall
+ * icon and fade, wards that saw an enemy pulse with a ghost of it, labels pop.
+ */
 export function ReplayLayer({ store }: { store: Store }) {
   const before = store.previousView.value;
   const after = store.view.value;
@@ -54,12 +57,49 @@ export function ReplayLayer({ store }: { store: Store }) {
     return { x: p.x + (group.indexOf(tok) - (group.length - 1) / 2) * PAWN_SPREAD, y: p.y };
   };
 
+  const drawn = tokens.filter((x) => positions[x.from] && positions[x.to]);
+  const at = new Map<string, { x: number; y: number }>();
+  for (const tok of drawn) {
+    const a = spot(tok.from, tok);
+    const b = spot(tok.to, tok);
+    at.set(tok.champion, { x: a.x + (b.x - a.x) * tok.f, y: a.y + (b.y - a.y) * tok.f });
+  }
+
   const marks = steps.flatMap((s, i) => {
     if (s.kind === 'move') return [];
     const p = positions[s.position];
     const [a, b] = stepWindow(steps, i);
     if (!p || t < a) return [];
     const k = Math.min(1, (t - a) / (b - a));
+    if (s.kind === 'recall') {
+      const c = at.get(s.champion);
+      if (!c || t >= b) return [];
+      return [
+        <g key={i} class="replay-recall">
+          <circle cx={c.x} cy={c.y} r={12} fill="#0b1220" stroke="#38bdf8" stroke-width={2} />
+          <image href={recallIcon()} x={c.x - 11} y={c.y - 11} width={22} height={22} />
+        </g>,
+      ];
+    }
+    if (s.kind === 'spotted') {
+      if (t > b) return [];
+      const pulse = Math.sin(Math.PI * k);
+      const ex = p.x + 11;
+      const ey = p.y - 11;
+      const clip = `sclip-${i}`;
+      return [
+        <g key={i} class="replay-spot">
+          <circle class="spot-pulse" cx={ex} cy={ey} r={6 + 10 * k} opacity={pulse} />
+          <ellipse cx={ex} cy={ey} rx={6.5 * (1 + 0.3 * pulse)} ry={4 * (1 + 0.3 * pulse)} fill="#fde68a" stroke="#111" stroke-width={1} />
+          <circle cx={ex} cy={ey} r={2} fill="#111" />
+          <g class="ghost" opacity={0.75 * pulse}>
+            <clipPath id={clip}><circle cx={p.x} cy={p.y} r={12} /></clipPath>
+            <circle cx={p.x} cy={p.y} r={13} fill={before.side === 'blue' ? '#b91c1c' : '#1d4ed8'} stroke={before.side === 'blue' ? '#fca5a5' : '#93c5fd'} stroke-width={2} stroke-dasharray="3 2" />
+            <image href={championImage(data, s.champion)} x={p.x - 12} y={p.y - 12} width={24} height={24} clip-path={`url(#${clip})`} />
+          </g>
+        </g>,
+      ];
+    }
     if (s.kind === 'fight') {
       if (t > b) return [];
       return [<circle key={i} class="replay-flash" cx={p.x} cy={p.y} r={18 + 16 * k} opacity={Math.sin(Math.PI * k)} />];
@@ -74,11 +114,8 @@ export function ReplayLayer({ store }: { store: Store }) {
 
   return (
     <g class="replay" pointer-events="none">
-      {tokens.filter((x) => positions[x.from] && positions[x.to]).sort((a, b) => Number(a.ally) - Number(b.ally)).map((tok) => {
-        const a = spot(tok.from, tok);
-        const b = spot(tok.to, tok);
-        const x = a.x + (b.x - a.x) * tok.f;
-        const y = a.y + (b.y - a.y) * tok.f;
+      {drawn.sort((a, b) => Number(a.ally) - Number(b.ally)).map((tok) => {
+        const { x, y } = at.get(tok.champion)!;
         const clip = `rclip-${tok.champion}`;
         return (
           <g key={tok.champion} class={`pawn${tok.ally ? ' mine' : ''}`} opacity={tok.opacity}>

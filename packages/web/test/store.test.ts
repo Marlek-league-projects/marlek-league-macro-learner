@@ -328,4 +328,26 @@ describe('store', () => {
     }
     expect(auto).toBeGreaterThan(0);
   });
+
+  test('objective prompt: doing it is a stay order, another order selects the token; both close it until next round', () => {
+    const store = started();
+    const j = blue(store, 'jungle');
+    const s = blue(store, 'support');
+    store.doObjective(j.id);
+    expect(store.pending.value[j.id]).toMatchObject({ kind: 'move', champion: j.id, to: j.position });
+    store.otherOrder(s.id);
+    expect(store.selected.value).toBe(s.id);
+    expect(store.objectivePromptsClosed.value).toEqual([j.id, s.id]);
+    store.confirmRound();
+    store.confirmContacts();
+    store.next();
+    expect(store.objectivePromptsClosed.value).toEqual([]);
+  });
+
+  test('round 1 budget: the engine decides who can act on arrival', () => {
+    const store = started();
+    expect(store.stepBudget()).toBe(engine.stepBudget(data.rules, 1));
+    expect(store.canAct(0)).toBe(true);
+    expect(store.canAct(store.stepBudget())).toBe(false);
+  });
 });

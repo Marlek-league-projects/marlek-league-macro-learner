@@ -4,7 +4,7 @@ import { level, teamScore } from './economy';
 import { aiContactChoice, aiOrders } from './ai';
 import type { GameEngine } from './contracts';
 import { detectContacts } from './contacts';
-import { defaultOrders, isLaneChange, reachable, route, spawnPoints, stepBudget, validateOrders } from './movement';
+import { canAct, defaultOrders, isLaneChange, reachable, route, spawnPoints, stepBudget, validateOrders } from './movement';
 import { resolveRound } from './round';
 import { newGame } from './setup';
 import { explainRound } from './teaching';
@@ -30,7 +30,7 @@ export { aiOrders, aiContactChoice, evaluate } from './ai';
 
 export function createEngine(): GameEngine {
   return {
-    newGame, defaultOrders, reachable, route, stepBudget, isLaneChange, spawnPoints, validateOrders, detectContacts, resolveRound, viewFor, eventsFor, wardRoundsLeft, estimateEnemy,
+    newGame, defaultOrders, reachable, route, stepBudget, canAct, isLaneChange, spawnPoints, validateOrders, detectContacts, resolveRound, viewFor, eventsFor, wardRoundsLeft, estimateEnemy,
     aiOrders, aiContactChoice, explainRound, createRng, roundWindow, totalRounds, level, teamScore,
   };
 }

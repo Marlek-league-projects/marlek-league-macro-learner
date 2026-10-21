@@ -2,11 +2,22 @@ import { useState } from 'preact/hooks';
 import type { Lane, Position, Role, Side } from '@lml/data/contracts';
 import type { PlayerView } from '@lml/engine/contracts';
 import type { Store } from '../store';
-import { wardRoundsLeft, wardTooltip } from './wards';
+import { wardTooltip } from './wards';
 import { ActionsPanel } from './ActionsPanel';
 import { ContactsOverlay } from './ContactPrompt';
+import { ObjectivePrompt } from './ObjectivePrompt';
 import { contactDock } from './popover';
-import { dotRadius, hitRadius, PAWN_SPREAD, pressureDirection, spawnCountdown, wavePoint } from './map-marks';
+import {
+  ARRIVAL_ONLY_TIP,
+  dotRadius,
+  hitRadius,
+  objectivePromptEntries,
+  PAWN_SPREAD,
+  pressureDirection,
+  rangeRing,
+  spawnCountdown,
+  wavePoint,
+} from './map-marks';
 import { hpColor, type Hud, hudText, hudTop, hudValues } from './hud';
 import { nodeClickKeepsSelection, pawnClick, pawnHitPassesThrough } from './pawn-click';
 import { ReplayLayer } from './ReplayLayer';
@@ -19,6 +30,7 @@ import {
   kindLabel,
   OBJECTIVE_LABEL,
   plural,
+  recallIcon,
   roleIcon,
 } from './format';
 
@@ -113,6 +125,17 @@ function Nexus({ p, side }: { p: Position; side: Side }) {
   );
 }
 
+/** League's recall icon in a round frame, centred on (x, y). */
+function RecallBadge({ x, y, size }: { x: number; y: number; size: number }) {
+  return (
+    <g class="recall-badge" pointer-events="none">
+      <title>Recall</title>
+      <circle cx={x} cy={y} r={size / 2 + 1.5} fill="#0b1220" stroke="#38bdf8" stroke-width={1.5} />
+      <image href={recallIcon()} x={x - size / 2} y={y - size / 2} width={size} height={size} />
+    </g>
+  );
+}
+
 function Eye({ x, y, left, tip }: { x: number; y: number; left: number; tip: string }) {
   return (
     <g transform={`translate(${x} ${y})`} class="ward">
@@ -170,7 +193,14 @@ export function MapView({ store }: { store: Store }) {
   const pending = store.pending.value;
   const replayable = store.screen.value === 'review' || store.screen.value === 'over';
   const replaying = replayable && store.replaying.value && store.previousView.value !== null;
-  const contactAt = new Set(store.screen.value === 'contacts' ? store.contacts.value.map((c) => c.position) : []);
+  // Every zone position where the contact's champions arrived gets a ring.
+  const contactAt = new Set(
+    store.screen.value === 'contacts' ? store.contacts.value.flatMap((c) => c.positions) : [],
+  );
+  const objectiveEntries = ordering ? objectivePromptEntries(view, now, store.objectivePromptsClosed.value) : [];
+  /** Act or arrival-only ring of a position for the selected token (spawn points always act). */
+  const ring = (id: string) =>
+    reach ? rangeRing(reach[id], (d) => selected?.status === 'respawning' || store.canAct(d)) : null;
 
   const order = (to: string) => {
     if (!selected) return;
@@ -189,7 +219,10 @@ export function MapView({ store }: { store: Store }) {
       const d = reach[p.id];
       if (d === undefined) parts.push('hors de portée ce round');
       else if (selected?.status === 'respawning') parts.push('point de réapparition');
-      else parts.push(d === 0 ? 'rester ici' : plural(d, 'mouvement'));
+      else {
+        parts.push(d === 0 ? 'rester ici' : plural(d, 'mouvement'));
+        if (ring(p.id) === 'arrive') parts.push(ARRIVAL_ONLY_TIP);
+      }
     }
     return parts.join(' · ');
   };
@@ -200,7 +233,8 @@ export function MapView({ store }: { store: Store }) {
     const ok = !reach || reach[p.id] !== undefined;
     const destroyed = p.kind === 'tower' && (view.towers[p.id] ?? 0) <= 0;
     const cleared = p.kind === 'camp' && typeof countdown(p.id) === 'number';
-    const cls = `node${reach ? (ok ? ' reach' : ' off') : ''}${destroyed ? ' down' : ''}${cleared ? ' cleared' : ''}`;
+    const kind = ring(p.id);
+    const cls = `node${reach ? (kind === 'act' ? ' reach' : kind === 'arrive' ? ' arrive' : ' off') : ''}${destroyed ? ' down' : ''}${cleared ? ' cleared' : ''}`;
     // Unreachable positions get no click circle while a pawn is selected.
     const hit = ok && (
       <circle
@@ -234,7 +268,11 @@ export function MapView({ store }: { store: Store }) {
         onMouseLeave={() => setTip(null)}
       />
     );
-    return <g key={p.id} class={`mpos${reach && ok ? ' act' : ''}`}>{dot}{hit}</g>;
+    // Arrival-only: a dashed ring around the dot (the token gets there but cannot act this round).
+    const arriveRing = kind === 'arrive' && (
+      <circle class="arrive-ring" cx={p.x} cy={p.y} r={dotRadius(p) + 5} pointer-events="none" />
+    );
+    return <g key={p.id} class={`mpos${reach && ok ? ' act' : ''}`}>{dot}{arriveRing}{hit}</g>;
   });
 
   const pawns = pawnsOf(view);
@@ -280,15 +318,23 @@ export function MapView({ store }: { store: Store }) {
     );
   });
 
+  // Pending moves as dashed arrows along the engine's route; a recall's step ends in the recall icon.
   const arrows = view.allies.flatMap((c) => {
     const o = pending[c.id];
-    if (!o || o.kind === 'recall') return [];
+    if (!o || o.to === undefined) return [];
     const from = o.kind === 'spawn' ? `base-${c.side}` : c.position;
     if (o.to === from) return [];
-    const path = (o.kind === 'move' ? store.routeOf(c.id, o.to) : [from, o.to]).map((id) => positions[id]);
-    if (path.some((p) => !p)) return [];
+    const path = (o.kind === 'spawn' ? [from, o.to] : store.routeOf(c.id, o.to)).map((id) => positions[id]);
+    if (path.length < 2 || path.some((p) => !p)) return [];
     const points = path.map((p) => `${p!.x},${p!.y}`).join(' ');
-    return [<polyline key={c.id} class="arrow" points={points} marker-end="url(#arr)" />];
+    if (o.kind !== 'recall') return [<polyline key={c.id} class="arrow" points={points} marker-end="url(#arr)" />];
+    const end = path[path.length - 1]!;
+    return [
+      <g key={c.id} class="recall-arrow">
+        <polyline class="arrow" points={points} />
+        <RecallBadge x={end.x} y={end.y} size={20} />
+      </g>,
+    ];
   });
 
   /** Where a pawn is drawn: pawns sharing a position stand side by side. */
@@ -299,6 +345,14 @@ export function MapView({ store }: { store: Store }) {
     const i = group.indexOf(pawn);
     return { x: p.x + (i - (group.length - 1) / 2) * PAWN_SPREAD, y: p.y };
   };
+  // A recall with no step: the icon sits on the token.
+  const recallsInPlace = view.allies.flatMap((c) => {
+    const o = pending[c.id];
+    if (o?.kind !== 'recall' || o.to !== undefined) return [];
+    const pawn = pawns.find((x) => x.ally && x.id === c.id);
+    const at = pawn && pawnPoint(pawn);
+    return at ? [<RecallBadge key={c.id} x={at.x + 10} y={at.y + 10} size={16} />] : [];
+  });
   const hud = hudValues(view, data, store.level, store.estimateEnemy);
   const selectedPawn = pawns.find((pawn) => pawn.ally && pawn.id === selected?.id);
   const anchor = selectedPawn ? pawnPoint(selectedPawn) : null;
@@ -360,7 +414,9 @@ export function MapView({ store }: { store: Store }) {
         <g>
           {view.wards.map((w, i) => {
             const p = positions[w.position];
-            return p ? <Eye key={`${w.position}-${i}`} x={p.x + 11} y={p.y - 11} left={wardRoundsLeft(w.placedRound, view.round)} tip={wardTooltip(w.placedRound)} /> : null;
+            if (!p) return null;
+            const left = store.wardRoundsLeft(w);
+            return <Eye key={`${w.position}-${i}`} x={p.x + 11} y={p.y - 11} left={left} tip={wardTooltip(w, left, view.round)} />;
           })}
         </g>
         <g pointer-events="none">
@@ -371,6 +427,7 @@ export function MapView({ store }: { store: Store }) {
         </g>
         <g pointer-events="none">{arrows}</g>
         {replaying ? <ReplayLayer key={store.replayRun.value} store={store} /> : <g>{pawnNodes}</g>}
+        {!replaying && <g pointer-events="none">{recallsInPlace}</g>}
         <g pointer-events="none">{timers}</g>
       </svg>
       {ordering && anchor && (
@@ -381,6 +438,13 @@ export function MapView({ store }: { store: Store }) {
             const p = positions[id];
             return p ? [{ x: p.x / SIZE, y: p.y / SIZE }] : [];
           })}
+        />
+      )}
+      {objectiveEntries.length > 0 && (
+        <ObjectivePrompt
+          store={store}
+          entries={objectiveEntries}
+          dock={contactDock(objectiveEntries.map((e) => (positions[e.pit]?.y ?? 0) / SIZE))}
         />
       )}
       {contactAt.size > 0 && (

@@ -16,6 +16,7 @@ import type {
   Rng,
   RoundWindow,
   Stance,
+  Ward,
   WardSpot,
 } from '@lml/engine/contracts';
 
@@ -60,6 +61,8 @@ export interface Store {
   panelAt: Signal<{ x: number; y: number } | null>;
   /** The actions panel is being dragged: map clicks are ignored meanwhile. */
   panelDragging: Signal<boolean>;
+  /** Champions whose objective prompt was answered this order phase (shown once per round and champion). */
+  objectivePromptsClosed: Signal<string[]>;
   start(s: Settings): void;
   /** Back to the start screen, dropping the current game. */
   reset(): void;
@@ -67,10 +70,18 @@ export interface Store {
   reachableForSelected(): Record<string, number>;
   /** Steps every champion may take this round; arriving on the last one leaves no action. */
   stepBudget(): number;
+  /** A position `distance` steps away lets the champion act on arrival this round. */
+  canAct(distance: number): boolean;
   /** The path the engine walks for an own champion's move to `to`, both ends included. */
   routeOf(champion: string, to: string): string[];
   /** A move to `to` can come before a recall: it leaves a step of the budget for the recall. */
   recallStep(champion: string, to: string): boolean;
+  /** Rounds an own ward stays active, seen from the view's round (1 = its last active round). */
+  wardRoundsLeft(ward: Ward): number;
+  /** Stays on the pit to take its objective, and closes the champion's objective prompt. */
+  doObjective(champion: string): void;
+  /** Closes the champion's objective prompt and selects it for another order. */
+  otherOrder(champion: string): void;
   setMove(champion: string, to: string): void;
   setWard(champion: string, spot: WardSpot | null): void;
   setUnward(champion: string, spot: 'from' | 'to' | null): void;
@@ -122,6 +133,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
   const recalled = signal<string[]>([]);
   const panelAt = signal<{ x: number; y: number } | null>(null);
   const panelDragging = signal(false);
+  const objectivePromptsClosed = signal<string[]>([]);
 
   // The full state never leaves the store; components only see `view`.
   let state: GameState | null = null;
@@ -225,7 +237,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
 
   return {
     data, screen, view, previousView, replaying, replayRun, selected, pending, contacts, choices, lastEvents, explanations, settings, recalled,
-    panelAt, panelDragging,
+    panelAt, panelDragging, objectivePromptsClosed,
 
     start(s) {
       settings.value = s;
@@ -242,6 +254,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       lastEvents.value = [];
       explanations.value = [];
       recalled.value = [];
+      objectivePromptsClosed.value = [];
       previousView.value = null;
       stopReplay();
       panelDragging.value = false;
@@ -260,6 +273,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       lastEvents.value = [];
       explanations.value = [];
       recalled.value = [];
+      objectivePromptsClosed.value = [];
       previousView.value = null;
       stopReplay();
       panelDragging.value = false;
@@ -276,6 +290,24 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       if (!id || !state) return {};
       const c = state.champions.find((x) => x.id === id && x.side === PLAYER);
       return c && c.status === 'alive' ? engine.reachable(state, data, id) : {};
+    },
+
+    canAct(distance) {
+      return engine.canAct(distance, budget());
+    },
+
+    wardRoundsLeft(ward) {
+      return engine.wardRoundsLeft(ward, view.value?.round ?? current().round, data.rules);
+    },
+
+    doObjective(id) {
+      this.setMove(id, champion(id).position);
+      objectivePromptsClosed.value = [...objectivePromptsClosed.value, id];
+    },
+
+    otherOrder(id) {
+      objectivePromptsClosed.value = [...objectivePromptsClosed.value, id];
+      selected.value = id;
     },
 
     setMove(id, to) {
@@ -386,6 +418,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       selected.value = null;
       contacts.value = [];
       choices.value = {};
+      objectivePromptsClosed.value = [];
       previousView.value = null;
       stopReplay();
       panelDragging.value = false;

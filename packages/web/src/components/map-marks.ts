@@ -1,5 +1,5 @@
 // Map geometry and timers, from the player's view only (fog of war holds).
-import type { GameData, Lane, Position, Side } from '@lml/data/contracts';
+import type { GameData, Lane, ObjectiveId, Position, Side } from '@lml/data/contracts';
 import type { PlayerView } from '@lml/engine/contracts';
 
 export interface Point {
@@ -72,4 +72,44 @@ export function pressureDirection(data: GameData, lane: Lane, side: Side): Point
   const len = Math.hypot(dx, dy) || 1;
   const sign = side === 'blue' ? 1 : -1;
   return { x: (sign * dx) / len, y: (sign * dy) / len };
+}
+
+/** How a position lights up for the selected token: it can act there, only arrive there, or it is out of reach. */
+export type RangeRing = 'act' | 'arrive' | null;
+
+/** `distance` from `reachable` (undefined: out of reach); `canAct` is the engine's rule for this round's budget. */
+export function rangeRing(distance: number | undefined, canAct: (distance: number) => boolean): RangeRing {
+  if (distance === undefined) return null;
+  return canAct(distance) ? 'act' : 'arrive';
+}
+
+export const ARRIVAL_ONLY_TIP = "Arrivée seulement : pas d'action ce tour";
+
+const PIT_SCUTTLE: Record<'baron-pit' | 'dragon-pit', 'scuttle-top' | 'scuttle-bot'> = {
+  'baron-pit': 'scuttle-top',
+  'dragon-pit': 'scuttle-bot',
+};
+
+export interface ObjectivePromptEntry {
+  champion: string;
+  pit: 'baron-pit' | 'dragon-pit';
+  objective: ObjectiveId;
+  /** The river's Scuttle is up too: doing the objective takes it in the same round. */
+  withScuttle: boolean;
+}
+
+/**
+ * The objective prompt at the start of the order phase: each own alive champion standing on a pit whose objective
+ * is up or being taken, minus the ones already answered (`closed`). Never for a champion on a Scuttle.
+ */
+export function objectivePromptEntries(view: PlayerView, now: number, closed: readonly string[]): ObjectivePromptEntry[] {
+  const out: ObjectivePromptEntry[] = [];
+  for (const c of view.allies) {
+    if (c.status !== 'alive' || closed.includes(c.id)) continue;
+    if (c.position !== 'baron-pit' && c.position !== 'dragon-pit') continue;
+    const objective = view.pits[c.position].objective;
+    if (!objective) continue;
+    out.push({ champion: c.id, pit: c.position, objective, withScuttle: view.scuttles[PIT_SCUTTLE[c.position]] <= now });
+  }
+  return out;
 }

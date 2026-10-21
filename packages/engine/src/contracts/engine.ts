@@ -33,6 +33,8 @@ export interface GameEngine {
   route(data: GameData, from: string, to: string, side: Side): string[];
   /** Steps every champion may take in `round`; arriving on the last one leaves no action. */
   stepBudget(rules: Rules, round: number): number;
+  /** A champion `distance` steps away acts on arrival (staying acts). */
+  canAct(distance: number, budget: number): boolean;
   spawnPoints(state: GameState, data: GameData, championId: string): string[];
   validateOrders(state: GameState, data: GameData, side: Side, orders: Order[]): void;
   detectContacts(state: GameState, data: GameData, orders: Orders): Contact[];

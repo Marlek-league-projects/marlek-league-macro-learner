@@ -2,7 +2,15 @@ import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
 import { createEngine } from '@lml/engine';
 import type { PlayerView } from '@lml/engine/contracts';
-import { dotRadius, hitRadius, spawnCountdown, WAVE_NEAR_TOWER, wavePoint } from '../src/components/map-marks';
+import {
+  dotRadius,
+  hitRadius,
+  objectivePromptEntries,
+  rangeRing,
+  spawnCountdown,
+  WAVE_NEAR_TOWER,
+  wavePoint,
+} from '../src/components/map-marks';
 import { createStore } from '../src/store';
 
 const data = loadGameData();
@@ -118,5 +126,57 @@ describe('click targets', () => {
 
   test('pits are drawn larger than other positions', () => {
     expect(dotRadius(positions['dragon-pit']!)).toBeGreaterThan(dotRadius(positions['krugs-blue']!));
+  });
+});
+
+describe('range rings', () => {
+  const canAct = (d: number) => d < 2;
+  test('in reach and able to act, arrival-only on the last step, nothing out of reach', () => {
+    expect(rangeRing(0, canAct)).toBe('act');
+    expect(rangeRing(1, canAct)).toBe('act');
+    expect(rangeRing(2, canAct)).toBe('arrive');
+    expect(rangeRing(undefined, canAct)).toBeNull();
+  });
+});
+
+describe('enemy camp timers', () => {
+  test('an enemy camp the view knows a timer for counts down like an own camp', () => {
+    const v = view();
+    v.camps = { ...v.camps, 'krugs-red': 500 };
+    expect(spawnCountdown(v, data, 'krugs-red', 420)).toBe(80);
+  });
+});
+
+describe('objective prompt entries', () => {
+  /** Opening view with the blue jungler on `position` and the pits' objectives set. */
+  function onPit(position: string, dragon: 'dragon' | null, scuttleBotAt = 0) {
+    const v = view();
+    const j = v.allies.find((c) => c.role === 'jungle')!;
+    j.position = position;
+    v.pits['dragon-pit'] = { objective: dragon, nextSpawn: null, capture: null };
+    v.scuttles['scuttle-bot'] = scuttleBotAt;
+    return { v, j };
+  }
+
+  test('an own champion on a pit whose objective is up, with the Scuttle up too', () => {
+    const { v, j } = onPit('dragon-pit', 'dragon', 100);
+    expect(objectivePromptEntries(v, 300, [])).toEqual([{ champion: j.id, pit: 'dragon-pit', objective: 'dragon', withScuttle: true }]);
+    expect(objectivePromptEntries(v, 50, [])[0]!.withScuttle).toBe(false);
+  });
+
+  test('an objective being taken still prompts', () => {
+    const { v, j } = onPit('dragon-pit', 'dragon');
+    v.pits['dragon-pit'].capture = { side: 'blue', startedRound: 3 };
+    expect(objectivePromptEntries(v, 300, []).map((e) => e.champion)).toEqual([j.id]);
+  });
+
+  test('none once answered, on an empty pit, on the Scuttle, or when dead', () => {
+    const answered = onPit('dragon-pit', 'dragon');
+    expect(objectivePromptEntries(answered.v, 300, [answered.j.id])).toEqual([]);
+    expect(objectivePromptEntries(onPit('dragon-pit', null).v, 300, [])).toEqual([]);
+    expect(objectivePromptEntries(onPit('scuttle-bot', 'dragon').v, 300, [])).toEqual([]);
+    const dead = onPit('dragon-pit', 'dragon');
+    dead.j.status = 'dead';
+    expect(objectivePromptEntries(dead.v, 300, [])).toEqual([]);
   });
 });
