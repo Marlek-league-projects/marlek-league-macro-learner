@@ -3,7 +3,7 @@ import type { ChampionState, Order, Stance } from '@lml/engine/contracts';
 import type { GameData } from '@lml/data/contracts';
 import type { Store } from '../store';
 import { championName, errorText, plural, positionLabel, roleIcon } from './format';
-import { placePopover } from './popover';
+import { clampInside, placePopover, visibleRegion } from './popover';
 import { deepWardSpots } from './ward-spots';
 
 const STANCES: { id: Stance; label: string }[] = [
@@ -39,6 +39,8 @@ function DeepWardChoice(
 /**
  * The selected pawn's actions, floating next to it inside the map box (its offset parent).
  * `anchor` (the pawn) and `avoid` (positions it should leave clickable) are shares (0..1) of the map's drawing.
+ * Opens on the side covering the fewest `avoid` points; its title bar drags it (kept in the store for the
+ * session, double-click puts it back next to the pawn). It always stays inside the map box and the viewport.
  */
 export function ActionsPanel(
   { store, anchor, avoid }: { store: Store; anchor: { x: number; y: number }; avoid: { x: number; y: number }[] },
@@ -46,24 +48,35 @@ export function ActionsPanel(
   const [error, setError] = useState<{ champion: string; text: string } | null>(null);
   const [at, setAt] = useState<{ left: number; top: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ pointer: number; x: number; y: number; left: number; top: number } | null>(null);
   const view = store.view.value;
   const id = store.screen.value === 'orders' ? store.selected.value : null;
   const c = view?.allies.find((x) => x.id === id) ?? null;
+  const dragged = store.panelAt.value;
 
-  useLayoutEffect(() => {
+  /** The panel, its map box, the box's size and the part of the box inside the viewport (box px). */
+  const frame = () => {
     const el = ref.current;
     const box = el?.parentElement;
-    const svg = box?.querySelector('svg');
-    if (!el || !box || !svg) return;
+    if (!el || !box) return null;
     const b = box.getBoundingClientRect();
-    const m = svg.getBoundingClientRect();
-    const px = (p: { x: number; y: number }) => ({ x: m.left - b.left + p.x * m.width, y: m.top - b.top + p.y * m.height });
-    const next = placePopover(
-      px(anchor),
-      { width: el.offsetWidth, height: el.offsetHeight },
-      { width: box.clientWidth, height: box.clientHeight },
-      avoid.map(px),
-    );
+    const size = { width: box.clientWidth, height: box.clientHeight };
+    const region = visibleRegion({ x: b.left, y: b.top }, size, { width: window.innerWidth, height: window.innerHeight });
+    return { box, b, size, region, pop: { width: el.offsetWidth, height: el.offsetHeight } };
+  };
+
+  useLayoutEffect(() => {
+    const f = frame();
+    const svg = f?.box.querySelector('svg');
+    if (!f || !svg) return;
+    let next: { left: number; top: number };
+    if (dragged) next = { left: dragged.x * f.size.width, top: dragged.y * f.size.height };
+    else {
+      const m = svg.getBoundingClientRect();
+      const px = (p: { x: number; y: number }) => ({ x: m.left - f.b.left + p.x * m.width, y: m.top - f.b.top + p.y * m.height });
+      next = placePopover(px(anchor), f.pop, f.region, avoid.map(px));
+    }
+    next = clampInside(next, f.pop, f.region);
     if (!at || Math.abs(at.left - next.left) > 0.5 || Math.abs(at.top - next.top) > 0.5) setAt(next);
   });
 
@@ -78,13 +91,47 @@ export function ActionsPanel(
     }
   };
 
+  const onDown = (e: PointerEvent) => {
+    if (!at || e.button !== 0 || (e.target as HTMLElement).closest('button')) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    drag.current = { pointer: e.pointerId, x: e.clientX, y: e.clientY, left: at.left, top: at.top };
+    store.panelDragging.value = true;
+    e.preventDefault();
+  };
+  const onMove = (e: PointerEvent) => {
+    const d = drag.current;
+    const f = frame();
+    if (!d || d.pointer !== e.pointerId || !f) return;
+    const next = clampInside({ left: d.left + e.clientX - d.x, top: d.top + e.clientY - d.y }, f.pop, f.region);
+    store.panelAt.value = { x: next.left / f.size.width, y: next.top / f.size.height };
+  };
+  const onUp = (e: PointerEvent) => {
+    if (drag.current?.pointer !== e.pointerId) return;
+    drag.current = null;
+    // Still "dragging" for the click this release may fire, so the map ignores it.
+    setTimeout(() => (store.panelDragging.value = false), 0);
+  };
+
   return (
     <div
       ref={ref}
-      class="popover"
+      class={`popover${store.panelDragging.value ? ' dragging' : ''}`}
       style={at ? { left: `${at.left}px`, top: `${at.top}px` } : { visibility: 'hidden' }}
     >
-      <button class="close" title="Fermer" onClick={() => store.select(null)}>×</button>
+      <div
+        class="ptitle"
+        title="Glisser pour déplacer · double-clic : replacer près du pion"
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+        onDblClick={() => (store.panelAt.value = null)}
+      >
+        <img class="ri" src={roleIcon(c.role)} alt="" />
+        <strong>{championName(store.data, c.id)}</strong>
+        {c.status === 'alive' && <span class="muted">· {positionLabel(store.data, c.position)}</span>}
+        <button class="close" title="Fermer" onClick={() => store.select(null)}>×</button>
+      </div>
       <ChampionActions store={store} c={c} order={store.pending.value[c.id]} run={run} />
       {error?.champion === c.id && <div class="error">{error.text}</div>}
     </div>
@@ -100,16 +147,9 @@ interface ActionsProps {
 
 function ChampionActions({ store, c, order, run }: ActionsProps) {
   const { data } = store;
-  const header = (
-    <div>
-      <img class="ri" src={roleIcon(c.role)} alt="" />
-      <strong>{championName(data, c.id)}</strong>
-      {c.status === 'alive' && <> · {positionLabel(data, c.position)}</>}
-    </div>
-  );
 
   if (c.status === 'dead') {
-    return <>{header}<div class="neg">Mort (retour round {c.respawnRound})</div></>;
+    return <><div class="neg">Mort (retour round {c.respawnRound})</div></>;
   }
 
   if (c.status === 'respawning') {
@@ -117,7 +157,6 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
     const chosen = order?.kind === 'spawn' ? order.to : points[0];
     return (
       <>
-        {header}
         <div class="note">Choisis où réapparaître :</div>
         <div class="stack">
           {points.map((p) => (
@@ -145,7 +184,6 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
 
   return (
     <>
-      {header}
       <div class="note">
         Portée : {plural(moves, 'mouvement')}. Clique une position allumée.
       </div>

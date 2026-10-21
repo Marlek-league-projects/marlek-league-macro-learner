@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { Store } from '../store';
 import { buildReplay, parseReplayAt, REPLAY_MS, stepWindow, tokensAt, type ReplayToken } from '../replay';
 import { championImage, championName, roleIcon } from './format';
+import { PAWN_SPREAD } from './map-marks';
 
-const SPREAD = 42;
 
 /** Plays the last round on the map: tokens slide, fights flash, the dead fade out, labels pop. */
 export function ReplayLayer({ store }: { store: Store }) {
@@ -51,7 +51,7 @@ export function ReplayLayer({ store }: { store: Store }) {
   const spot = (node: string, tok: ReplayToken) => {
     const p = positions[node] ?? { x: 0, y: 0 };
     const group = members.get(node)!;
-    return { x: p.x + (group.indexOf(tok) - (group.length - 1) / 2) * SPREAD, y: p.y };
+    return { x: p.x + (group.indexOf(tok) - (group.length - 1) / 2) * PAWN_SPREAD, y: p.y };
   };
 
   const marks = steps.flatMap((s, i) => {

@@ -38,6 +38,7 @@ h2 { font-size:18px; margin:0; }
 .bar { height:6px; background:#21262d; border-radius:3px; margin:4px 0 2px; overflow:hidden; }
 .bar i { display:block; height:100%; }
 .xp i { background:#a78bfa } .lead i { background:#4ade80 }
+.bar.hp { height:5px; }
 .muted { color:var(--mut); }
 .small { font-size:11px; }
 .ri { width:16px; height:16px; vertical-align:-3px; margin-right:3px; }
@@ -58,7 +59,10 @@ h2 { font-size:18px; margin:0; }
 
 /* Actions popover, next to the selected pawn */
 .popover { position:absolute; z-index:5; width:230px; background:#161b22f2; border:1px solid #6e7681; border-radius:8px; padding:8px 10px; font-size:12px; display:flex; flex-direction:column; gap:6px; box-shadow:0 6px 18px #000a; }
-.popover .close { position:absolute; top:4px; right:4px; padding:0 6px; line-height:18px; background:none; border:none; color:var(--mut); font-size:16px; }
+.popover .ptitle { display:flex; align-items:center; gap:4px; margin:-8px -10px 0; padding:5px 6px 5px 10px; background:#21262d; border-bottom:1px solid #30363d; border-radius:8px 8px 0 0; cursor:grab; user-select:none; touch-action:none; white-space:nowrap; overflow:hidden; }
+.popover .ptitle .muted { overflow:hidden; text-overflow:ellipsis; }
+.popover.dragging { opacity:.92; } .popover.dragging .ptitle { cursor:grabbing; }
+.popover .close { margin-left:auto; padding:0 6px; line-height:18px; background:none; border:none; color:var(--mut); font-size:16px; }
 .popover button { padding:4px 6px; }
 .popover .opt label { margin:1px 0; }
 .seg.stance button { font-weight:600; }
@@ -72,6 +76,8 @@ svg { width:100%; display:block; }
 .pawn.mine { cursor:pointer; }
 .pawn.sel circle.body { stroke:#fde047; stroke-width:3; }
 .pawn.away { opacity:.6; }
+.hud text { font-size:8px; font-weight:700; fill:#e5e7eb; paint-order:stroke; stroke:#000; stroke-width:2.5px; }
+.hud .pow { fill:#fde047; }
 .pname { font-size:9px; font-weight:600; fill:#e5e7eb; paint-order:stroke; stroke:#000; stroke-width:2px; stroke-opacity:.6; }
 .arrow { fill:none; stroke:#fde047; stroke-width:3; stroke-dasharray:6 4; }
 .timer { font-size:10px; font-weight:700; fill:#fff; paint-order:stroke; stroke:#000; stroke-width:3px; }

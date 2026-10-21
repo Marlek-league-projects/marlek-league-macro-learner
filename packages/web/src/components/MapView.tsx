@@ -5,7 +5,8 @@ import type { Store } from '../store';
 import { ActionsPanel } from './ActionsPanel';
 import { ContactsOverlay } from './ContactPrompt';
 import { contactDock } from './popover';
-import { dotRadius, hitRadius, pressureDirection, spawnCountdown, strengthFills, wavePoint } from './map-marks';
+import { dotRadius, hitRadius, PAWN_SPREAD, pressureDirection, spawnCountdown, wavePoint } from './map-marks';
+import { hpColor, type Hud, hudText, hudTop, hudValues } from './hud';
 import { nodeClickKeepsSelection, pawnClick, pawnHitPassesThrough } from './pawn-click';
 import { ReplayLayer } from './ReplayLayer';
 import {
@@ -120,6 +121,30 @@ function Eye({ x, y }: { x: number; y: number }) {
   );
 }
 
+/**
+ * A token's HUD: level and power, HP bar, XP bar (allies only). Stacked above the role icon, or below the name
+ * when the token stands too close to the map's top edge for it to fit.
+ */
+function PawnHud({ x, y, hud }: { x: number; y: number; hud: Hud }) {
+  const w = 28;
+  const top = hudTop(y);
+  return (
+    <g class="hud" pointer-events="none">
+      <text x={x} y={top + 8} text-anchor="middle">
+        niv {hud.level}·<tspan class="pow">{hud.power}</tspan>
+      </text>
+      <rect x={x - w / 2} y={top + 10} width={w} height={4.5} rx={1} fill="#0b0f14" stroke="#000" stroke-width={0.8} />
+      <rect x={x - w / 2 + 0.5} y={top + 10.5} width={(w - 1) * hud.hp} height={3.5} rx={0.8} fill={hpColor(hud.hp)} />
+      {hud.xp !== null && (
+        <>
+          <rect x={x - w / 2} y={top + 15.5} width={w} height={2.5} fill="#0b0f14" />
+          <rect x={x - w / 2} y={top + 15.5} width={w * hud.xp} height={2.5} fill="#a78bfa" />
+        </>
+      )}
+    </g>
+  );
+}
+
 export function MapView({ store }: { store: Store }) {
   const [tip, setTip] = useState<Tip | null>(null);
   const view = store.view.value;
@@ -217,7 +242,7 @@ export function MapView({ store }: { store: Store }) {
     const left = countdown(p.id);
     if (left === null) return null;
     const n = byPosition.get(p.id)?.length ?? 0;
-    const reachX = Math.max(dotRadius(p), n > 0 ? ((n - 1) / 2) * 42 + 14 : 0);
+    const reachX = Math.max(dotRadius(p), n > 0 ? ((n - 1) / 2) * PAWN_SPREAD + 14 : 0);
     const pit = p.kind === 'pit' ? view.pits[p.id as 'baron-pit' | 'dragon-pit'] : null;
     const text = left !== 'up' ? clock(left) : pit?.objective ? OBJECTIVE_LABEL[pit.objective] : 'en vie';
     return (
@@ -268,9 +293,9 @@ export function MapView({ store }: { store: Store }) {
     if (!p) return null;
     const group = byPosition.get(pawn.position)!;
     const i = group.indexOf(pawn);
-    return { x: p.x + (i - (group.length - 1) / 2) * 42, y: p.y };
+    return { x: p.x + (i - (group.length - 1) / 2) * PAWN_SPREAD, y: p.y };
   };
-  const strength = strengthFills(view, data, store.level, store.estimateEnemy);
+  const hud = hudValues(view, data, store.level, store.estimateEnemy);
   const selectedPawn = pawns.find((pawn) => pawn.ally && pawn.id === selected?.id);
   const anchor = selectedPawn ? pawnPoint(selectedPawn) : null;
 
@@ -278,7 +303,7 @@ export function MapView({ store }: { store: Store }) {
     const at = pawnPoint(pawn);
     if (!at) return null;
     const { x, y } = at;
-    const fill = strength[pawn.id];
+    const values = hud[pawn.id];
     const name = championName(data, pawn.id);
     const clip = `clip-${pawn.id}`;
     const isSel = selected?.id === pawn.id;
@@ -295,7 +320,7 @@ export function MapView({ store }: { store: Store }) {
           else if (action.kind === 'order') order(action.to);
         }}
         onMouseMove={(e: MouseEvent) =>
-          setTip({ text: `${name}${pawn.away ? ' · en base' : ''}`, x: e.clientX, y: e.clientY })}
+          setTip({ text: `${name}${pawn.away ? ' · en base' : ''}${values ? ` · ${hudText(values)}` : ''}`, x: e.clientX, y: e.clientY })}
         onMouseLeave={() => setTip(null)}
       >
         <rect class="hit" x={x - 13} y={y - 33} width={26} height={46} fill="transparent" pointer-events={passThrough ? 'none' : undefined} />
@@ -303,13 +328,7 @@ export function MapView({ store }: { store: Store }) {
         <circle class="body" cx={x} cy={y} r={13} fill={pawn.side === 'blue' ? '#1d4ed8' : '#b91c1c'} stroke={pawn.side === 'blue' ? '#93c5fd' : '#fca5a5'} stroke-width={2} />
         <image href={championImage(data, pawn.id)} x={x - 12} y={y - 12} width={24} height={24} clip-path={`url(#${clip})`} />
         <image href={roleIcon(pawn.role)} x={x - 9} y={y - 33} width={18} height={18} pointer-events={passThrough ? 'none' : undefined} />
-        {fill !== undefined && (
-          <g class="strength" pointer-events="none">
-            <title>Force (niveau et avance)</title>
-            <rect x={x - 14} y={y - 40} width={28} height={5} rx={1.5} fill="#0b0f14" stroke="#000" stroke-width={0.8} />
-            <rect x={x - 13.5} y={y - 39.5} width={27 * fill} height={4} rx={1} fill={SIDE_COLOR[pawn.side]} />
-          </g>
-        )}
+        {values && <PawnHud x={x} y={y} hud={values} />}
         <text x={x} y={y + 25} text-anchor="middle" class="pname">{name}</text>
       </g>
     );
@@ -317,7 +336,13 @@ export function MapView({ store }: { store: Store }) {
 
   const base = (side: Side) => positions[`base-${side}`];
   return (
-    <div class="mapbox">
+    <div
+      class="mapbox"
+      onClickCapture={(e: MouseEvent) => {
+        // A click ending a drag of the actions panel is not an order.
+        if (store.panelDragging.value) e.stopPropagation();
+      }}
+    >
       <svg viewBox={`0 0 ${SIZE} ${SIZE}`} onClick={() => ordering && store.select(null)}>
         <Defs />
         <rect width={SIZE} height={SIZE} fill="#2b3428" />
