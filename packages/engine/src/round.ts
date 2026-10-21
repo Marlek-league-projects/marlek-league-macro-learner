@@ -93,7 +93,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     hurt.add(id);
     if (before > c.hp) events.push({ type: 'hpLost', champion: id, amount: before - c.hp });
   };
-  /** A tied fight: everyone goes back to where it stood (and acts there if it has a step left). */
+  /** A tied fight: everyone goes back to where it stood (and acts there only if it had a step left on arrival). */
   const goBack = (ids: string[]): void => {
     for (const id of ids) byId(id).position = byId(id).previous;
   };
@@ -233,13 +233,11 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
 
   // 7-9. herald, camps, objectives, lanes
   launchHeralds(s, data, orders, events);
-  // Only a champion back where it stood, or with a step left on arrival (a lane fight's pull-in neither gives nor takes
-  // it), who did not flee, retreat or have its recall interrupted, acts: clears its camp, takes its objective, farms its
-  // wave.
+  // Only a champion with a step left on arrival (one who stayed always has it) who did not flee, retreat or have its
+  // recall interrupted acts: clears its camp, takes its objective, farms its wave. A lane fight's pull-in or a tied
+  // fight's way back neither gives nor takes that step.
   const acting = new Set(
-    s.champions
-      .filter((c) => c.status === 'alive' && !forfeited.has(c.id) && (c.position === c.previous || arrivedActing.has(c.id)))
-      .map((c) => c.id),
+    s.champions.filter((c) => c.status === 'alive' && !forfeited.has(c.id) && arrivedActing.has(c.id)).map((c) => c.id),
   );
   // `moved.acted` tells the result after contacts (a completed recall is the action).
   for (const e of events) if (e.type === 'moved') e.acted = acting.has(e.champion) || recalled.has(e.champion);

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData, mirrorId } from '@lml/data';
 import { canAct, defaultOrders, newGame, reachable, reachableFrom, roundWindow, route, spawnPoints, stepBudget, validateOrders } from '@lml/engine';
+import { retreatStep } from '../src/movement';
 import type { ChampionState, GameState, Order } from '@lml/engine/contracts';
 
 const d = loadGameData();
@@ -297,4 +298,12 @@ describe('default respawn', () => {
       expect(to()).toBe(`${lane}-t2-blue`);
     });
   }
+});
+
+describe('retreatStep', () => {
+  test('is mirror-symmetric: red retreats from the mirror of a position to the mirror of blue\'s step', () => {
+    for (const p of Object.keys(d.graph.positions)) {
+      expect(retreatStep(d, 'red', mirrorId(p))).toBe(mirrorId(retreatStep(d, 'blue', p)));
+    }
+  });
 });

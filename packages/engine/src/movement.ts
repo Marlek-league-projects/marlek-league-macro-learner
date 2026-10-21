@@ -138,7 +138,8 @@ export function spawnPointsFor(
 
 /**
  * One step toward `side`'s base for a champion fleeing a tile it did not leave: along a lane to the next
- * position behind it (T1 → T2 → T3 → base), elsewhere to the neighbour closest to the base. Ties by id.
+ * position behind it (T1 → T2 → T3 → base), elsewhere to the neighbour closest to the base. Ties by id, seen from
+ * blue (red takes the mirror of blue's step, as in `route`).
  */
 export function retreatStep(data: GameData, side: Side, position: string): string {
   const { graph } = data;
@@ -147,7 +148,8 @@ export function retreatStep(data: GameData, side: Side, position: string): strin
   const options = (graph.adj[position] ?? []).filter(
     (n) => n !== enemyBase(side) && (lane === undefined || n === base || graph.positions[n]?.lane === lane),
   );
-  const best = options.sort((a, b) => graph.distance(a, base) - graph.distance(b, base) || a.localeCompare(b))[0];
+  const id = (p: string): string => (side === 'blue' ? p : mirrorId(p));
+  const best = options.sort((a, b) => graph.distance(a, base) - graph.distance(b, base) || id(a).localeCompare(id(b)))[0];
   return best !== undefined && graph.distance(best, base) < graph.distance(position, base) ? best : position;
 }
 

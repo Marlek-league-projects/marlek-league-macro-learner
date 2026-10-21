@@ -9,6 +9,7 @@ import {
   detectContacts,
   newGame,
   reachableFrom,
+  resolveFight,
   resolveRound,
   roundWindow,
   stepBudget,
@@ -17,6 +18,7 @@ import {
 } from '@lml/engine';
 import type { ChampionState, ContactChoices, GameState, Order, Orders, PlayerView, Rng } from '@lml/engine/contracts';
 import { assignStances, makeContext, planCandidates, rollMistakes, towerAllowed } from '../src/ai/heuristics';
+import { updateVision } from '../src/vision';
 
 const d = loadGameData();
 const profile = (rank: Rank): AiProfile => d.aiProfiles.find((p) => p.rank === rank)!;
@@ -632,6 +634,27 @@ test('AI stance: a laner whose move leaves its home lane goes back to Farm', () 
   const ctx = makeContext(view, d, false);
   const orders = defaultOrders(s, d, 'red').map((o) => (o.champion === rt.id ? { kind: 'move' as const, champion: rt.id, to: 'scuttle-top' } : o));
   expect(orderOf(assignStances(ctx, orders), rt.id)).toEqual({ kind: 'move', champion: rt.id, to: 'scuttle-top', stance: 'farm' });
+});
+
+test('AI stance: opposite T1s are predicted at the lane middle, where the engine resolves the fight', () => {
+  const s = newGame(d, 7);
+  s.round = 10;
+  place(s, 'blue', 'mid', 'mid-t1-blue');
+  place(s, 'red', 'mid', 'mid-t1-red');
+  updateVision(s, d);
+  const [bm, rm] = [get(s, 'blue', 'mid').id, get(s, 'red', 'mid').id];
+  const { scores } = resolveFight(s, d, 'mid-lane', [bm], [rm], roundWindow(d.rules, 10).stage);
+  const margin = scores.blue - scores.red;
+  // Blue is ahead at the lane middle (Trade), red behind (Farm); each T1 alone would promise an All-in.
+  expect(margin).toBeGreaterThan(d.aiTuning.tradeMargin);
+  expect(margin).toBeLessThan(d.aiTuning.allInMargin);
+  for (const side of ['blue', 'red'] as const) {
+    const me = side === 'blue' ? bm : rm;
+    const to = side === 'blue' ? 'mid-t1-blue' : 'mid-t1-red';
+    const orders = defaultOrders(s, d, side).map((o) => (o.champion === me ? { kind: 'move' as const, champion: me, to } : o));
+    const stance = orderOf(assignStances(makeContext(viewFor(s, d, side), d, false), orders), me).stance;
+    expect(stance).toBe(side === 'blue' ? 'trade' : undefined);
+  }
 });
 
 test('AI stance: a recalling laner goes back to Farm, with or without a step first', () => {

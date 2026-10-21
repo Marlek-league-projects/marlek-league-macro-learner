@@ -1,3 +1,4 @@
+import { mirrorId } from '@lml/data';
 import type { GameData, Side } from '@lml/data/contracts';
 import type { ChampionState, Choice, Contact, ContactChoices, ContactKind, GameState, Orders, Stance } from './contracts';
 import { canAct, HOME_LANE, reachableFrom, stepBudget } from './movement';
@@ -60,13 +61,26 @@ const byId = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /**
  * Where a contact's fight resolves: the position of the smaller side (the one with most of its champions), or on
- * even numbers the zone position with the most champions. Remaining ties go to the lowest id.
+ * even numbers the zone position with the most champions. Remaining ties are side-neutral: in a lane, the position
+ * closest to the lane middle (the lane middle itself when two are as close); elsewhere the lowest mirror-normalized
+ * id (an id or its mirror, whichever sorts first).
  */
-function fightPosition(arrival: Record<string, string>, blue: string[], red: string[]): string {
+export function fightPosition(data: GameData, arrival: Record<string, string>, blue: string[], red: string[]): string {
   const ids = blue.length < red.length ? blue : red.length < blue.length ? red : [...blue, ...red];
   const count = new Map<string, number>();
   for (const id of ids) count.set(arrival[id]!, (count.get(arrival[id]!) ?? 0) + 1);
-  return [...count].sort((a, b) => b[1] - a[1] || byId(a[0], b[0]))[0]![0];
+  const most = Math.max(...count.values());
+  const tied = [...count].filter(([, n]) => n === most).map(([p]) => p);
+  const lane = data.graph.positions[tied[0]!]!.lane;
+  if (lane) {
+    const mid = `${lane}-lane`;
+    const toMid = (p: string): number => data.graph.distance(p, mid);
+    const nearest = Math.min(...tied.map(toMid));
+    const best = tied.filter((p) => toMid(p) === nearest);
+    return best.length === 1 ? best[0]! : mid;
+  }
+  const key = (p: string): string => (p < mirrorId(p) ? p : mirrorId(p));
+  return tied.sort((a, b) => byId(key(a), key(b)))[0]!;
 }
 
 type Zone = { id: string; position: string; positions: string[]; blue: string[]; red: string[] };
@@ -121,12 +135,15 @@ function laneContact(state: GameState, data: GameData, orders: Orders, arrival: 
   return build(kind, zone, null, onOwnTower ? { [smaller]: 'farm' } : {});
 }
 
-/** Whether the river's pit objective is up (or spawns by this round's end) or its Scuttle is: else nothing to continue. */
-function riverHasObjective(state: GameState, data: GameData, zone: string): boolean {
+/**
+ * Whether `side` knows of something to take in the river: its pit objective up (or spawning by this round's end; pits
+ * are public), or its Scuttle up by this round's end as `side` last saw it. Else no objective to keep on.
+ */
+function riverHasObjective(state: GameState, data: GameData, zone: string, side: Side): boolean {
   const end = roundWindow(data.rules, state.round).end;
   const [pitId, scuttleId] = zone === 'river-top' ? (['baron-pit', 'scuttle-top'] as const) : (['dragon-pit', 'scuttle-bot'] as const);
   const pit = state.pits[pitId];
-  return pit.objective !== null || (pit.nextSpawn !== null && pit.nextSpawn <= end) || state.scuttles[scuttleId] <= end;
+  return pit.objective !== null || (pit.nextSpawn !== null && pit.nextSpawn <= end) || state.scuttlesSeen[side][scuttleId] <= end;
 }
 
 /**
@@ -160,13 +177,13 @@ export function detectContacts(state: GameState, data: GameData, orders: Orders)
     blue.sort();
     red.sort();
     const positions = [...new Set([...blue, ...red].map((c) => arrival[c]!))].sort();
-    const zone: Zone = { id, position: fightPosition(arrival, blue, red), positions, blue, red };
+    const zone: Zone = { id, position: fightPosition(data, arrival, blue, red), positions, blue, red };
     const p = data.graph.positions[zone.position]!;
     if (p.lane) {
       out.push(laneContact(state, data, orders, arrival, zone));
     } else if (id.startsWith('river-')) {
       const extra: Partial<Record<Side, Choice>> = {};
-      if (riverHasObjective(state, data, id)) for (const s of SIDES) if (zone[s].some(acts)) extra[s] = 'objective';
+      for (const s of SIDES) if (riverHasObjective(state, data, id, s) && zone[s].some(acts)) extra[s] = 'objective';
       out.push(build('objective', zone, null, extra));
     } else if (p.kind === 'camp' && p.side) {
       out.push(build('invade', zone, other(p.side)));

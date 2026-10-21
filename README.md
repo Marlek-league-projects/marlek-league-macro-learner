@@ -84,7 +84,7 @@ Bases are never contacts.
 | Both sides in a river | Objective | Smaller side flees, otherwise fight. See *Neutral objectives*. |
 | An enemy camp | Invade | The invader can only fight |
 
-**Where the fight happens.** On the position of the smaller side (the one with most of its champions if they are spread), or with even numbers on the zone position holding the most champions; remaining ties go to the lowest position id. In a lane, when nobody flees, every champion of the contact is moved onto that position, and a standing tower there counts for its defenders. Being moved there neither gives nor takes an action: a champion acts there only if it had a step left on arrival. *(design call)* Automatic lane trades and river contacts move nobody: in a river, each champion stays on the pit or the Scuttle it arrived on.
+**Where the fight happens.** On the position of the smaller side (the one with most of its champions if they are spread), or with even numbers on the zone position holding the most champions; remaining ties never favour a side: in a lane, the tied position closest to the lane middle wins, and the lane middle itself when two are as close (one champion on each T1 fights in the middle, with no tower); in a river, the pit wins over the Scuttle. In a lane, when nobody flees, every champion of the contact is moved onto that position, and a standing tower there counts for its defenders. Being moved there neither gives nor takes an action: a champion acts there only if it had a step left on arrival. The same holds when a tied fight sends it back. *(design call)* Automatic lane trades and river contacts move nobody: in a river, each champion stays on the pit or the Scuttle it arrived on.
 
 **Staying under your tower.** In a lane, a smaller side whose champions all stand on their own standing tower may also choose **farm**: it stays and farms at `economy.pressureFarmShare` (half) of a normal round. If the bigger side fights, each of them loses `fight.pressureHpLoss` (10) HP, and they die only if the bigger side wins by more than `aiTuning.allInMargin`.
 
@@ -130,7 +130,7 @@ Game stages for matchups, skirmish and teamfight: *really early, early, mid, mid
 
 - **The side with the higher score wins.** The **score gap** sets how many champions die on the losing side (`fight.deathGap` per death, data): a small gap can kill nobody, a large one kills everyone. The most wounded die first. Every losing survivor loses HP. Winners gain gold and XP for each kill. Losers who survive a fight retreat (like a flee), leaving the spot to the winners.
 - **Ganks and lane position.** A ganked laner's position on its wave matters: pushed toward the enemy tower it is exposed (bonus to the gankers), in the middle it is neutral, under its own tower it is protected (the tower already helps the defenders). A gank that kills nobody still costs the ganked champions HP.
-- **On an exact tie**, nobody dies and both sides go back to their previous position.
+- **On an exact tie**, nobody dies and both sides go back to their previous position. A champion who arrived there on its last step does not act back there either.
 
 **HP is visible.** Every HP loss shows in the log (yours, and the enemies you see after the round). A champion who lost HP this round does not regenerate at its end.
 
@@ -161,7 +161,7 @@ Game stages for matchups, skirmish and teamfight: *really early, early, mid, mid
 
 | Objective | Reward |
 |---|---|
-| **Scuttle Crab** | Gold for the champion who takes it, plus a **Scuttle ward** on the Scuttle's own position, which also sees the nearby pit (Dragon for the bottom Scuttle, Baron for the top one). It lasts like a normal ward, never counts toward the 3-ward limit, and replaces only your previous Scuttle ward on that Scuttle. |
+| **Scuttle Crab** | Gold for the champion who takes it, plus a **Scuttle ward** on the Scuttle's own position, which also sees the nearby pit (Dragon for the bottom Scuttle, Baron for the top one). It already gives vision at the end of the round the Scuttle is taken (a normal ward only from the next round), then lasts like a normal ward, never counts toward the 3-ward limit, and replaces only your previous Scuttle ward on that Scuttle. |
 | **Dragon** | Lead for the whole team |
 | **Voidgrubs** | Tower damage ×1.5 for the team, for the rest of the game |
 | **Herald** | Picked up by the champion who takes it, then launched on a tower in a later round to remove 3 HP |
@@ -175,7 +175,7 @@ Tower damage bonuses stack: Voidgrubs plus Baron gives ×3. The Herald launch is
 - Voidgrubs, Herald and Baron follow their real spawn timers from the current patch, stored in data. They share the Baron pit, each one replacing the previous.
 - There is no Dragon Soul bonus. Each Dragon simply adds team lead.
 - **The river is one grouped fight.** A champion with a step left on a pit starts or continues its objective. When the pit objective is taken, the river's Scuttle is taken in the same round if it is up, shared by the same champions. A champion on the Scuttle takes only the Scuttle and never starts the pit objective. Any enemy anywhere in the river contests both.
-- **A contested river** offers each side **fight**, **flee**, and **keep taking the objective** (only to a side with a champion acting on the pit or the Scuttle):
+- **A contested river** offers each side **fight**, **flee**, and **keep taking the objective** (only to a side with a champion acting on the pit or the Scuttle, and only when that side knows of something to take: the pit objective is up or spawns this round, or the Scuttle is up as that side last saw it):
   - *objective* against *flee*: the objective (and the Scuttle) proceeds;
   - *objective* against *fight*: a fight where the objective side's score is multiplied by `fight.objectiveFocus` (0.8); if it still wins, it takes the objective this round as well as the kills;
   - *objective* against *objective*: a race. The higher fight score keeps taking it and the other side leaves; nobody dies or loses HP. On a tie, both stay and nobody takes it.
@@ -194,7 +194,7 @@ Each champion has a **lead gauge** made of two parts:
 
 **End-of-game verdict** *(design call)*: each team scores its gold (including the value of items) plus fixed values for each objective and each tower plate or tower. The values live in data. The higher score wins.
 
-**Health.** Every champion has **100 HP**. A lost trade costs HP, the winner loses a little; a champion regains some HP every round; a recall or a respawn restores full HP. A wounded champion weighs less in fights. Values live in data.
+**Health.** Every champion has **100 HP**. A lost trade costs HP, the winner loses a little; a champion regains some HP every round, except a round in which it lost HP; a recall or a respawn restores full HP. A wounded champion weighs less in fights. Values live in data.
 
 **Death.** A champion who dies also spends its unspent gold on items, as on a recall.
 
@@ -204,7 +204,7 @@ Recalling is how you **cash in** your advantage. A champion sitting on a lot of 
 
 The map positions form a graph, and a move is a walk of a few steps on it. Starting values:
 
-- **Step budget**: every champion, laner or jungler, has the same number of steps per round, set by the round's length: 2 steps in 20 s rounds, 3 in 40 s rounds, 4 in 1 min rounds (`rules.moves.budgetBySeconds`; cap the 1 min value at 3 if it feels too mobile).
+- **Step budget**: every champion, laner or jungler, has the same number of steps per round, set by the round's length: 2 steps in 20 s rounds, 3 in 40 s rounds, 4 in 1 min rounds (`rules.moves.budgetBySeconds`).
 - **An action costs a step**: clearing a camp, taking a Scuttle, starting or continuing a pit objective, farming your lane's wave, and recalling all need a step left once you arrive. Staying where you are always leaves one.
 - **Arrival only**: a position reached on the last step of the budget is reached, but nothing is done there that round. The champion still fights or flees there, and acts the next round by staying. For example, with 2 steps, a jungler going Gromp → Wolves arrives without clearing Wolves, and a laner arriving in its lane on its last step gets no farm that round.
 - **Changing lane ends the move**: going from one lane to another (mid T1 → top or bot T1) is 1 step, and the champion stops there for the round.
@@ -262,7 +262,7 @@ Vision is revealed when the round resolves, so you use what you saw this round t
 - **Actions** (a small panel next to the selected token, opened on the side where it hides the fewest positions, and **draggable** by its title; it keeps its position between rounds): the selected token's options, including a laner's stance. Place a ward or clear one, each on the starting or arrival position. Recall, in place or after a step that leaves a step of the budget for it ("Déplacement puis recall"). The panel shows the round's range ("Portée : N pas, une action coûte un pas").
 - **Objective prompt**: at the start of the order phase, each of your champions standing on a pit whose objective is up or being taken gets a prompt docked on the map: "Faire le Dragon" (plus " + Carapateur" when the river's Scuttle is up), which gives a stay order, or "Autre ordre", which selects the token. It shows once per champion and round.
 - **Round summary** (below the map): current phase, round and game time, next objective spawn, the list of this round's orders, the **Confirm round** button, and teaching-mode explanations after the round resolves.
-- **Contact prompts**: when a contact needs an answer during resolution, the choices appear in an overlay docked on the map, next to the contacts. Each prompt is titled by its zone ("Lane top", "Rivière haut (Carapateur + Nashor)", or the camp's name), lists the zone positions involved, and rings each of them on the map. The choices are Combattre (All-in on an even lane contact), Fuir, "Farmer sous la tour" (plain "Farmer" on an even lane contact) and, on a contested river, "Continuer l'objectif". Only a side that picks "Continuer l'objectif" progresses the pit's objective, and a recalling champion is never offered it.
+- **Contact prompts**: when a contact needs an answer during resolution, the choices appear in an overlay docked on the map, next to the contacts. Each prompt is titled by its zone ("Lane top", "Rivière haut (Carapateur + Nashor)", or the camp's name), lists the zone positions involved, and rings each of them on the map. The choices are Combattre (All-in on an even lane contact), Fuir, "Farmer sous la tour" (plain "Farmer" on an even lane contact) and, on a contested river, "Continuer l'objectif". Only a side that picks "Continuer l'objectif" progresses the pit's objective, and a recalling champion is never offered it. When offered, "Continuer l'objectif" is preselected; otherwise the contact's default is.
 - **After a round resolves**, the banner button becomes **Round suivant**, next to **Revoir le tour**.
 - **Ward markers**: an eye icon on every position where your team has a ward, with the rounds it has left (from the engine's ward timing) and its expiry round in the tooltip. The Scuttle's ward sits on the dead Scuttle, with the tooltip "Ward du Carapateur".
 - **Round replay**: after a round resolves, a short animation (about 2 s, with replay and skip buttons) plays it on the map: visible tokens slide to their destination along their route, fights flash, deaths and taken objectives appear. A recalling token shows the recall icon and fades out at the end, after its step if it had one. When a ward spots an enemy, its eye pulses and a dashed ghost of the enemy flashes there, without revealing anything the ward didn't see. Only what you saw is shown.
@@ -334,7 +334,7 @@ All values that are scored from 0–10 or -5 to +5 come as five numbers, one per
 | `tags` | `[Fighter, Assassin]` | Class, used in teaching-mode explanations |
 | `skirmish` | `[8, 8, 7, 5, 4]` | Skirmish strength per stage, 0–10 |
 | `teamfight` | `[4, 5, 6, 5, 4]` | Teamfight strength per stage, 0–10 |
-| `clearSpeed` | `7` | Junglers only: how fast they clear camps, 0–10 |
+| `clearSpeed` | `7` | Unused, reserved: junglers clear one camp per round |
 | `waveclear` | `3` | How well they push a wave, used as a tie-breaker, 0–10 |
 
 **`matchup`** (top, jungle, mid)

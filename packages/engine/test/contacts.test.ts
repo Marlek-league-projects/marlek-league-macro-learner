@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { loadGameData } from '@lml/data';
+import { loadGameData, mirrorId } from '@lml/data';
 import { defaultOrders, detectContacts, fightScore, newGame, resolveChoice, resolveRound } from '@lml/engine';
 import type { ChampionState, GameState, Order, Orders } from '@lml/engine/contracts';
 
@@ -12,6 +12,12 @@ function setup(place: Array<[string, string, string]>): GameState {
   for (const [side, role, pos] of place) get(s, side, role).position = pos;
   return s;
 }
+/** The bot Scuttle is up, and both sides saw it. */
+const scuttleBotUp = (s: GameState): void => {
+  s.scuttles['scuttle-bot'] = 0;
+  s.scuttlesSeen.blue['scuttle-bot'] = 0;
+  s.scuttlesSeen.red['scuttle-bot'] = 0;
+};
 const stay = (s: GameState, over: Order[] = []): Orders => {
   const f = (side: 'blue' | 'red'): Order[] =>
     defaultOrders(s, d, side).map((o) => over.find((x) => x.champion === o.champion) ?? o);
@@ -82,6 +88,32 @@ describe('detectContacts', () => {
   });
 });
 
+describe('fight position', () => {
+  const at = (blue: string, red: string, role: 'mid' | 'jungle'): string => {
+    const s = setup([['blue', role, blue], ['red', role, red]]);
+    const [b, r] = [get(s, 'blue', role).id, get(s, 'red', role).id];
+    const o = stay(s, [{ kind: 'move', champion: b, to: blue }, { kind: 'move', champion: r, to: red }]);
+    return detectContacts(s, d, o).find((c) => c.blue.includes(b))!.position;
+  };
+
+  test('opposite T1s resolve at the lane middle, not at the blue tower', () => {
+    expect(at('mid-t1-blue', 'mid-t1-red', 'mid')).toBe('mid-lane');
+    expect(at('mid-t1-red', 'mid-t1-blue', 'mid')).toBe('mid-lane');
+  });
+
+  test('an even tie is side-neutral: the mirrored contact resolves at the mirrored position', () => {
+    const lane = d.graph.lanePositions('mid');
+    for (const b of lane) {
+      for (const r of lane) {
+        expect(at(mirrorId(r), mirrorId(b), 'mid')).toBe(mirrorId(at(b, r, 'mid')));
+      }
+    }
+    for (const [b, r] of [['scuttle-top', 'baron-pit'], ['baron-pit', 'scuttle-top']] as const) {
+      expect(at(mirrorId(r), mirrorId(b), 'jungle')).toBe(mirrorId(at(b, r, 'jungle')));
+    }
+  });
+});
+
 describe('zone contacts', () => {
   test('playtest: an enemy laner alone on my T1 against my laner and my jungler in the lane is a prompted gank on my tower', () => {
     const s = setup([['red', 'top', 'top-t1-blue'], ['blue', 'top', 'top-lane'], ['blue', 'jungle', 'scuttle-top']]);
@@ -132,7 +164,7 @@ describe('zone contacts', () => {
 
   test('blue on scuttle-bot and red on dragon-pit is one river-bot contact; acting sides may keep taking the objective', () => {
     const s = setup([['blue', 'jungle', 'krugs-blue'], ['red', 'jungle', 'bluebuff-red']]);
-    s.scuttles['scuttle-bot'] = 0;
+    scuttleBotUp(s);
     const bj = get(s, 'blue', 'jungle').id;
     const rj = get(s, 'red', 'jungle').id;
     const o = stay(s, [{ kind: 'move', champion: bj, to: 'scuttle-bot' }, { kind: 'move', champion: rj, to: 'dragon-pit' }]);
@@ -144,7 +176,7 @@ describe('zone contacts', () => {
 
   test('an arrival-only champion on the pit cannot choose objective, and still fights', () => {
     const s = setup([['blue', 'jungle', 'krugs-blue'], ['red', 'jungle', 'scuttle-bot']]);
-    s.scuttles['scuttle-bot'] = 0;
+    scuttleBotUp(s);
     const bj = get(s, 'blue', 'jungle').id;
     const o = stay(s, [{ kind: 'move', champion: bj, to: 'dragon-pit' }]);
     const c = detectContacts(s, d, o).find((x) => x.id === 'river-bot')!;
@@ -178,7 +210,7 @@ describe('resolveChoice', () => {
 
 test('a recalling champion on the pit cannot choose objective', () => {
   const s = setup([['blue', 'jungle', 'dragon-pit'], ['red', 'jungle', 'bluebuff-red']]);
-  s.scuttles['scuttle-bot'] = 0;
+  scuttleBotUp(s);
   const bj = get(s, 'blue', 'jungle').id;
   const rj = get(s, 'red', 'jungle').id;
   const o = stay(s, [{ kind: 'recall', champion: bj }, { kind: 'move', champion: rj, to: 'dragon-pit' }]);
@@ -188,16 +220,25 @@ test('a recalling champion on the pit cannot choose objective', () => {
 });
 
 describe('river objective option', () => {
-  const river = (scuttleUp: boolean) => {
+  /** Scuttle respawn times: the real one, then as blue and red last saw it (0: up, Infinity: taken). */
+  const river = (actual: number, blue = actual, red = actual) => {
     const s = setup([['blue', 'jungle', 'dragon-pit'], ['red', 'jungle', 'dragon-pit']]);
     s.round = 10;
-    s.scuttles['scuttle-bot'] = scuttleUp ? 0 : Infinity;
+    s.scuttles['scuttle-bot'] = actual;
+    s.scuttlesSeen.blue['scuttle-bot'] = blue;
+    s.scuttlesSeen.red['scuttle-bot'] = red;
     return detectContacts(s, d, stay(s)).find((x) => x.id === 'river-bot')!;
   };
   test('nothing to take: no objective option', () => {
-    expect(river(false).options.blue).toEqual(['fight', 'flee']);
+    expect(river(Infinity).options.blue).toEqual(['fight', 'flee']);
   });
   test('Scuttle up: objective option', () => {
-    expect(river(true).options.blue).toContain('objective');
+    expect(river(0).options.blue).toContain('objective');
+  });
+  test('the option follows what each side saw of the Scuttle, never the hidden truth', () => {
+    // Red took it unseen by blue: blue still believes it is up; red knows it is gone.
+    expect(river(Infinity, 0, Infinity).options).toEqual({ blue: ['fight', 'flee', 'objective'], red: ['fight', 'flee'] });
+    // Up again, but only blue saw it respawn.
+    expect(river(0, 0, Infinity).options).toEqual({ blue: ['fight', 'flee', 'objective'], red: ['fight', 'flee'] });
   });
 });

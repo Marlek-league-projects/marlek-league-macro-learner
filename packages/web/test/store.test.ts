@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
 import { createEngine } from '@lml/engine';
-import { createStore } from '../src/store';
+import type { Choice, Contact } from '@lml/engine/contracts';
+import { createStore, playerDefault } from '../src/store';
 
 const data = loadGameData();
 const engine = createEngine();
@@ -333,7 +334,8 @@ describe('store', () => {
     const store = started();
     const j = blue(store, 'jungle');
     const s = blue(store, 'support');
-    store.doObjective(j.id);
+    const { doObjective } = store; // works unbound, e.g. passed as a callback
+    doObjective(j.id);
     expect(store.pending.value[j.id]).toMatchObject({ kind: 'move', champion: j.id, to: j.position });
     store.otherOrder(s.id);
     expect(store.selected.value).toBe(s.id);
@@ -342,6 +344,15 @@ describe('store', () => {
     store.confirmContacts();
     store.next();
     expect(store.objectivePromptsClosed.value).toEqual([]);
+  });
+
+  test('a contact offering the objective preselects it; otherwise the contact default', () => {
+    const contact = (blue: Choice[]): Contact => ({
+      id: 'river-bot', kind: 'objective', position: 'dragon-pit', positions: ['dragon-pit'], blue: [], red: [],
+      options: { blue, red: ['fight', 'flee'] }, defaults: { blue: 'flee', red: 'fight' }, invader: null, auto: false,
+    });
+    expect(playerDefault(contact(['fight', 'flee', 'objective']))).toBe('objective');
+    expect(playerDefault(contact(['fight', 'flee']))).toBe('flee');
   });
 
   test('round 1 budget: the engine decides who can act on arrival', () => {

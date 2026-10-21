@@ -179,6 +179,32 @@ describe('resolveRound', () => {
     expect([after(rj.id).position, after(rj.id).status]).toEqual(['scuttle-bot', 'alive']);
   });
 
+  test('a tied fight sends an arrival-only champion back without an action; a champion who stayed still acts', () => {
+    const s = setup(7, [
+      ['blue', 'jungle', 'gromp-blue'],
+      ['red', 'jungle', 'raptors-red'],
+    ]);
+    const bj = get(s, 'blue', 'jungle');
+    const rj = get(s, 'red', 'jungle');
+    const stage = roundWindow(d.rules, 7).stage;
+    const { scores } = resolveFight(s, d, 'raptors-red', [bj.id], [rj.id], stage);
+    const weaker = scores.blue < scores.red ? bj : rj;
+    weaker.bonusLead += (Math.abs(scores.blue - scores.red) * 1000) / d.rules.fight.lead;
+    expect(resolveFight(s, d, 'raptors-red', [bj.id], [rj.id], stage).winner).toBeNull();
+
+    // gromp-blue to raptors-red takes the whole budget: no step left to act on arrival.
+    const o = ordersWith(s, [
+      { kind: 'move', champion: bj.id, to: 'raptors-red' },
+      { kind: 'move', champion: rj.id, to: 'raptors-red' },
+    ]);
+    const { state, events } = resolveRound(s, d, o, {});
+    expect(events.find((e) => e.type === 'fight')).toMatchObject({ position: 'raptors-red', winner: null });
+    expect(state.champions.find((c) => c.id === bj.id)!.position).toBe('gromp-blue');
+    expect(events.some((e) => e.type === 'campCleared' && e.champion === bj.id)).toBe(false);
+    expect(events).toContainEqual(expect.objectContaining({ type: 'campCleared', camp: 'raptors-red', champion: rj.id }));
+    expect(events).toContainEqual(expect.objectContaining({ type: 'moved', champion: bj.id, acted: false }));
+  });
+
   test('a Herald carrier who recalls keeps the Herald and can launch it after respawning', () => {
     const s = setup(26, [['blue', 'top', 'top-t1-blue']]);
     const bt = get(s, 'blue', 'top');

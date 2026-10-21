@@ -1,7 +1,7 @@
-import { MISTAKE_IDS } from '@lml/data';
+import { MISTAKE_IDS, mirrorId } from '@lml/data';
 import type { AiProfile, GameData, Lane, MistakeId, ObjectiveId, Role, Side } from '@lml/data/contracts';
 import type { ChampionState, Choice, Contact, EnemyInfo, GameState, Order, PlayerView, Rng, Stance } from '../contracts';
-import { gankedSide } from '../contacts';
+import { fightPosition, gankedSide } from '../contacts';
 import { resolveFight } from '../fight';
 import { canAct, reachableFrom, spawnPointsFor, stepBudget } from '../movement';
 import { type PitId, SCUTTLE_PIT } from '../objectives';
@@ -132,9 +132,12 @@ function routeRank(ctx: Ctx, c: ChampionState, pos: string): number {
   return p.side === ctx.side ? 2 : 3;
 }
 
+/** A position id as blue would see it: red compares mirrored ids, so both sides break ties alike. */
+const seenFromBlue = (ctx: Ctx, id: string): string => (ctx.side === 'blue' ? id : mirrorId(id));
+
 /**
  * Reachable position closest to `target` among those passing `where`, or null; ties: fewest moves, then
- * `routeRank`, then id.
+ * `routeRank`, then id seen from blue (red picks the mirror of blue's choice).
  */
 function closest(ctx: Ctx, c: ChampionState, target: string, where: (pos: string, steps: number) => boolean): string | null {
   const r = reach(ctx, c);
@@ -146,7 +149,7 @@ function closest(ctx: Ctx, c: ChampionState, target: string, where: (pos: string
           dist(ctx.data, a, target) - dist(ctx.data, b, target) ||
           r[a]! - r[b]! ||
           routeRank(ctx, c, a) - routeRank(ctx, c, b) ||
-          a.localeCompare(b),
+          seenFromBlue(ctx, a).localeCompare(seenFromBlue(ctx, b)),
       )[0] ?? null
   );
 }
@@ -567,11 +570,11 @@ function junglerThreat(ctx: Ctx, pos: string): boolean {
 }
 
 /**
- * Lane stances from the predicted fight on each laner's destination, with what `view.side` knows: its laners
- * heading into that lane against the known enemies there. All-in above `aiTuning.allInMargin`, Trade above
- * `tradeMargin`, otherwise (or with no known enemy there, when the move leaves the home lane, or on a recall) Farm.
- * A Farm with lane pressure (above `pushMargin`) and no enemy jungler threat becomes Push. Set on the
- * order only when it changes.
+ * Lane stances from the predicted fight where the lane contact would resolve (`fightPosition`), with what `view.side`
+ * knows: its laners heading into that lane against the known enemies there, where they were last seen. All-in above
+ * `aiTuning.allInMargin`, Trade above `tradeMargin`, otherwise (or with no known enemy there, when the move leaves the
+ * home lane, or on a recall) Farm. A Farm with lane pressure (above `pushMargin`) and no enemy jungler threat becomes
+ * Push. Set on the order only when it changes.
  */
 export function assignStances(ctx: Ctx, orders: Order[]): Order[] {
   const { view, data } = ctx;
@@ -593,7 +596,10 @@ export function assignStances(ctx: Ctx, orders: Order[]): Order[] {
     let stance: Stance = 'farm';
     if (enemies.length > 0) {
       const [blue, red] = ctx.side === 'blue' ? [allies, enemies] : [enemies, allies];
-      const { scores } = resolveFight(state, data, o.to, blue, red, stage);
+      const arrival: Record<string, string> = {};
+      for (const x of orders) if (allies.includes(x.champion) && x.kind === 'move') arrival[x.champion] = x.to;
+      for (const e of view.enemies) if (enemies.includes(e.id)) arrival[e.id] = e.position!;
+      const { scores } = resolveFight(state, data, fightPosition(data, arrival, blue, red), blue, red, stage);
       const margin = scores[ctx.side] - scores[ctx.enemy];
       stance = margin > allInMargin ? 'allin' : margin > tradeMargin ? 'trade' : 'farm';
       if (stance === 'farm' && margin > pushMargin && !junglerThreat(ctx, o.to)) stance = 'push';

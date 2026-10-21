@@ -114,6 +114,10 @@ export interface Store {
 /** Contacts the player answers: automatic ones (lane stances, lane pressure) resolve without a prompt. */
 export const promptContacts = (contacts: Contact[]): Contact[] => contacts.filter((c) => !c.auto);
 
+/** The player's preselected choice in a contact: keep on the objective when offered, otherwise the contact default. */
+export const playerDefault = (contact: Contact): Choice =>
+  contact.options.blue.includes('objective') ? 'objective' : contact.defaults.blue;
+
 const PLAYER: Side = 'blue';
 const ENEMY: Side = 'red';
 
@@ -188,13 +192,25 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     return def?.kind === 'move' ? { ...def } : { kind: 'move', champion: id, to: champion(id).position };
   };
 
+  /** A move order to `to`, keeping the champion's pending ward, unward, Herald launch and stance. */
+  const setMove = (id: string, to: string): void => {
+    const prev = existingMove(id);
+    const order: Order = { kind: 'move', champion: id, to };
+    if (prev?.ward !== undefined) order.ward = prev.ward;
+    if (prev?.unward !== undefined) order.unward = prev.unward;
+    if (prev?.launchHerald) order.launchHerald = true;
+    const stance = pending.value[id]?.stance;
+    if (stance !== undefined) order.stance = stance;
+    place(order);
+  };
+
   const resolve = (): void => {
     const before = current();
     const orders = roundOrders;
     if (!orders) throw new Error('no round in progress');
     const full: ContactChoices = {};
     for (const c of contacts.value) {
-      full[c.id] = { blue: choices.value[c.id]?.blue ?? c.defaults.blue, red: redChoices[c.id]?.red ?? c.defaults.red };
+      full[c.id] = { blue: choices.value[c.id]?.blue ?? playerDefault(c), red: redChoices[c.id]?.red ?? c.defaults.red };
     }
     const result = engine.resolveRound(before, data, orders, full);
     state = result.state;
@@ -301,7 +317,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     },
 
     doObjective(id) {
-      this.setMove(id, champion(id).position);
+      setMove(id, champion(id).position);
       objectivePromptsClosed.value = [...objectivePromptsClosed.value, id];
     },
 
@@ -310,16 +326,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       selected.value = id;
     },
 
-    setMove(id, to) {
-      const prev = existingMove(id);
-      const order: Order = { kind: 'move', champion: id, to };
-      if (prev?.ward !== undefined) order.ward = prev.ward;
-      if (prev?.unward !== undefined) order.unward = prev.unward;
-      if (prev?.launchHerald) order.launchHerald = true;
-      const stance = pending.value[id]?.stance;
-      if (stance !== undefined) order.stance = stance;
-      place(order);
-    },
+    setMove,
 
     setWard(id, spot) {
       const prev = pending.value[id];

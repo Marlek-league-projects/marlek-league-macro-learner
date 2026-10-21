@@ -1,5 +1,5 @@
 import type { Contact } from '@lml/engine/contracts';
-import type { Store } from '../store';
+import { playerDefault, type Store } from '../store';
 import { championImage, championName, choiceLabel, CONTACT_LABEL, positionLabel, zoneTitle } from './format';
 
 function Names({ store, ids }: { store: Store; ids: string[] }) {
@@ -15,9 +15,12 @@ function Names({ store, ids }: { store: Store; ids: string[] }) {
   );
 }
 
-/** One contact of the round: its zone and positions, who, and the player's choice (the default is preselected). */
+/**
+ * One contact of the round: its zone and positions, who, and the player's choice (preselected: keep on the objective
+ * when offered, otherwise the default).
+ */
 export function ContactPrompt({ store, contact }: { store: Store; contact: Contact }) {
-  const chosen = store.choices.value[contact.id]?.blue ?? contact.defaults.blue;
+  const chosen = store.choices.value[contact.id]?.blue ?? playerDefault(contact);
   const view = store.view.value;
   const title = view ? zoneTitle(contact, view, store.data, store.roundWindow().start) : positionLabel(store.data, contact.position);
   const where = contact.positions.map((id) => positionLabel(store.data, id)).join(', ');
