@@ -3,7 +3,7 @@ import type { ChampionState, GameState, Order, PlayerView, Stance } from './cont
 import { frontTower } from './lanes';
 
 const LANES: Lane[] = ['top', 'mid', 'bot'];
-const HOME_LANE: Record<Exclude<Role, 'jungle'>, Lane> = { top: 'top', mid: 'mid', adc: 'bot', support: 'bot' };
+export const HOME_LANE: Record<Exclude<Role, 'jungle'>, Lane> = { top: 'top', mid: 'mid', adc: 'bot', support: 'bot' };
 const STANCES: Stance[] = ['farm', 'trade', 'allin'];
 
 export function movesFor(c: ChampionState, rules: Rules): number {

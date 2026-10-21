@@ -75,6 +75,21 @@ describe('gank or lane pressure', () => {
     expect(safe.state.waves.bot).toBe(1);
   });
 
+  test('a laner returning to its own lane is not a ganker: the 2v1 stays lane pressure', () => {
+    const s = setup(10, [
+      ['blue', 'adc', 'bot-lane'],
+      ['blue', 'support', 'dragon-pit'],
+      ['red', 'adc', 'bot-lane'],
+      ['red', 'support', 'mid-lane'],
+    ]);
+    s.waves.bot = 0;
+    const back: Order = { kind: 'move', champion: get(s, 'blue', 'support').id, to: 'bot-lane' };
+    validateOrders(s, d, 'blue', ordersWith(s, [back]).blue);
+    const c = detectContacts(s, d, ordersWith(s, [back])).find((x) => x.position === 'bot-lane')!;
+    expect(c.kind).toBe('pressure');
+    expect(c.auto).toBe(true);
+  });
+
   test('a jungler arriving into the lane is a gank, prompted as before', () => {
     const s = setup(10, [
       ['blue', 'adc', 'bot-lane'],

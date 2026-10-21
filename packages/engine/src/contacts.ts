@@ -1,5 +1,6 @@
 import type { GameData, Side } from '@lml/data/contracts';
 import type { ChampionState, Choice, Contact, ContactChoices, ContactKind, GameState, Orders, Stance } from './contracts';
+import { HOME_LANE } from './movement';
 
 const SIDES: Side[] = ['blue', 'red'];
 const other = (s: Side): Side => (s === 'blue' ? 'red' : 'blue');
@@ -59,14 +60,17 @@ function buildAuto(kind: ContactKind, position: string, blue: string[], red: str
 /**
  * Contact on a lane position. Even numbers: a `trade` resolved from both stances. Uneven: a `gank` when the bigger
  * side includes a champion who arrived from outside the lane this round (or spawned), otherwise `pressure`, where
- * the smaller side can only farm and the bigger side's stance applies.
+ * the smaller side can only farm and the bigger side's stance applies. A laner coming back to its own lane is not
+ * a ganker.
  */
 function laneContact(state: GameState, data: GameData, orders: Orders, position: string, blue: string[], red: string[]): Contact {
   const choice = { blue: stanceChoice(state, orders, blue), red: stanceChoice(state, orders, red) };
   if (blue.length === red.length) return buildAuto('trade', position, blue, red, choice);
   const bigger: Side = blue.length > red.length ? 'blue' : 'red';
   const lane = data.graph.positions[position]!.lane;
-  const arrived = (c: ChampionState): boolean => c.status !== 'alive' || data.graph.positions[c.position]?.lane !== lane;
+  const arrived = (c: ChampionState): boolean =>
+    (c.role === 'jungle' || HOME_LANE[c.role] !== lane) &&
+    (c.status !== 'alive' || data.graph.positions[c.position]?.lane !== lane);
   const ids = bigger === 'blue' ? blue : red;
   if (ids.some((id) => arrived(state.champions.find((c) => c.id === id)!))) {
     return build('gank', position, blue, red, null);
