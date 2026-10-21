@@ -50,6 +50,14 @@ test('validateRules rejects a round length with no step budget', () => {
   expect(() => validateRules(r)).toThrow(/rules\.moves.*40s/);
 });
 
+test('validateRules rejects a ward duration that is not a positive integer', () => {
+  const r = structuredClone(data.rules);
+  r.wards.duration = 0;
+  expect(() => validateRules(r)).toThrow(/rules\.wards.*duration/);
+  r.wards.duration = 1.5;
+  expect(() => validateRules(r)).toThrow(/rules\.wards.*duration/);
+});
+
 test('validateRules rejects a pressureFarmShare outside 0..1', () => {
   const r = structuredClone(data.rules);
   r.economy.pressureFarmShare = 1.5;
@@ -90,6 +98,9 @@ test('validateAiTuning rejects bad tuning', () => {
   const g = structuredClone(data.aiTuning);
   delete (g as Partial<typeof g>).recallHp;
   expect(() => validateAiTuning(g)).toThrow(/aiTuning.*recallHp/);
+  const h = structuredClone(data.aiTuning);
+  h.walkPenalty = -1;
+  expect(() => validateAiTuning(h)).toThrow(/aiTuning.*walkPenalty/);
 });
 
 test('validateAiProfiles and validateTeaching reject bad data', () => {

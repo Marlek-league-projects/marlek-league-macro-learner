@@ -8,14 +8,15 @@ import {
   defaultOrders,
   detectContacts,
   newGame,
+  reachableFrom,
   resolveRound,
   roundWindow,
   stepBudget,
   validateOrders,
   viewFor,
 } from '@lml/engine';
-import type { ChampionState, ContactChoices, GameState, Order, Orders, Rng } from '@lml/engine/contracts';
-import { assignStances, makeContext, planCandidates, rollMistakes } from '../src/ai/heuristics';
+import type { ChampionState, ContactChoices, GameState, Order, Orders, PlayerView, Rng } from '@lml/engine/contracts';
+import { assignStances, makeContext, planCandidates, rollMistakes, towerAllowed } from '../src/ai/heuristics';
 
 const d = loadGameData();
 const profile = (rank: Rank): AiProfile => d.aiProfiles.find((p) => p.rank === rank)!;
@@ -38,17 +39,31 @@ function stubRng(f: (n: number) => number): Rng {
 /** Fuzz seeds per rank; 30 in the brief, kept as long as the suite stays under its time budget. */
 const SEEDS = 30;
 
-/** A full AI vs AI game at `p` for both sides; checks every round's orders against the real state. */
+/** Orders of `view.side` ending on an enemy tower `towerAllowed` forbids, as `round: champion kind from → to`. */
+function towerViolations(view: PlayerView, orders: Order[]): string[] {
+  const ctx = makeContext(view, d, false);
+  const from = (id: string): string | undefined => view.allies.find((a) => a.id === id)?.position;
+  return orders.flatMap((o) =>
+    o.to !== undefined && !towerAllowed(ctx, o.to) ? [`${view.round}: ${o.champion} ${o.kind} ${from(o.champion)} → ${o.to}`] : [],
+  );
+}
+
+/**
+ * A full AI vs AI game at `p` for both sides; checks every round's orders against the real state and the tower
+ * rule (no order ends under an enemy tower without the wave).
+ */
 function playGame(p: AiProfile, seed: number): GameState {
   let s = newGame(d, seed);
   const rng = { blue: createRng(seed), red: createRng(seed + 1000) };
   while (!s.over) {
+    const views = { blue: viewFor(s, d, 'blue'), red: viewFor(s, d, 'red') };
     const orders: Orders = {
-      blue: aiOrders(viewFor(s, d, 'blue'), d, p, rng.blue),
-      red: aiOrders(viewFor(s, d, 'red'), d, p, rng.red),
+      blue: aiOrders(views.blue, d, p, rng.blue),
+      red: aiOrders(views.red, d, p, rng.red),
     };
     validateOrders(s, d, 'blue', orders.blue);
     validateOrders(s, d, 'red', orders.red);
+    expect([...towerViolations(views.blue, orders.blue), ...towerViolations(views.red, orders.red)]).toEqual([]);
     const choices: ContactChoices = {};
     for (const c of detectContacts(s, d, orders)) {
       choices[c.id] = {
@@ -77,6 +92,19 @@ describe('aiOrders fuzz', () => {
       expect(b.winner).toBe(a.winner);
       expect(b).toEqual(a);
     });
+  }
+
+  // Every mistake forced on every champion and round, one at a time and all together: still never under an enemy
+  // tower without the wave (checked in `playGame`).
+  const forced = (ids: readonly string[]): AiProfile => {
+    const base = profile('gold');
+    const mistakes = Object.fromEntries(MISTAKE_IDS.map((id) => [id, ids.includes(id) ? 1 : 0])) as AiProfile['mistakes'];
+    return { ...base, mistakes };
+  };
+  for (const [name, ids] of [...MISTAKE_IDS.map((id) => [id, [id]] as const), ['every mistake', MISTAKE_IDS] as const]) {
+    test(`forced ${name}: AI vs AI games respect the tower rule`, () => {
+      for (let seed = 1; seed <= 5; seed++) expect(playGame(forced(ids), seed).over).toBe(true);
+    }, 20_000);
   }
 });
 
@@ -240,13 +268,17 @@ describe('aiOrders', () => {
     }
   });
 
-  test('after the enemy laner vanished next to us, with the jungler seen far away, the challenger takes the tower', () => {
-    const s = vanishedLaner(0, 'top-lane');
-    s.lastSeen.blue[get(s, 'red', 'jungle').id] = { position: 'bot-t2-red', round: 9 };
-    place(s, 'red', 'jungle', 'bot-t2-red');
-    expect(d.graph.distance('bot-t2-red', 'top-t1-red')).toBeGreaterThan(stepBudget(d.rules, s.round));
-    const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
-    expect(orderOf(orders, get(s, 'blue', 'top').id)).toMatchObject({ kind: 'move', to: 'top-t1-red' });
+  test('after the enemy laner vanished next to us, with the jungler seen far away, the challenger takes the tower only with its wave there', () => {
+    const conversion = (wave: 0 | 1): Order => {
+      const s = vanishedLaner(wave, 'top-lane');
+      s.lastSeen.blue[get(s, 'red', 'jungle').id] = { position: 'bot-t2-red', round: 9 };
+      place(s, 'red', 'jungle', 'bot-t2-red');
+      expect(d.graph.distance('bot-t2-red', 'top-t1-red')).toBeGreaterThan(stepBudget(d.rules, s.round));
+      const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
+      return orderOf(orders, get(s, 'blue', 'top').id);
+    };
+    expect(conversion(1)).toMatchObject({ kind: 'move', to: 'top-t1-red' });
+    expect(conversion(0)).not.toMatchObject({ to: 'top-t1-red' });
   });
 
   function greedScenario(): GameState {
@@ -460,15 +492,36 @@ describe('laning phase', () => {
     expect(adcRotates(s, 'iron', onlyMistake('rotateWithoutPriority'))).toBe(true);
   });
 
-  test('an iron laner with a forced pointlessPlay roll may roam', () => {
-    const s = newGame(d, 7);
-    s.round = 10;
-    place(s, 'blue', 'top', 'top-t1-blue');
-    const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('iron'), onlyMistake('pointlessPlay'));
-    validateOrders(s, d, 'blue', orders);
-    const o = orderOf(orders, get(s, 'blue', 'top').id);
-    expect(o.kind).toBe('move');
-    expect(d.graph.positions[(o as Extract<Order, { kind: 'move' }>).to]!.lane).toBeUndefined();
+  test('a forced pointlessPlay wanders only within its own camps, the river and its own lane, never under a tower without the wave', () => {
+    const wanders = new Set<string>();
+    for (const [role, from] of [['top', 'top-lane'], ['top', 'top-t1-blue'], ['jungle', 'raptors-blue'], ['jungle', 'gromp-blue']]) {
+      for (let k = 0; k < 10; k++) {
+        const s = newGame(d, 7);
+        s.round = 10;
+        s.waves.top = 0;
+        place(s, 'blue', role!, from!);
+        const c = get(s, 'blue', role!);
+        // Only the pointlessPlay roll comes up, then the pick draws k/10.
+        const pick = stubRng((n) =>
+          n < MISTAKE_IDS.length * 5 ? (n % MISTAKE_IDS.length === MISTAKE_IDS.indexOf('pointlessPlay') ? 0 : 0.99) : k / 10,
+        );
+        const view = viewFor(s, d, 'blue');
+        const orders = aiOrders(view, d, profile('iron'), pick);
+        validateOrders(s, d, 'blue', orders);
+        const o = orderOf(orders, c.id);
+        expect(o.kind).toBe('move');
+        const to = (o as Extract<Order, { kind: 'move' }>).to;
+        const p = d.graph.positions[to]!;
+        const allowed =
+          (p.kind === 'camp' && p.side === 'blue') || p.kind === 'scuttle' || p.kind === 'pit' || (role === 'top' && p.lane === 'top');
+        expect({ to, allowed }).toEqual({ to, allowed: true });
+        expect(towerAllowed(makeContext(view, d, false), to)).toBe(true);
+        wanders.add(to);
+      }
+    }
+    // It still wanders: several different spots, and never the enemy T1 (the top wave is in the middle).
+    expect(wanders.size).toBeGreaterThan(3);
+    expect(wanders.has('top-t1-red')).toBe(false);
   });
 });
 
@@ -695,5 +748,191 @@ describe('AI gank choice and lane exposure', () => {
     const neutral = threshold(0);
     expect(threshold(1)).toBeLessThan(neutral);
     expect(threshold(-1)).toBe(neutral);
+  });
+});
+
+describe('AI tower rule', () => {
+  test('towerAllowed: an enemy tower only when it is the front tower with the wave at it; own and destroyed towers are fine', () => {
+    const s = newGame(d, 7);
+    s.round = 10;
+    const ctx = (wave: -1 | 0 | 1): ReturnType<typeof makeContext> => {
+      s.waves.top = wave;
+      return makeContext(viewFor(s, d, 'blue'), d, false);
+    };
+    expect(towerAllowed(ctx(0), 'top-t1-red')).toBe(false);
+    expect(towerAllowed(ctx(-1), 'top-t1-red')).toBe(false);
+    expect(towerAllowed(ctx(1), 'top-t1-red')).toBe(true);
+    expect(towerAllowed(ctx(1), 'top-t2-red')).toBe(false); // not the front tower while the T1 stands
+    expect(towerAllowed(ctx(-1), 'top-t1-blue')).toBe(true);
+    expect(towerAllowed(ctx(0), 'top-lane')).toBe(true);
+    s.towers['top-t1-red'] = 0;
+    expect(towerAllowed(ctx(0), 'top-t1-red')).toBe(true);
+    expect(towerAllowed(ctx(0), 'top-t2-red')).toBe(false);
+    expect(towerAllowed(ctx(1), 'top-t2-red')).toBe(true);
+    // Mirrored for red.
+    s.waves.bot = -1;
+    expect(towerAllowed(makeContext(viewFor(s, d, 'red'), d, false), 'bot-t1-blue')).toBe(true);
+    s.waves.bot = 0;
+    expect(towerAllowed(makeContext(viewFor(s, d, 'red'), d, false), 'bot-t1-blue')).toBe(false);
+  });
+
+  test('the Herald waits for the wave: it is launched on the enemy front tower only with the wave there', () => {
+    const heraldOrder = (wave: 0 | 1): Order => {
+      const s = newGame(d, 7);
+      s.round = 30;
+      s.waves.top = wave;
+      place(s, 'blue', 'top', 'top-lane');
+      const top = get(s, 'blue', 'top');
+      top.hasHerald = true;
+      const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('gold'), stubRng(() => 0.99));
+      validateOrders(s, d, 'blue', orders);
+      return orderOf(orders, top.id);
+    };
+    expect(heraldOrder(1)).toMatchObject({ kind: 'move', to: 'top-t1-red', launchHerald: true });
+    const waiting = heraldOrder(0);
+    expect(waiting).not.toMatchObject({ to: 'top-t1-red' });
+    expect(waiting).not.toMatchObject({ launchHerald: true });
+  });
+});
+
+describe('AI range-aware targets', () => {
+  /** Blue jungler on `from` in round 10 (step budget 2); only `up` own camps are up. */
+  function jungler(from: string, up: string[]): { s: GameState; id: string } {
+    const s = newGame(d, 7);
+    s.round = 10;
+    s.pits['dragon-pit'].nextSpawn = 900;
+    s.pits['baron-pit'].nextSpawn = 900;
+    s.scuttles = { 'scuttle-top': 900, 'scuttle-bot': 900 };
+    s.scuttlesSeen = { blue: { ...s.scuttles }, red: { ...s.scuttles } };
+    for (const id of Object.keys(s.camps)) s.camps[id] = up.includes(id) ? 0 : 900;
+    s.campsSeen.blue = { ...s.camps };
+    s.campsSeen.red = { ...s.camps };
+    place(s, 'blue', 'jungle', from);
+    return { s, id: get(s, 'blue', 'jungle').id };
+  }
+  const candidates = (s: GameState, id: string) => {
+    const view = viewFor(s, d, 'blue');
+    const none = new Map(view.allies.map((a) => [a.id, new Set<(typeof MISTAKE_IDS)[number]>()]));
+    const ctx = makeContext(view, d, false);
+    return planCandidates(ctx, none, stubRng(() => 0.99))[view.allies.findIndex((a) => a.id === id)]!;
+  };
+
+  test('a camp 2 steps away at budget 2 is not a clear: it scores as a walk (walkPenalty), and a camp in action range wins', () => {
+    expect(stepBudget(d.rules, 10)).toBe(2);
+    const from = 'gromp-blue';
+    const r = reachableFrom(d, from, 2, 'blue');
+    const far = Object.keys(r).find((p) => r[p] === 2 && d.graph.positions[p]!.kind === 'camp' && d.graph.positions[p]!.side === 'blue')!;
+    const near = Object.keys(r).find((p) => r[p] === 1 && d.graph.positions[p]!.kind === 'camp' && d.graph.positions[p]!.side === 'blue')!;
+    expect([far, near].every(Boolean)).toBe(true);
+
+    const alone = jungler(from, [far]);
+    const walk = candidates(alone.s, alone.id).find((c) => c.order.kind === 'move' && c.order.to === far)!;
+    const prio = /buff-/.test(far) ? d.aiTuning.priorities.buff : d.aiTuning.priorities.camp;
+    expect(walk.score).toBe(prio - d.aiTuning.walkPenalty);
+
+    // Make the far camp a buff-level target: the camp in action range still comes first.
+    const both = jungler(from, [far, near]);
+    const tuned = { ...d, aiTuning: { ...d.aiTuning, priorities: { ...d.aiTuning.priorities, buff: d.aiTuning.priorities.camp + 1 } } };
+    const view = viewFor(both.s, tuned, 'blue');
+    const best = orderOf(aiOrders(view, tuned, profile('gold'), stubRng(() => 0.99)), both.id);
+    expect(best).toMatchObject({ kind: 'move', to: near });
+  });
+
+  test('a laner farms where it still acts: from its T1 with the wave pushed it stops on the lane middle, not 2 steps away', () => {
+    const s = newGame(d, 7);
+    s.round = 10;
+    s.waves.top = 1;
+    s.pits['baron-pit'].nextSpawn = 900;
+    place(s, 'blue', 'top', 'top-t2-blue');
+    // T2 → lane middle is 2 steps: arrival only, so the top stops on its T1 (1 step) and farms.
+    expect(reachableFrom(d, 'top-t2-blue', 2, 'blue')['top-lane']).toBe(2);
+    const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('gold'), stubRng(() => 0.99));
+    expect(orderOf(orders, get(s, 'blue', 'top').id)).toMatchObject({ kind: 'move', to: 'top-t1-blue' });
+  });
+});
+
+describe('AI contact choices', () => {
+  const noChase = stubRng(() => 0.999);
+  /** Lone red adc on its own T1 against the blue duo arriving on the lane middle (a pressure, no ganker). */
+  function underTower(): { s: GameState; orders: Orders } {
+    const s = newGame(d, 7);
+    s.round = 10;
+    s.waves.bot = 1;
+    place(s, 'blue', 'adc', 'bot-lane');
+    place(s, 'blue', 'support', 'bot-lane');
+    place(s, 'red', 'adc', 'bot-t1-red');
+    place(s, 'red', 'support', 'raptors-red');
+    const over: Order[] = ['adc', 'support'].map((r) => ({ kind: 'move', champion: get(s, 'blue', r).id, to: 'bot-lane' }));
+    const f = (side: 'blue' | 'red'): Order[] => defaultOrders(s, d, side).map((o) => over.find((x) => x.champion === o.champion) ?? o);
+    return { s, orders: { blue: f('blue'), red: f('red') } };
+  }
+
+  test('outnumbered under its own tower with no ganker, the AI farms; when that fight would kill it, it flees', () => {
+    const { s, orders } = underTower();
+    const c = detectContacts(s, d, orders).find((x) => x.id === 'lane-bot')!;
+    expect(c.kind).toBe('pressure');
+    expect(c.options.red).toContain('farm');
+    const loose = { ...d, aiTuning: { ...d.aiTuning, allInMargin: 1_000_000 } };
+    expect(aiContactChoice(viewFor(s, loose, 'red'), loose, c, profile('challenger'), noChase)).toBe('farm');
+    const strict = { ...d, aiTuning: { ...d.aiTuning, allInMargin: 0 } };
+    expect(aiContactChoice(viewFor(s, strict, 'red'), strict, c, profile('challenger'), noChase)).toBe('flee');
+  });
+
+  test('a gank it would lose is fled, even on its own tower', () => {
+    const { s, orders } = underTower();
+    place(s, 'blue', 'jungle', 'raptors-red');
+    const bj = get(s, 'blue', 'jungle').id;
+    orders.blue = orders.blue.map((o) => (o.champion === bj ? { kind: 'move', champion: bj, to: 'bot-lane' } : o));
+    const loose = { ...d, aiTuning: { ...d.aiTuning, allInMargin: 1_000_000 } };
+    const c = detectContacts(s, loose, orders).find((x) => x.id === 'lane-bot')!;
+    expect(c.kind).toBe('gank');
+    expect(c.options.red).toContain('farm');
+    expect(aiContactChoice(viewFor(s, loose, 'red'), loose, c, profile('challenger'), noChase)).toBe('flee');
+  });
+
+  /** Round 11, Dragon up and held by the blue jungler since round 10; the red jungler arrives on the Scuttle. */
+  function river(lead: number): { s: GameState; orders: Orders } {
+    const s = newGame(d, 7);
+    s.round = 11;
+    place(s, 'blue', 'jungle', 'dragon-pit');
+    place(s, 'red', 'jungle', 'bluebuff-red');
+    s.pits['dragon-pit'] = { objective: 'dragon', nextSpawn: null, capture: { side: 'blue', startedRound: 10 } };
+    const bj = get(s, 'blue', 'jungle');
+    bj.bonusLead += lead;
+    const rj = get(s, 'red', 'jungle').id;
+    s.lastSeen.blue[rj] = { position: 'bluebuff-red', round: 10 };
+    const over: Order[] = [
+      { kind: 'move', champion: bj.id, to: 'dragon-pit' },
+      { kind: 'move', champion: rj, to: 'scuttle-bot' },
+    ];
+    const f = (side: 'blue' | 'red'): Order[] => defaultOrders(s, d, side).map((o) => over.find((x) => x.champion === o.champion) ?? o);
+    return { s, orders: { blue: f('blue'), red: f('red') } };
+  }
+  const blueChoice = (lead: number, objectiveFocus = d.rules.fight.objectiveFocus) => {
+    const tuned = { ...d, rules: { ...d.rules, fight: { ...d.rules.fight, objectiveFocus } } };
+    const { s, orders } = river(lead);
+    const c = detectContacts(s, tuned, orders).find((x) => x.id === 'river-bot')!;
+    expect(c.options.blue).toContain('objective');
+    return aiContactChoice(viewFor(s, tuned, 'blue'), tuned, c, profile('challenger'), noChase);
+  };
+
+  test('on a contested river the AI keeps taking the objective when its score × objectiveFocus still wins', () => {
+    expect(blueChoice(100_000)).toBe('objective');
+    // Blue wins the plain fight (8.66 to 8.2 here) but not at half its strength: it fights instead.
+    expect(blueChoice(0, 1)).toBe('objective');
+    expect(blueChoice(0, 0.5)).toBe('fight');
+    // Losing anyway: it flees.
+    expect(blueChoice(-100_000)).toBe('flee');
+  });
+
+  test('on a river with nothing up, the AI does not choose objective', () => {
+    const tuned = d;
+    const { s, orders } = river(100_000);
+    s.pits['dragon-pit'] = { objective: null, nextSpawn: 900, capture: null };
+    s.scuttles = { 'scuttle-top': 900, 'scuttle-bot': 900 };
+    s.scuttlesSeen = { blue: { ...s.scuttles }, red: { ...s.scuttles } };
+    const c = detectContacts(s, tuned, orders).find((x) => x.id === 'river-bot')!;
+    expect(c.options.blue).toContain('objective');
+    expect(aiContactChoice(viewFor(s, tuned, 'blue'), tuned, c, profile('challenger'), noChase)).toBe('fight');
   });
 });

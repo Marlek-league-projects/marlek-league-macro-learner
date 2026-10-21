@@ -28,7 +28,8 @@ export interface Rules {
   phases: Phase[];
   /** Step budget of every champion per round, by the round's length in seconds (`Phase.roundSeconds`). */
   moves: { budgetBySeconds: Record<string, number> };
-  wards: { perRound: number; unwardPerRound: number; unwardRoles: Role[] };
+  /** `duration`: rounds a ward gives vision, from the round after it is placed. */
+  wards: { perRound: number; duration: number; unwardPerRound: number; unwardRoles: Role[] };
   towers: {
     hp: number;
     pushDamage: number[];
@@ -83,8 +84,15 @@ export interface Rules {
     survivorLoss: number;
     /** Fight-score penalty of a ganked side whose lane wave is pushed toward the enemy tower. */
     gankExposed: number;
-    /** HP lost by each surviving ganked champion (replaces `survivorLoss` for them, never added to it). */
+    /**
+     * HP lost by each surviving ganked champion (replaces `survivorLoss` for them, never added to it), and by each
+     * champion of an outnumbered side fleeing a side that fights.
+     */
     gankHpLoss: number;
+    /** HP lost by each champion of a smaller side farming under its tower when the bigger side fights without killing. */
+    pressureHpLoss: number;
+    /** Fight-score multiplier of a side that keeps taking a contested river objective against a side that fights. */
+    objectiveFocus: number;
   };
   /** Champion health: trades cost it, it regenerates each round, recall and respawn restore it; it never kills. */
   health: {
@@ -179,6 +187,11 @@ export interface AiTuning {
   waveSacrificeCost: number;
   /** Game time (s): rounds starting before it are the laning phase, where laners only farm their wave, recall or take a paying rotation. */
   laningPhaseUntil: number;
+  /**
+   * Subtracted from a candidate whose target needs an action (a camp, a Scuttle, a live pit objective, a laner's farm)
+   * when the champion only arrives there this round, with no step left to act: the round is lost.
+   */
+  walkPenalty: number;
   /** Candidate priorities, higher first. */
   priorities: Record<AiPriority, number>;
 }

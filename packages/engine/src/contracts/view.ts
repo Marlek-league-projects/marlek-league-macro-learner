@@ -41,9 +41,9 @@ export interface PlayerView {
   waves: GameState['waves'];
   pits: GameState['pits'];
   scuttles: GameState['scuttles'];
-  /** Own-side camps only. */
+  /** Camp timers as this side last saw them, own and enemy (an unseen clear leaves the old timer). */
   camps: GameState['camps'];
-  /** Own wards only. */
+  /** Own wards only, the scuttle ward included (`scuttle: true`, on the scuttle). */
   wards: Ward[];
   grubs: GameState['grubs'];
   baronUntilRound: GameState['baronUntilRound'];

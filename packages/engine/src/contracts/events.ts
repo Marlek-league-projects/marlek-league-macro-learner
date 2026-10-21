@@ -14,4 +14,11 @@ export type GameEvent =
   | { type: 'objectiveStarted' | 'objectiveTaken'; objective: ObjectiveId; side: Side; position: string; champions: string[] }
   | { type: 'campCleared'; camp: string; champion: string }
   | { type: 'wardPlaced' | 'wardCleared'; side: Side; position: string }
-  | { type: 'heraldLaunched'; tower: string; side: Side };
+  /**
+   * An enemy `champion`'s route this round crossed what `side`'s ward on `position` sees. `to`: where it ended the
+   * round when `side` sees it there, else null. Only `side` sees this event.
+   */
+  | { type: 'wardSpotted'; side: Side; position: string; champion: string; to: string | null }
+  | { type: 'heraldLaunched'; tower: string; side: Side }
+  /** HP actually lost (after clamping at 0). */
+  | { type: 'hpLost'; champion: string; amount: number };

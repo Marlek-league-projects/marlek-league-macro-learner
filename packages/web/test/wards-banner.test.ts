@@ -1,13 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import { wardExpiryRound, wardRoundsLeft, wardTooltip } from '../src/components/wards';
+import { wardTooltip } from '../src/components/wards';
 import { bannerHasReplay, bannerPrimary } from '../src/components/banner-action';
 
 describe('wards', () => {
-  test('rounds left', () => {
-    expect(wardRoundsLeft(4, 5)).toBe(1);
-    expect(wardRoundsLeft(4, 6)).toBe(1);
-    expect(wardExpiryRound(4)).toBe(5);
-    expect(wardTooltip(4)).toBe('Ward (expire au round 5)');
+  test('tooltip: the last active round from the engine rounds left; the scuttle ward is named', () => {
+    expect(wardTooltip({}, 2, 5)).toBe('Ward (expire au round 6)');
+    expect(wardTooltip({}, 1, 5)).toBe('Ward (expire au round 5)');
+    expect(wardTooltip({ scuttle: true }, 2, 5)).toBe('Ward du Carapateur');
   });
 });
 

@@ -1,19 +1,19 @@
 import type { Store } from '../store';
-import { eventText } from './format';
+import { eventLines } from './format';
 
 /** The last round's events (already fog-filtered) and, in teaching mode, its explanations. */
 export function EventLog({ store }: { store: Store }) {
-  const events = store.lastEvents.value;
+  const lines = eventLines(store.lastEvents.value, store.data);
   const explanations = store.explanations.value;
   return (
     <>
       <div>
         <h3>Ce qui s'est passé</h3>
-        {events.length === 0 ? (
+        {lines.length === 0 ? (
           <div class="note">Rien de visible ce round.</div>
         ) : (
           <ul class="log">
-            {events.map((e, i) => <li key={i}>{eventText(e, store.data)}</li>)}
+            {lines.map((line, i) => <li key={i}>{line}</li>)}
           </ul>
         )}
       </div>

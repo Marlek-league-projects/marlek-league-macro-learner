@@ -1,17 +1,10 @@
+// Ward marker texts. The engine owns ward timing (`wardRoundsLeft`); the web only words it.
+import type { Ward } from '@lml/engine/contracts';
+
 /**
- * A ward placed in round N is active for round N+1 and then fades. Seen from `viewRound` (the round being
- * ordered, or the one about to be resolved after a review), it has `placedRound + 2 - viewRound` rounds left
- * (1 = last active round); never below 1.
+ * Tooltip of an own ward with `left` rounds left seen from `viewRound` (1 = its last active round). The Scuttle's
+ * ward, shown on the dead Scuttle, is named instead (its eye shows the rounds left).
  */
-export function wardRoundsLeft(placedRound: number, viewRound: number): number {
-  return Math.max(1, placedRound + 2 - viewRound);
-}
-
-/** The last round the ward is active. */
-export function wardExpiryRound(placedRound: number): number {
-  return placedRound + 1;
-}
-
-export function wardTooltip(placedRound: number): string {
-  return `Ward (expire au round ${wardExpiryRound(placedRound)})`;
+export function wardTooltip(ward: Pick<Ward, 'scuttle'>, left: number, viewRound: number): string {
+  return ward.scuttle ? 'Ward du Carapateur' : `Ward (expire au round ${viewRound + left - 1})`;
 }

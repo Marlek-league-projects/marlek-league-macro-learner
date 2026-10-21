@@ -65,26 +65,38 @@ The longer a round, the farther a token can move during it. Objective timers cha
 
 ## Fights
 
-**Contact.** A contact happens when enemy champions end the round on the same position. Only the arrival position counts, so champions who cross paths during the round don't meet.
+**Contact.** A contact happens when enemy champions end the round in the same **zone**. Only the arrival position counts, so champions who cross paths during the round between two zones don't meet. The zones are:
 
-When a contact happens, resolution pauses and each player involved chooses to **fight** or **flee**, with a default already selected. Against the AI, the AI answers for its side. A round therefore has two steps: give the orders, then answer the contacts.
+- a **lane**: its towers (T1 to T3 of both sides) and its middle;
+- a **river**: the top one is the top Scuttle and the Baron pit, the bottom one the bottom Scuttle and the Dragon pit;
+- each **jungle camp** on its own.
 
-| Situation | Default choice |
-|---|---|
-| Even numbers in lane (1v1, 2v2) | **Farm** (play the lane normally). See *Lane contacts* below. |
-| Ganked (an enemy **arrives** in your lane this round from elsewhere and outnumbers you; a laner coming back to its own lane is not a ganker) | **Flee** |
-| Outnumbered without a gank (e.g. the enemy support roamed away, so it is 2v1) | No prompt: **lane pressure** (see below) |
-| The ganker | Asked to choose: commit to the fight or not |
-| Neutral objective with an enemy already there | Asked to choose: fight or flee |
+Bases are never contacts.
 
-- **Flee**: the champion survives and goes back to its previous position. On an objective, it gives the objective up. *(design call)* A champion who did not move this round (or just spawned there) retreats one step toward its base instead: along its lane to the next own tower (T1 → T2 → T3 → base), elsewhere to the neighbouring position closest to its base. It no longer defends the tile it left.
-- **Fight**: the winner takes the objective or the kill. Losers **die**.
-- If both sides flee, nobody takes the objective and it stays up for the next round. If one side flees and the other fights, the fighting side takes it without a fight.
+**Standard laning** (even numbers in a lane, and all of them home laners of that lane: 1v1 tops, 2v2 bot duos) resolves automatically from the stances (see *Lane contacts* below). Every other zone with both sides present pauses the resolution, and each player involved chooses to **fight** or **flee**, with a default already selected: the smaller side flees, otherwise it fights. Against the AI, the AI answers for its side. A round therefore has two steps: give the orders, then answer the contacts.
+
+| Situation | Kind | Default choice |
+|---|---|---|
+| Even numbers in lane, all home laners | Lane trade (automatic) | Each side's **stance**. See *Lane contacts* below. |
+| Ganked (an enemy **arrives** in your lane this round from elsewhere and outnumbers you; a laner coming back to its own lane is not a ganker) | Gank | **Flee** (the gankers: **fight**) |
+| Outnumbered in lane without a gank (e.g. the enemy support roamed away, so it is 2v1) | Lane pressure | **Flee** (the bigger side: **fight**) |
+| Anything else in a lane (e.g. both junglers join a 1v1) | Skirmish | Smaller side flees, otherwise fight |
+| Both sides in a river | Objective | Smaller side flees, otherwise fight. See *Neutral objectives*. |
+| An enemy camp | Invade | The invader can only fight |
+
+**Where the fight happens.** On the position of the smaller side (the one with most of its champions if they are spread), or with even numbers on the zone position holding the most champions; remaining ties go to the lowest position id. In a lane, when nobody flees, every champion of the contact is moved onto that position, and a standing tower there counts for its defenders. Being moved there neither gives nor takes an action: a champion acts there only if it had a step left on arrival. *(design call)* Automatic lane trades and river contacts move nobody: in a river, each champion stays on the pit or the Scuttle it arrived on.
+
+**Staying under your tower.** In a lane, a smaller side whose champions all stand on their own standing tower may also choose **farm**: it stays and farms at `economy.pressureFarmShare` (half) of a normal round. If the bigger side fights, each of them loses `fight.pressureHpLoss` (10) HP, and they die only if the bigger side wins by more than `aiTuning.allInMargin`.
+
+- **Flee**: the champion survives and goes back to its previous position. On an objective, it gives the objective up. *(design call)* A champion who did not move this round (or just spawned there) retreats one step toward its base instead: along its lane to the next own tower (T1 → T2 → T3 → base), elsewhere to the neighbouring position closest to its base. It no longer defends the tile it left. A champion who flees or retreats **forfeits its action** this round: no camp, no Scuttle or objective, no farm. So does a champion whose recall a fight interrupted.
+- An outnumbered side that flees a side that fights loses `fight.gankHpLoss` HP.
+- **Fight**: the winner takes the kill. Losers **die**. On a pit objective, only a side that chose to keep taking it takes it (see *Neutral objectives*).
+- If both sides flee, nobody takes the objective and it stays up for the next round. If one side flees and the other keeps taking the objective, that side takes it without a fight.
 - *(design call)* In lane, if one side flees and the other trades or fights, the side that stayed wins the trade (wave and lead).
 
-**Lane pressure without a gank.** When a lane is uneven and nobody arrived from elsewhere (for example someone left it, or a laner walked back to its own lane), nothing is asked. The bigger side pushes the wave and hits the tower (plates). In any uneven lane without a gank, the smaller side farms at a reduced share of a normal round's gold and XP (`economy.pressureFarmShare`, half). It only dies if the bigger side's posture is All-in and it has enough advantage.
+**Lane pressure without a gank.** When a lane is uneven and nobody arrived from elsewhere (for example someone left it, or a laner walked back to its own lane), the contact is prompted like a gank, but the ganked side's exposure plays no part. The bigger side pushes the wave and hits the tower (plates). A smaller side that stays to farm under its tower farms at a reduced share (see *Staying under your tower*).
 
-**Lane stance.** Each laner has a persistent **stance**, set once in its actions and kept until changed: **Farm** (default), **Trade** or **All-in**. Even lane contacts resolve automatically from both stances, with no prompt each round. The game only asks for a choice on real events: a gank, a contested objective, an invade.
+**Lane stance.** Each laner has a persistent **stance**, set once in its actions and kept until changed: **Farm** (default), **Trade** or **All-in**. Even lane contacts resolve automatically from both stances, with no prompt each round. The game only asks for a choice outside standard laning: a gank, an outnumbered lane, a skirmish, a contested river, an invade.
 
 **Laners follow their wave.** A laner with no order stays in its lane on Farm (safe), and follows its lane's wave automatically: it stands where the wave is (in front of its tower, in the middle, or in front of the enemy tower) and farms.
 
@@ -120,6 +132,8 @@ Game stages for matchups, skirmish and teamfight: *really early, early, mid, mid
 - **Ganks and lane position.** A ganked laner's position on its wave matters: pushed toward the enemy tower it is exposed (bonus to the gankers), in the middle it is neutral, under its own tower it is protected (the tower already helps the defenders). A gank that kills nobody still costs the ganked champions HP.
 - **On an exact tie**, nobody dies and both sides go back to their previous position.
 
+**HP is visible.** Every HP loss shows in the log (yours, and the enemies you see after the round). A champion who lost HP this round does not regenerate at its end.
+
 ## Lanes and towers
 
 **Waves.** Each lane has a wave position: near the blue tower, in the middle, or near the red tower. The wave state is **deterministic**, like a fight:
@@ -147,7 +161,7 @@ Game stages for matchups, skirmish and teamfight: *really early, early, mid, mid
 
 | Objective | Reward |
 |---|---|
-| **Scuttle Crab** | Gold for the champion who takes it, plus vision of the nearby pit (Dragon for the bottom Scuttle, Baron for the top one) This vision lasts like a normal ward and does not count toward the 3-ward limit. |
+| **Scuttle Crab** | Gold for the champion who takes it, plus a **Scuttle ward** on the Scuttle's own position, which also sees the nearby pit (Dragon for the bottom Scuttle, Baron for the top one). It lasts like a normal ward, never counts toward the 3-ward limit, and replaces only your previous Scuttle ward on that Scuttle. |
 | **Dragon** | Lead for the whole team |
 | **Voidgrubs** | Tower damage ×1.5 for the team, for the rest of the game |
 | **Herald** | Picked up by the champion who takes it, then launched on a tower in a later round to remove 3 HP |
@@ -160,7 +174,14 @@ Tower damage bonuses stack: Voidgrubs plus Baron gives ×3. The Herald launch is
 - **Dragon, Voidgrubs, Herald and Baron take time.** You arrive on the pit one round and take the objective at the end of the next round, as long as you stay there. With **4 or more champions** on the pit, Dragon, Voidgrubs and Herald are taken on arrival. Baron always takes the extra round, even with 5 champions. In between, the enemy has a round to contest it. The Scuttle Crab is taken on arrival.
 - Voidgrubs, Herald and Baron follow their real spawn timers from the current patch, stored in data. They share the Baron pit, each one replacing the previous.
 - There is no Dragon Soul bonus. Each Dragon simply adds team lead.
-- Jungle camps respawn on their real timers and give gold and XP to whoever clears them: one camp per round, the one the champion stands on with a step left (see [Movement](#movement)). `clearSpeed` no longer lets a jungler clear a second camp on the way.
+- **The river is one grouped fight.** A champion with a step left on a pit starts or continues its objective. When the pit objective is taken, the river's Scuttle is taken in the same round if it is up, shared by the same champions. A champion on the Scuttle takes only the Scuttle and never starts the pit objective. Any enemy anywhere in the river contests both.
+- **A contested river** offers each side **fight**, **flee**, and **keep taking the objective** (only to a side with a champion acting on the pit or the Scuttle):
+  - *objective* against *flee*: the objective (and the Scuttle) proceeds;
+  - *objective* against *fight*: a fight where the objective side's score is multiplied by `fight.objectiveFocus` (0.8); if it still wins, it takes the objective this round as well as the kills;
+  - *objective* against *objective*: a race. The higher fight score keeps taking it and the other side leaves; nobody dies or loses HP. On a tie, both stay and nobody takes it.
+  - *fight* (won, or against *flee*): the winner takes the kills but does not start, continue or take the pit objective this round; a capture in progress is lost. A champion on the Scuttle with a step left still takes the Scuttle.
+  - A champion arriving on its last step (no action left), or recalling, cannot choose the objective, but still fights.
+- Jungle camps respawn on their real timers and give gold and XP to whoever clears them: one camp per round, the one the champion stands on with a step left (see [Movement](#movement)). `clearSpeed` no longer lets a jungler clear a second camp on the way. Clearing an enemy camp works like your own, and you then know its respawn timer.
 
 ## Lead, gold and recall
 
@@ -212,11 +233,15 @@ Enemy champions are hidden in fog of war. You see an enemy champion only if it i
 
 Vision is revealed when the round resolves, so you use what you saw this round to plan the next one. The enemy jungler's starting camp is visible only during the first round.
 
+**Camp timers.** You know a camp's respawn timer, yours or the enemy's, from the last time you saw it: with a champion or a ward on it, or by clearing it. An enemy clear you did not see leaves the camp shown as before.
+
 **Wards**
 
 - A champion can place a ward in addition to its move, **either on its starting position or on its arrival position** (the player chooses).
 - Each team can place up to **3 wards per round**.
-- A ward placed in round N gives vision when round N+1 resolves, then fades once round N+1 is confirmed.
+- A ward lasts **2 rounds** (`wards.duration`): placed in round N, it gives vision when rounds N+1 and N+2 resolve, then fades. Its marker shows the rounds it has left.
+- **Spotting.** An enemy whose path this round (its start, every step and its arrival) crosses one of your active wards is reported in your log: *"Ward à {position} : {champion} repéré"*, with its arrival position this round (before any fight pulls it, or it flees) when you see that position. A Scuttle ward taken this round spots only from the next round. Otherwise its last seen position becomes the last warded position on its path. An enemy standing still on a ward is simply visible. Only the ward's team gets the report.
+- The **Scuttle ward** (see [Neutral objectives](#neutral-objectives)) shows on the dead Scuttle.
 - First round: depending on their starting side, the jungler can place their ward at the **Blue Buff** or at the **Raptors**.
 
 **Clearing wards**
@@ -232,15 +257,17 @@ Vision is revealed when the round resolves, so you use what you saw this round t
 - **Teams on the sides, like League**: your team in a column left of the map, the enemy team in a column right of the map. One card per champion with role icon, name, level, XP bar, lead bar and unspent gold (own team), or last seen position (enemy).
 - **Above every visible token**: its HP bar, its power score (level and lead), its level and its XP bar, so you can compare yourself with a visible enemy. The team cards show the same, plus unspent gold for your own champions.
 - **Center**: a flat map showing every playable position, with a tooltip on hover. One token per champion, with the official League role icon above it (from CommunityDragon) and its name below. Fog of war covers what you can't see. The map takes the full available height, and every position and token has a click target larger than its drawing.
-  - Each neutral objective and jungle camp shows, on its own position, the time left before it spawns, or that it is up. A cleared camp is greyed out with its respawn timer.
+  - Each neutral objective and jungle camp shows, on its own position, the time left before it spawns, or that it is up. A cleared camp is greyed out with its respawn timer. This includes the enemy's camps whose timers your side knows.
   - Each lane shows its **wave** marker (near the blue tower, in the middle or near the red tower), so you can read lane priority.
-- **Actions** (a small panel next to the selected token, opened on the side where it hides the fewest positions, and **draggable** by its title; it keeps its position between rounds): the selected token's options, including a laner's stance. Place a ward or clear one, each on the starting or arrival position. Recall.
+- **Actions** (a small panel next to the selected token, opened on the side where it hides the fewest positions, and **draggable** by its title; it keeps its position between rounds): the selected token's options, including a laner's stance. Place a ward or clear one, each on the starting or arrival position. Recall, in place or after a step that leaves a step of the budget for it ("Déplacement puis recall"). The panel shows the round's range ("Portée : N pas, une action coûte un pas").
+- **Objective prompt**: at the start of the order phase, each of your champions standing on a pit whose objective is up or being taken gets a prompt docked on the map: "Faire le Dragon" (plus " + Carapateur" when the river's Scuttle is up), which gives a stay order, or "Autre ordre", which selects the token. It shows once per champion and round.
 - **Round summary** (below the map): current phase, round and game time, next objective spawn, the list of this round's orders, the **Confirm round** button, and teaching-mode explanations after the round resolves.
-- **Contact prompts**: when a contact needs an answer during resolution, the fight or flee choices appear in an overlay docked on the map, next to the contacts.
+- **Contact prompts**: when a contact needs an answer during resolution, the choices appear in an overlay docked on the map, next to the contacts. Each prompt is titled by its zone ("Lane top", "Rivière haut (Carapateur + Nashor)", or the camp's name), lists the zone positions involved, and rings each of them on the map. The choices are Combattre (All-in on an even lane contact), Fuir, "Farmer sous la tour" (plain "Farmer" on an even lane contact) and, on a contested river, "Continuer l'objectif". Only a side that picks "Continuer l'objectif" progresses the pit's objective, and a recalling champion is never offered it.
 - **After a round resolves**, the banner button becomes **Round suivant**, next to **Revoir le tour**.
-- **Ward markers**: an eye icon on every position where your team has a ward, with the rounds it has left.
-- **Round replay**: after a round resolves, a short animation (about 2 s, with replay and skip buttons) plays it on the map: visible tokens slide to their destination, fights flash, deaths and taken objectives appear. Only what you saw is shown. The text log stays below.
-- **Giving orders**: click a token, and only the positions it can reach this round light up. Then click its next position. A dashed arrow shows the move. With no order, a laner standing in its home lane follows its wave; any other token stays where it is.
+- **Ward markers**: an eye icon on every position where your team has a ward, with the rounds it has left (from the engine's ward timing) and its expiry round in the tooltip. The Scuttle's ward sits on the dead Scuttle, with the tooltip "Ward du Carapateur".
+- **Round replay**: after a round resolves, a short animation (about 2 s, with replay and skip buttons) plays it on the map: visible tokens slide to their destination along their route, fights flash, deaths and taken objectives appear. A recalling token shows the recall icon and fades out at the end, after its step if it had one. When a ward spots an enemy, its eye pulses and a dashed ghost of the enemy flashes there, without revealing anything the ward didn't see. Only what you saw is shown.
+- **Log** (below the map): one line per event. A move onto a camp and its clear read as one line ("… se déplace vers … et tue le camp"). An arrival on the last step reads "… arrive à … (sans action)". HP lost reads "… −N PV", and a ward spotting reads "Ward à … : … repéré → …".
+- **Giving orders**: click a token, and only the positions it can reach this round light up. Positions where it can still act on arrival are yellow. Positions it reaches on its last step have a dashed ring and the tooltip "Arrivée seulement : pas d'action ce tour". Then click its next position. A dashed arrow shows the move along the engine's route; a recall after a step ends its arrow in the recall icon, and a recall in place shows the icon on the token. With no order, a laner standing in its home lane follows its wave; any other token stays where it is.
 
 The clickable mockup [`docs/game-screen-mockup.html`](docs/game-screen-mockup.html) is the reference for this layout. It also holds the first draft of the position coordinates and the movement graph.
 
@@ -265,7 +292,7 @@ Each level is a data profile with a frequency per mistake (for example, Iron gre
 |---|---|---|---|---|---|---|
 | **Greed / overextend** | Stays shoved with no vision, keeps pushing a tower with the enemy missing | very often | often | sometimes | rarely | very rarely |
 | **Objective timing** | Shows up late to a spawn, starts it without priority, forgets respawn timers | very often | often | sometimes | rarely | very rarely |
-| **Pointless plays** | Fights or invades when nothing is up on the map | very often | often | sometimes | rarely | very rarely |
+| **Pointless plays** | Wanders for no reason: a random move within its own jungle, the river or its own lane | very often | often | sometimes | rarely | very rarely |
 | **Chasing kills** | Picks fight over flee when outnumbered | very often | often | sometimes | rarely | very rarely |
 | **Rotating without priority** | Leaves lane to help without the wave pushed | often | often | sometimes | rarely | very rarely |
 | **Bad recall** | Recalls with the wave crashing into its own tower, right before a spawn, or sits on gold | often | often | sometimes | rarely | very rarely |
@@ -276,6 +303,17 @@ Each level is a data profile with a frequency per mistake (for example, Iron gre
 **Laning phase.** Until 14:00 (plates), AI laners stay in their lane and follow their wave: the normal role and priority rotations to objectives are off for laners. Only the jungler roams. The exceptions are recalls and the Emerald+ wave sacrifice, limited to the pit on the laner's half of the map (top to the Baron pit, bot to the Dragon). The mid laner, as far from both pits, never sacrifices its wave in this phase: it only rotates with priority (its wave pushed toward the enemy tower). Mistakes (rotating without priority, pointless plays) can still break the rule.
 
 At any time, the AI skips an objective when the enemies it knows near the pit would win the fight against the group it could bring there, instead of walking in only to flee.
+
+**Range and action.** The AI plays by the same step budget as you (see *Movement*). A target that needs an action (clearing a camp, taking a Scuttle, a live Dragon or Nashor, a laner's farm) counts as reached only where the AI still has a step left to act. One it can only arrive at is a walk toward it, scored lower (`aiTuning.walkPenalty`) because the round is lost: a jungler clears the camp in action range before walking to a farther buff, and a laner stops on the lane position where it still farms. Pushing a tower only needs presence. The AI invades only enemy camps whose timer it does not know to be down.
+
+**Never under a tower without its wave** *(hard rule, never a mistake)*. An AI champion ends its move on a standing enemy tower only when it is that lane's front tower and the AI's wave is at it. This covers pushing, taking a tower after a won fight, Herald launches (the Herald waits for the wave) and pointless plays. When nothing else is allowed, the champion stays where it is.
+
+**Contacts.** The AI answers a prompted contact with what it knows:
+
+- on a contested river with something to take, it keeps taking the objective when its fight score × `fight.objectiveFocus` still wins;
+- otherwise it fights when it wins the fight (or, rolling *Chasing kills*, when outnumbered);
+- outnumbered under its own tower with no ganker (lane pressure), it stays and farms, unless the bigger side would win by more than `aiTuning.allInMargin` and kill it;
+- otherwise (a gank it would lose, for example) it flees.
 
 Master, Grandmaster and Challenger keep a small mistake rate that goes down with each rank, and they also differ in how many rounds ahead they plan.
 

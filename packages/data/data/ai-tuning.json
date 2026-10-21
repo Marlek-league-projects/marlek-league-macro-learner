@@ -11,6 +11,7 @@
   "pushJunglerDistance": 2,
   "waveSacrificeCost": 2000,
   "laningPhaseUntil": 840,
+  "walkPenalty": 12,
   "priorities": {
     "pointless": 100,
     "herald": 90,

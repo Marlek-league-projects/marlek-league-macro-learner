@@ -1,6 +1,6 @@
 import type { Contact } from '@lml/engine/contracts';
 import type { Store } from '../store';
-import { championImage, championName, choiceLabel, CONTACT_LABEL, positionLabel } from './format';
+import { championImage, championName, choiceLabel, CONTACT_LABEL, positionLabel, zoneTitle } from './format';
 
 function Names({ store, ids }: { store: Store; ids: string[] }) {
   return (
@@ -15,14 +15,18 @@ function Names({ store, ids }: { store: Store; ids: string[] }) {
   );
 }
 
-/** One contact of the round: where, who, and the player's choice (the default is preselected). */
+/** One contact of the round: its zone and positions, who, and the player's choice (the default is preselected). */
 export function ContactPrompt({ store, contact }: { store: Store; contact: Contact }) {
   const chosen = store.choices.value[contact.id]?.blue ?? contact.defaults.blue;
+  const view = store.view.value;
+  const title = view ? zoneTitle(contact, view, store.data, store.roundWindow().start) : positionLabel(store.data, contact.position);
+  const where = contact.positions.map((id) => positionLabel(store.data, id)).join(', ');
   return (
     <div class="contact">
       <div>
-        <strong>{CONTACT_LABEL[contact.kind]}</strong> · {positionLabel(store.data, contact.position)}
+        <strong>{CONTACT_LABEL[contact.kind]}</strong> · {title}
       </div>
+      <div class="note">Positions : {where}</div>
       <div class="note">Toi : <Names store={store} ids={contact.blue} /></div>
       <div class="note">Adversaire : <Names store={store} ids={contact.red} /></div>
       <div class="choices">

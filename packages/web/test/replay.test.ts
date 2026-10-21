@@ -74,14 +74,54 @@ describe('buildReplay', () => {
     expect(steps[2]).toMatchObject({ kind: 'death', position: 'top-lane', champion: 'Fiora' });
   });
 
-  test('a recall produces no slide step', () => {
+  test('a recall in place is a recall step where the token stands, with no slide', () => {
     const before = opening();
     const after = structuredClone(before);
     const fiora = after.allies.find((c) => c.id === 'Fiora')!;
     fiora.status = 'respawning';
     fiora.position = 'base-blue';
     const steps = buildReplay(before, after, [{ type: 'recall', champion: 'Fiora', itemsBought: 1200 }]);
-    expect(steps).toEqual([]);
+    expect(steps).toEqual([{ kind: 'recall', champion: 'Fiora', position: 'top-t1-blue' }]);
+  });
+
+  test('a recall after a step recalls at the end of the move; the catch-up never slides it on', () => {
+    const before = opening();
+    const after = structuredClone(before);
+    const fiora = after.allies.find((c) => c.id === 'Fiora')!;
+    fiora.status = 'respawning';
+    fiora.position = 'base-blue';
+    const steps = buildReplay(before, after, [
+      { type: 'moved', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane', acted: true },
+      { type: 'recall', champion: 'Fiora', itemsBought: 1200 },
+    ]);
+    expect(steps).toEqual([
+      { kind: 'move', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane' },
+      { kind: 'recall', champion: 'Fiora', position: 'top-lane' },
+    ]);
+  });
+
+  test('a recalled enemy seen before is not slid to where the after view last saw it', () => {
+    const before = opening();
+    const after = structuredClone(before);
+    const kindred = after.enemies.find((e) => e.id === 'Kindred')!;
+    kindred.position = 'gromp-red';
+    const steps = buildReplay(before, after, [{ type: 'recall', champion: 'Kindred', itemsBought: 0 }]);
+    expect(steps).toEqual([{ kind: 'recall', champion: 'Kindred', position: 'bluebuff-red' }]);
+  });
+
+  test('a ward spotting is a spotted step at the ward, played during the moves', () => {
+    const before = opening();
+    const steps = buildReplay(before, before, [
+      { type: 'moved', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane', acted: true },
+      { type: 'wardSpotted', side: 'blue', position: 'scuttle-top', champion: 'Garen', to: null },
+    ]);
+    const i = steps.findIndex((s) => s.kind === 'spotted');
+    expect(steps[i]).toEqual({ kind: 'spotted', champion: 'Garen', position: 'scuttle-top', to: null });
+    const [a, b] = stepWindow(steps, i);
+    expect(a).toBeLessThan(0.4);
+    expect(b).toBeLessThanOrEqual(0.6);
+    // A spotting reveals nothing else: the hidden enemy gets no token.
+    expect(tokensAt(before, steps, 0.3).some((t) => t.champion === 'Garen')).toBe(false);
   });
 
   test('a drawn fight sends the fighters back with a move after the fight', () => {
@@ -151,6 +191,29 @@ describe('timeline', () => {
     const garen = tokensAt(before, steps, 0).find((x) => x.champion === 'Garen');
     expect(garen).toMatchObject({ ally: false, from: 'top-t1-red', to: 'top-lane', f: 0 });
     expect(tokensAt(before, steps, 0.2).find((x) => x.champion === 'Garen')!.f).toBeCloseTo(0.5);
+  });
+});
+
+describe('recall timeline', () => {
+  test('the token reaches its step, stays there while the recall plays, then fades out', () => {
+    const before = opening();
+    const after = structuredClone(before);
+    const fiora = after.allies.find((c) => c.id === 'Fiora')!;
+    fiora.status = 'respawning';
+    fiora.position = 'base-blue';
+    const steps = buildReplay(before, after, [
+      { type: 'moved', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane', acted: true },
+      { type: 'recall', champion: 'Fiora', itemsBought: 1200 },
+    ]);
+    const at = (t: number) => tokensAt(before, steps, t).find((x) => x.champion === 'Fiora')!;
+    const [a, b] = stepWindow(steps, 1);
+    expect(a).toBeGreaterThanOrEqual(0.4);
+    expect(at(a)).toMatchObject({ from: 'top-lane', to: 'top-lane', opacity: 1 });
+    const mid = at(0.85);
+    expect(mid).toMatchObject({ from: 'top-lane', to: 'top-lane' });
+    expect(mid.opacity).toBeGreaterThan(0);
+    expect(mid.opacity).toBeLessThan(1);
+    expect(at(b)).toMatchObject({ from: 'top-lane', to: 'top-lane', opacity: 0 });
   });
 });
 

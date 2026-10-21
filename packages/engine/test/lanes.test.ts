@@ -15,9 +15,11 @@ function fresh(round = 1): GameState {
   }
   return s;
 }
-const run = (s: GameState, tw: Partial<Record<Lane, Side | null>> = {}, ganked: Set<Lane> = new Set()): GameEvent[] => {
+/** Every champion acts (a step left on arrival). */
+const everyone = (s: GameState): Set<string> => new Set(s.champions.map((c) => c.id));
+const run = (s: GameState, tw: Partial<Record<Lane, Side | null>> = {}, noPressure: Set<Lane> = new Set()): GameEvent[] => {
   const ev: GameEvent[] = [];
-  updateLanes(s, d, tw, ev, ganked);
+  updateLanes(s, d, tw, ev, noPressure, everyone(s));
   return ev;
 };
 /** Puts three blue champions on the red T1 with the top wave already pushed. */
@@ -67,7 +69,7 @@ describe('laners staying in lane without a trade', () => {
     const adv = matchupAdvantage(d, get(s, 'blue', 'top').id, get(s, 'red', 'top').id, roundWindow(d.rules, 1).stage)!;
     expect(adv).toBeGreaterThan(0);
     const ev: GameEvent[] = [];
-    updateLanes(s, matchupOnly, {}, ev);
+    updateLanes(s, matchupOnly, {}, ev, new Set(), everyone(s));
     expect(s.waves.top).toBe(1);
     expect(ev).toContainEqual({ type: 'wave', lane: 'top', from: 0, to: 1 });
     expect(get(s, 'blue', 'top').bonusLead).toBe(0);
@@ -75,12 +77,12 @@ describe('laners staying in lane without a trade', () => {
   test('an exact tie leaves the wave', () => {
     const s = onT1s();
     const neutral = { ...matchupOnly, matchups: [] };
-    updateLanes(s, neutral, {}, []);
+    updateLanes(s, neutral, {}, [], new Set(), everyone(s));
     expect(s.waves.top).toBe(0);
   });
   test('a tied trade this round leaves the wave even if the scores differ', () => {
     const s = onT1s();
-    updateLanes(s, matchupOnly, { top: null }, []);
+    updateLanes(s, matchupOnly, { top: null }, [], new Set(), everyone(s));
     expect(s.waves.top).toBe(0);
   });
 });
@@ -158,7 +160,7 @@ describe('farming', () => {
     expect(get(s, 'red', 'support').xp).toBeCloseTo(soloXp * d.rules.economy.supportShare, 6);
     expect(get(s, 'red', 'top').xp).toBeCloseTo(soloXp, 6);
   });
-  test('under lane pressure the smaller side farms at pressureFarmShare; not after a gank', () => {
+  test('under lane pressure the smaller side farms at pressureFarmShare; not in a lane without pressure', () => {
     const farmed = (ganked: Set<Lane>): { gold: number; xp: number } => {
       const s = fresh();
       for (const r of ['adc', 'support']) get(s, 'blue', r).position = 'bot-lane';
@@ -245,12 +247,12 @@ describe('Push stance', () => {
 
   test('a side with a Push laner in its lane moves the wave one extra step toward the enemy', () => {
     const s = even();
-    updateLanes(s, neutral, {}, []);
+    updateLanes(s, neutral, {}, [], new Set(), everyone(s));
     expect(s.waves.top).toBe(0);
     const p = even();
     get(p, 'red', 'top').stance = 'push';
     const ev: GameEvent[] = [];
-    updateLanes(p, neutral, {}, ev);
+    updateLanes(p, neutral, {}, ev, new Set(), everyone(p));
     expect(p.waves.top).toBe(-1);
     expect(ev).toContainEqual({ type: 'wave', lane: 'top', from: 0, to: -1 });
   });
@@ -259,7 +261,7 @@ describe('Push stance', () => {
     const s = even();
     get(s, 'blue', 'top').stance = 'push';
     get(s, 'red', 'top').stance = 'push';
-    updateLanes(s, neutral, {}, []);
+    updateLanes(s, neutral, {}, [], new Set(), everyone(s));
     expect(s.waves.top).toBe(0);
 
     const lone = fresh();

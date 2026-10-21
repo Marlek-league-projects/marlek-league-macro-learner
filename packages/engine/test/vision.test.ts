@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
-import { defaultOrders, eventsFor, lanePressure, newGame, resolveRound, viewFor, visibleEnemies } from '@lml/engine';
+import { defaultOrders, eventsFor, lanePressure, newGame, resolveRound, route, viewFor, visibleEnemies, wardRoundsLeft } from '@lml/engine';
 import type { ChampionState, GameState, Order, Orders } from '@lml/engine/contracts';
 
 const d = loadGameData();
@@ -27,7 +27,7 @@ describe('visibleEnemies', () => {
     expect(seen).not.toContain(get(s, 'red', 'jungle').id);
   });
 
-  test('a ward placed in round 3 reveals in round 4 only', () => {
+  test('a ward placed in round 3 reveals in rounds 4 and 5, then is gone', () => {
     const s = newGame(d, 5);
     s.round = 3;
     place(s, 'blue', 'jungle', 'raptors-red');
@@ -35,21 +35,35 @@ describe('visibleEnemies', () => {
     const bj = get(s, 'blue', 'jungle').id;
     const rj = get(s, 'red', 'jungle').id;
     const r3 = resolveRound(s, d, ordersWith(s, [{ kind: 'move', champion: bj, to: 'redbuff-red', ward: 'from' }]), {});
-    expect(r3.state.wards).toContainEqual({ side: 'blue', position: 'raptors-red', placedRound: 3 });
+    const ward = { side: 'blue' as const, position: 'raptors-red', placedRound: 3 };
+    expect(r3.state.wards).toContainEqual(ward);
+    expect(wardRoundsLeft(ward, 4, d.rules)).toBe(2);
 
     const s4 = r3.state;
     place(s4, 'red', 'jungle', 'raptors-red');
     expect(visibleEnemies(s4, d, 'blue')).toContain(rj);
     const r4 = resolveRound(s4, d, ordersWith(s4), {});
     expect(r4.state.lastSeen.blue[rj]).toEqual({ position: 'raptors-red', round: 4 });
-    expect(r4.state.wards.some((w) => w.position === 'raptors-red')).toBe(false);
+    expect(r4.state.wards).toContainEqual(ward);
+    expect(wardRoundsLeft(ward, 5, d.rules)).toBe(1);
 
-    expect(visibleEnemies(r4.state, d, 'blue')).not.toContain(rj);
-    const r5 = resolveRound(r4.state, d, ordersWith(r4.state), {});
-    expect(r5.state.lastSeen.blue[rj]).toEqual({ position: 'raptors-red', round: 4 });
-    expect(viewFor(r5.state, d, 'blue').enemies.find((e) => e.id === rj)).toMatchObject({
-      visible: false, position: 'raptors-red', lastSeenRound: 4, level: null,
+    const s5 = r4.state;
+    expect(visibleEnemies(s5, d, 'blue')).toContain(rj);
+    const r5 = resolveRound(s5, d, ordersWith(s5), {});
+    expect(r5.state.lastSeen.blue[rj]).toEqual({ position: 'raptors-red', round: 5 });
+    expect(r5.state.wards.some((w) => w.position === 'raptors-red')).toBe(false);
+    expect(wardRoundsLeft(ward, 6, d.rules)).toBe(0);
+
+    expect(visibleEnemies(r5.state, d, 'blue')).not.toContain(rj);
+    const r6 = resolveRound(r5.state, d, ordersWith(r5.state), {});
+    expect(r6.state.lastSeen.blue[rj]).toEqual({ position: 'raptors-red', round: 5 });
+    expect(viewFor(r6.state, d, 'blue').enemies.find((e) => e.id === rj)).toMatchObject({
+      visible: false, position: 'raptors-red', lastSeenRound: 5, level: null,
     });
+  });
+
+  test('a ward being ordered shows its full duration', () => {
+    expect(wardRoundsLeft({ side: 'blue', position: 'raptors-red', placedRound: 3 }, 3, d.rules)).toBe(2);
   });
 });
 
@@ -84,7 +98,7 @@ describe('viewFor', () => {
     const mid = view.enemies.find((e) => e.id === get(s, 'red', 'mid').id)!;
     expect(mid).toMatchObject({ visible: false, position: 'mid-t1-red', lastSeenRound: 2 });
     expect(view.wards.every((w) => w.side === 'blue')).toBe(true);
-    expect(Object.keys(view.camps).every((id) => d.graph.positions[id]!.side === 'blue')).toBe(true);
+    expect(view.camps).toEqual(after.campsSeen.blue);
   });
 
   test('round 1 shows the enemy jungler start camp', () => {
@@ -173,7 +187,7 @@ describe('fog of war on own camps', () => {
     }
   });
 
-  test('a camp the side clears itself shows its respawn timer, enemy camps never show', () => {
+  test('a camp the side clears itself shows its respawn timer', () => {
     const s = newGame(d, 5);
     s.round = 7;
     place(s, 'blue', 'jungle', 'redbuff-blue');
@@ -181,7 +195,156 @@ describe('fog of war on own camps', () => {
     const view = viewFor(state, d, 'blue');
     expect(view.camps['redbuff-blue']).toBe(state.camps['redbuff-blue']!);
     expect(view.camps['redbuff-blue']).toBeGreaterThan(d.rules.camps.firstSpawn);
-    expect(Object.keys(view.camps).every((id) => d.graph.positions[id]?.side === 'blue')).toBe(true);
+  });
+});
+
+describe('enemy camp timers', () => {
+  test('the clearer sees an enemy camp timer, the owner without vision does not', () => {
+    const s = newGame(d, 5);
+    s.round = 7;
+    place(s, 'blue', 'jungle', 'raptors-red');
+    place(s, 'red', 'jungle', 'gromp-red');
+    const { state, events } = resolveRound(s, d, ordersWith(s), {});
+    expect(events).toContainEqual({ type: 'campCleared', camp: 'raptors-red', champion: get(s, 'blue', 'jungle').id });
+    expect(state.camps['raptors-red']).toBeGreaterThan(d.rules.camps.firstSpawn);
+    expect(viewFor(state, d, 'blue').camps['raptors-red']).toBe(state.camps['raptors-red']!);
+    expect(viewFor(state, d, 'red').camps['raptors-red']).toBe(d.rules.camps.firstSpawn);
+  });
+});
+
+describe('scuttle ward', () => {
+  /** Blue jungler takes the bot Scuttle in round 7 while three blue laners place order wards. */
+  const takeWithWards = (): ReturnType<typeof resolveRound> => {
+    const s = newGame(d, 5);
+    s.round = 7;
+    place(s, 'blue', 'jungle', 'scuttle-bot');
+    const wardFrom = (role: string): Order => ({ kind: 'move', champion: get(s, 'blue', role).id, to: get(s, 'blue', role).position, ward: 'from' });
+    return resolveRound(s, d, ordersWith(s, [wardFrom('top'), wardFrom('mid'), wardFrom('adc')]), {});
+  };
+
+  test('comes on top of the 3 order wards of the round', () => {
+    const { state, events } = takeWithWards();
+    expect(events.filter((e) => e.type === 'wardPlaced' && e.side === 'blue')).toHaveLength(3);
+    const blue = state.wards.filter((w) => w.side === 'blue');
+    expect(blue).toHaveLength(4);
+    expect(blue).toContainEqual({ side: 'blue', position: 'scuttle-bot', placedRound: 7, scuttle: true });
+  });
+
+  test('shows on the scuttle position in the view, for its side only', () => {
+    const { state } = takeWithWards();
+    expect(viewFor(state, d, 'blue').wards).toContainEqual({ side: 'blue', position: 'scuttle-bot', placedRound: 7, scuttle: true });
+    expect(viewFor(state, d, 'red').wards).toEqual([]);
+  });
+
+  test('reveals its pit for the next 2 rounds', () => {
+    const s = takeWithWards().state;
+    place(s, 'blue', 'jungle', 'redbuff-blue');
+    place(s, 'red', 'jungle', 'dragon-pit');
+    const rj = get(s, 'red', 'jungle').id;
+    expect(visibleEnemies(s, d, 'blue')).toContain(rj);
+    s.round = 9;
+    expect(visibleEnemies(s, d, 'blue')).toContain(rj);
+    s.round = 10;
+    expect(visibleEnemies(s, d, 'blue')).not.toContain(rj);
+  });
+});
+
+describe('ward spotting', () => {
+  /** Every alive champion stays put, then overrides by champion id. */
+  const stayWith = (s: GameState, over: Order[]): Orders => {
+    const f = (side: 'blue' | 'red'): Order[] =>
+      s.champions
+        .filter((c) => c.side === side && c.status === 'alive')
+        .map((c) => over.find((x) => x.champion === c.id) ?? { kind: 'move', champion: c.id, to: c.position });
+    return { blue: f('blue'), red: f('red') };
+  };
+  /** Round 15 (budget 3): red jungler walks from raptors-red to `to` past a blue ward on scuttle-top. */
+  const walk = (to: string, extraWard?: string): { s: GameState; r: ReturnType<typeof resolveRound>; rj: string } => {
+    const s = newGame(d, 5);
+    s.round = 15;
+    place(s, 'red', 'jungle', 'raptors-red');
+    s.wards.push({ side: 'blue', position: 'scuttle-top', placedRound: 14 });
+    if (extraWard) s.wards.push({ side: 'blue', position: extraWard, placedRound: 14 });
+    const rj = get(s, 'red', 'jungle').id;
+    expect(route(d, 'raptors-red', to, 'red')).toContain('scuttle-top');
+    return { s, r: resolveRound(s, d, stayWith(s, [{ kind: 'move', champion: rj, to }]), {}), rj };
+  };
+
+  test('an enemy walking through a warded Scuttle is spotted, with its arrival when seen', () => {
+    const { r, rj } = walk('bluebuff-blue', 'bluebuff-blue');
+    expect(r.events).toContainEqual({ type: 'wardSpotted', side: 'blue', position: 'scuttle-top', champion: rj, to: 'bluebuff-blue' });
+    expect(r.state.lastSeen.blue[rj]).toEqual({ position: 'bluebuff-blue', round: 15 });
+    expect(viewFor(r.state, d, 'blue').enemies.find((e) => e.id === rj)).toMatchObject({ visible: true, position: 'bluebuff-blue' });
+  });
+
+  test('an unseen arrival gives a null `to`, and the last warded position as last seen', () => {
+    const { r, rj } = walk('gromp-blue');
+    const spotted = r.events.filter((e) => e.type === 'wardSpotted');
+    expect(spotted).toEqual([{ type: 'wardSpotted', side: 'blue', position: 'scuttle-top', champion: rj, to: null }]);
+    expect(r.state.lastSeen.blue[rj]).toMatchObject({ position: 'scuttle-top', round: 15 });
+    const e = viewFor(r.state, d, 'blue').enemies.find((x) => x.id === rj)!;
+    expect(e).toMatchObject({ visible: false, position: 'scuttle-top', lastSeenRound: 15, level: null, hp: null });
+  });
+
+  test('only the ward side sees the event, and it does not reveal the enemy move', () => {
+    const { r, rj } = walk('gromp-blue');
+    const blue = eventsFor(r.events, r.state, d, 'blue');
+    expect(blue.some((e) => e.type === 'wardSpotted')).toBe(true);
+    expect(blue.some((e) => e.type === 'moved' && e.champion === rj)).toBe(false);
+    expect(eventsFor(r.events, r.state, d, 'red').some((e) => e.type === 'wardSpotted')).toBe(false);
+  });
+
+  test('an enemy leaving a warded camp is spotted', () => {
+    const s = newGame(d, 5);
+    s.round = 15;
+    place(s, 'red', 'jungle', 'raptors-red');
+    s.wards.push({ side: 'blue', position: 'raptors-red', placedRound: 13 });
+    const rj = get(s, 'red', 'jungle').id;
+    const r = resolveRound(s, d, stayWith(s, [{ kind: 'move', champion: rj, to: 'redbuff-red' }]), {});
+    expect(r.events).toContainEqual({ type: 'wardSpotted', side: 'blue', position: 'raptors-red', champion: rj, to: null });
+    expect(r.state.lastSeen.blue[rj]).toMatchObject({ position: 'raptors-red', round: 15 });
+  });
+
+  test('a champion staying on a warded position, or an own champion, is not spotted', () => {
+    const s = newGame(d, 5);
+    s.round = 15;
+    place(s, 'red', 'jungle', 'raptors-red');
+    place(s, 'blue', 'jungle', 'raptors-blue');
+    s.wards.push({ side: 'blue', position: 'raptors-red', placedRound: 14 });
+    s.wards.push({ side: 'blue', position: 'raptors-blue', placedRound: 14 });
+    const bj = get(s, 'blue', 'jungle').id;
+    const r = resolveRound(s, d, stayWith(s, [{ kind: 'move', champion: bj, to: 'redbuff-blue' }]), {});
+    expect(r.events.some((e) => e.type === 'wardSpotted')).toBe(false);
+  });
+
+  test('an enemy pulled into a lane fight is spotted once per ward, with its arrival position as `to`', () => {
+    // Round 1 (budget 2): the red jungler arrives on a warded top-t1-red, then is pulled to the top-lane skirmish.
+    const s = newGame(d, 5);
+    s.round = 1;
+    place(s, 'blue', 'top', 'top-lane');
+    place(s, 'blue', 'jungle', 'top-lane');
+    place(s, 'red', 'top', 'top-lane');
+    place(s, 'red', 'jungle', 'krugs-red');
+    get(s, 'red', 'jungle').bonusLead += 100_000;
+    get(s, 'red', 'top').bonusLead += 100_000;
+    s.wards.push({ side: 'blue', position: 'top-t1-red', placedRound: 0 });
+    const rj = get(s, 'red', 'jungle').id;
+    const r = resolveRound(s, d, stayWith(s, [{ kind: 'move', champion: rj, to: 'top-t1-red' }]), { 'lane-top': { blue: 'fight', red: 'fight' } });
+    expect(r.events.filter((e) => e.type === 'moved' && e.champion === rj)).toHaveLength(2);
+    expect(r.state.champions.find((c) => c.id === rj)!.position).toBe('top-lane');
+    const spotted = r.events.filter((e) => e.type === 'wardSpotted');
+    expect(spotted).toEqual([{ type: 'wardSpotted', side: 'blue', position: 'top-t1-red', champion: rj, to: 'top-t1-red' }]);
+  });
+
+  test('a scuttle ward taken this round does not spot moves of the same round', () => {
+    const s = newGame(d, 5);
+    s.round = 7;
+    place(s, 'blue', 'jungle', 'scuttle-bot');
+    place(s, 'red', 'jungle', 'dragon-pit');
+    const rj = get(s, 'red', 'jungle').id;
+    const r = resolveRound(s, d, stayWith(s, [{ kind: 'move', champion: rj, to: 'bluebuff-red' }]), {});
+    expect(r.events).toContainEqual(expect.objectContaining({ type: 'objectiveTaken', objective: 'scuttle', side: 'blue' }));
+    expect(r.events.some((e) => e.type === 'wardSpotted')).toBe(false);
   });
 });
 

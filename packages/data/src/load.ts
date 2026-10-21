@@ -66,12 +66,16 @@ export function validateRules(rules: Rules): void {
       fail('rules.moves', `budgetBySeconds has no positive integer step budget for ${p.roundSeconds}s rounds`);
     }
   }
+  const duration = rules.wards?.duration;
+  if (typeof duration !== 'number' || !Number.isInteger(duration) || duration < 1) {
+    fail('rules.wards', `duration = ${String(duration)} is not a positive integer`);
+  }
   checkPerStage('rules.towers.pushDamage', rules.towers.pushDamage);
   checkPerStage('rules.fight.numbers', rules.fight.numbers);
   const f = rules.fight;
   const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
   if (!finite(f.deathGap) || f.deathGap <= 0) fail('rules.fight', `deathGap = ${String(f.deathGap)} is not a positive number`);
-  for (const key of ['survivorLoss', 'gankExposed', 'gankHpLoss'] as const) {
+  for (const key of ['survivorLoss', 'gankExposed', 'gankHpLoss', 'pressureHpLoss', 'objectiveFocus'] as const) {
     if (!finite(f[key]) || f[key] < 0) fail('rules.fight', `${key} = ${String(f[key])} is not a non-negative number`);
   }
   const share = rules.economy.pressureFarmShare;
@@ -125,6 +129,7 @@ export function validateAiTuning(t: AiTuning): void {
   num('pushJunglerDistance', t.pushJunglerDistance, 0);
   num('waveSacrificeCost', t.waveSacrificeCost, 0);
   num('laningPhaseUntil', t.laningPhaseUntil, 0);
+  num('walkPenalty', t.walkPenalty, 0);
   for (const id of AI_PRIORITIES) num(`priorities.${id}`, t.priorities?.[id], -Infinity);
 }
 

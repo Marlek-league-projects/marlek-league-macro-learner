@@ -1,0 +1,46 @@
+import { useState } from 'preact/hooks';
+import type { Store } from '../store';
+import type { ObjectivePromptEntry } from './map-marks';
+import { championImage, championName, errorText, objectiveActionLabel, positionLabel } from './format';
+
+/**
+ * At the start of the order phase, one entry per own champion standing on a pit whose objective is up or being
+ * taken: do the objective (a stay order) or give another order (selects the token). Docked over the map edge
+ * that `dock` names, like the contacts overlay.
+ */
+export function ObjectivePrompt({ store, entries, dock }: { store: Store; entries: ObjectivePromptEntry[]; dock: 'top' | 'bottom' }) {
+  const [error, setError] = useState<string | null>(null);
+  const run = (fn: () => void) => {
+    try {
+      fn();
+      setError(null);
+    } catch (err) {
+      setError(errorText(err));
+    }
+  };
+  return (
+    <div class={`contacts-overlay objective-overlay ${dock}`}>
+      <div>
+        <strong>Objectif</strong>
+        <span class="note"> · Ton champion est sur le pit.</span>
+      </div>
+      <div class="contacts">
+        {entries.map((e) => (
+          <div key={e.champion} class="contact">
+            <div>
+              <img class="sq" src={championImage(store.data, e.champion)} alt="" />
+              <strong>{championName(store.data, e.champion)}</strong> · {positionLabel(store.data, e.pit)}
+            </div>
+            <div class="choices">
+              <button class="on" onClick={() => run(() => store.doObjective(e.champion))}>
+                {objectiveActionLabel(e.objective, e.withScuttle)}
+              </button>
+              <button onClick={() => run(() => store.otherOrder(e.champion))}>Autre ordre</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {error && <div class="error">{error}</div>}
+    </div>
+  );
+}

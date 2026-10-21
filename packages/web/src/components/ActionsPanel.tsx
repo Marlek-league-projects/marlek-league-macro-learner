@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { ChampionState, Order, Stance } from '@lml/engine/contracts';
 import type { GameData } from '@lml/data/contracts';
 import type { Store } from '../store';
-import { championName, errorText, plural, positionLabel, roleIcon } from './format';
+import { championName, errorText, positionLabel, roleIcon } from './format';
 import { clampInside, dragSpotUsable, placePopover, visibleRegion } from './popover';
 import { deepWardSpots } from './ward-spots';
 
@@ -197,7 +197,7 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
     );
   }
 
-  const moves = store.stepBudget();
+  const budget = store.stepBudget();
   const move = order?.kind === 'move' ? order : null;
   const recall = order?.kind === 'recall' ? order : null;
   const ward = move?.ward ?? recall?.ward;
@@ -213,7 +213,7 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
   return (
     <>
       <div class="note">
-        Portée : {plural(moves, 'mouvement')}. Clique une position allumée.
+        Portée : {budget} pas, une action coûte un pas. Clique une position allumée (pointillés : arrivée sans action).
       </div>
       {c.role !== 'jungle' && (
         <div class="seg stance" title="Attitude en lane, gardée d'un round à l'autre">
