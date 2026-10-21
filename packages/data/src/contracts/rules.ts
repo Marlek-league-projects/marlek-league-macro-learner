@@ -72,6 +72,14 @@ export interface Rules {
     strength: number;
     towerStrength: number;
     teamfightMinTotal: number;
+    /** Score gap per death on the losing side: `floor(gap / deathGap)` losers die (most wounded first), capped. */
+    deathGap: number;
+    /** HP lost by each surviving champion on a fight's losing side. */
+    survivorLoss: number;
+    /** Fight-score penalty of a ganked side whose lane wave is pushed toward the enemy tower. */
+    gankExposed: number;
+    /** HP lost by each surviving ganked champion (replaces `survivorLoss` for them, never added to it). */
+    gankHpLoss: number;
   };
   /** Champion health: trades cost it, it regenerates each round, recall and respawn restore it; it never kills. */
   health: {

@@ -68,7 +68,7 @@ describe('health', () => {
     }
   });
 
-  test('a trade won because the other side fled costs no HP', () => {
+  test('a trade won because the other side fled costs no trade HP; fleeing a committed gank costs gankHpLoss', () => {
     const s = newGame(d, 7);
     s.round = 10;
     place(s, 'blue', 'top', 'top-t1-blue');
@@ -85,7 +85,7 @@ describe('health', () => {
     expect(events).toContainEqual({ type: 'fled', champion: bt, to: 'top-t1-blue' });
     expect(events.some((e) => e.type === 'trade' && e.winner === 'red')).toBe(true);
     for (const role of ['top', 'jungle']) expect(get(state, 'red', role).hp).toBe(50 + H.regenPerRound);
-    expect(get(state, 'blue', 'top').hp).toBe(50 + H.regenPerRound);
+    expect(get(state, 'blue', 'top').hp).toBe(50 - d.rules.fight.gankHpLoss + H.regenPerRound);
   });
 
   test('health is clamped to 0..max and never kills by itself', () => {

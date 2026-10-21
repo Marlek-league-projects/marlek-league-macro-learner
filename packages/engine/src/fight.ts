@@ -54,6 +54,18 @@ export function fightScore(
   return score;
 }
 
+/**
+ * Fight-score modifier of the `ganked` side at `position`: `-fight.gankExposed` when its lane's wave is pushed toward
+ * the enemy tower, 0 in the middle or at its own tower (the tower already counts).
+ */
+export function gankModifier(state: GameState, data: GameData, position: string, ganked: Side): number {
+  const lane = data.graph.positions[position]?.lane;
+  if (!lane) return 0;
+  const enemyTower = ganked === 'blue' ? 1 : -1;
+  return state.waves[lane] === enemyTower ? -data.rules.fight.gankExposed : 0;
+}
+
+/** `ganked` is the defending side of a gank contact, whose score gets `gankModifier`. */
 export function resolveFight(
   state: GameState,
   data: GameData,
@@ -61,13 +73,26 @@ export function resolveFight(
   blue: string[],
   red: string[],
   stage: Stage,
+  ganked: Side | null = null,
 ): { winner: Side | null; scores: Record<Side, number> } {
   const towerFor = towerOwner(state, data, position);
   const scores: Record<Side, number> = {
     blue: fightScore(state, data, 'blue', blue, red, stage, towerFor),
     red: fightScore(state, data, 'red', red, blue, stage, towerFor),
   };
+  if (ganked) scores[ganked] += gankModifier(state, data, position, ganked);
   const diff = scores.blue - scores.red;
   const winner = Math.abs(diff) < EPSILON ? null : diff > 0 ? 'blue' : 'red';
   return { winner, scores };
+}
+
+/**
+ * Graded deaths: `floor(gap / fight.deathGap)` of the `eligible` losers die, most wounded first (lowest hp, then id).
+ * `gap` is the winner's score minus the loser's.
+ */
+export function fightVictims(state: GameState, data: GameData, eligible: string[], gap: number): string[] {
+  const n = Math.min(eligible.length, Math.max(0, Math.floor(gap / data.rules.fight.deathGap + EPSILON)));
+  const hp = (id: string): number => state.champions.find((c) => c.id === id)!.hp;
+  const order = [...eligible].sort((a, b) => hp(a) - hp(b) || (a < b ? -1 : a > b ? 1 : 0));
+  return order.slice(0, n);
 }

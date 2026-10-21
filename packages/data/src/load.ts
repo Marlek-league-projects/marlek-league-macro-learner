@@ -63,6 +63,12 @@ export function validateRules(rules: Rules): void {
   });
   checkPerStage('rules.towers.pushDamage', rules.towers.pushDamage);
   checkPerStage('rules.fight.numbers', rules.fight.numbers);
+  const f = rules.fight;
+  const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  if (!finite(f.deathGap) || f.deathGap <= 0) fail('rules.fight', `deathGap = ${String(f.deathGap)} is not a positive number`);
+  for (const key of ['survivorLoss', 'gankExposed', 'gankHpLoss'] as const) {
+    if (!finite(f[key]) || f[key] < 0) fail('rules.fight', `${key} = ${String(f[key])} is not a non-negative number`);
+  }
   const share = rules.economy.pressureFarmShare;
   if (typeof share !== 'number' || !Number.isFinite(share) || share < 0 || share > 1) {
     fail('rules.economy', `pressureFarmShare = ${String(share)} is not a number in 0..1`);

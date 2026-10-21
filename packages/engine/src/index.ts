@@ -18,7 +18,7 @@ export type { RoundWindow } from './time';
 export { randomDraft, newGame } from './setup';
 export { isLaneChange, movesFor, reachable, reachableFrom, spawnPoints, spawnPointsFor, validateOrders, defaultOrders } from './movement';
 export { arrivalPositions, detectContacts, resolveChoice } from './contacts';
-export { lead, fightScore, resolveFight } from './fight';
+export { lead, fightScore, resolveFight, gankModifier, fightVictims } from './fight';
 export { damageTower, frontTower, lanePressure, towerMultiplier, updateLanes } from './lanes';
 export { spawnObjectives, clearCamps, captureObjectives, launchHeralds } from './objectives';
 export { level, applyKill, completeRecall, advanceRespawns, teamScore, finishIfOver } from './economy';

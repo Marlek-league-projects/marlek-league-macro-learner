@@ -102,3 +102,16 @@ test('objective names are loaded and validated', () => {
   names.baron = '';
   expect(() => validateObjectiveNames(names)).toThrow(/objectiveNames\.baron/);
 });
+
+test('validateRules rejects bad graded-death and gank values', () => {
+  const a = structuredClone(data.rules);
+  a.fight.deathGap = 0;
+  expect(() => validateRules(a)).toThrow(/rules\.fight.*deathGap/);
+  for (const key of ['survivorLoss', 'gankExposed', 'gankHpLoss'] as const) {
+    const r = structuredClone(data.rules);
+    r.fight[key] = -1;
+    expect(() => validateRules(r)).toThrow(new RegExp(`rules\\.fight.*${key}`));
+    delete (r.fight as Partial<typeof r.fight>)[key];
+    expect(() => validateRules(r)).toThrow(new RegExp(`rules\\.fight.*${key}`));
+  }
+});
