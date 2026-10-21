@@ -531,6 +531,38 @@ describe('AI lane stances', () => {
     expect(stanceOf(100_000, 'trade', tuned(1_000_000, 1_000_000))).toMatchObject({ stance: 'farm' });
     expect(stanceOf(-100_000, 'farm').stance).toBeUndefined();
   });
+
+  /** Red top with lane pressure under Trade; the blue jungler seen last round at `jungler` (null: never seen). */
+  function pushOf(jungler: string | null): Order {
+    const s = newGame(d, 7);
+    s.round = 10;
+    s.waves.top = 0;
+    s.pits['dragon-pit'].nextSpawn = 600;
+    place(s, 'blue', 'top', 'top-lane');
+    place(s, 'red', 'top', 'top-lane');
+    get(s, 'red', 'top').bonusLead += 100_000;
+    s.lastSeen.red[get(s, 'blue', 'top').id] = { position: 'top-lane', round: 9 };
+    const bj = get(s, 'blue', 'jungle');
+    if (jungler) {
+      place(s, 'blue', 'jungle', jungler);
+      s.lastSeen.red[bj.id] = { position: jungler, round: 9 };
+    }
+    const tuning = tuned(1_000_000, 1_000_000);
+    const orders = aiOrders(viewFor(s, tuning, 'red'), tuning, profile('iron'), stubRng(() => 0.99));
+    validateOrders(s, tuning, 'red', orders);
+    return orderOf(orders, get(s, 'red', 'top').id);
+  }
+
+  test('with lane pressure and the enemy jungler seen far away, the laner Pushes', () => {
+    expect(d.graph.distance('dragon-pit', 'top-lane')).toBeGreaterThan(d.aiTuning.pushJunglerDistance);
+    expect(pushOf('dragon-pit')).toMatchObject({ kind: 'move', to: 'top-lane', stance: 'push' });
+  });
+
+  test('no Push when the enemy jungler is close or unseen', () => {
+    expect(d.graph.distance('scuttle-top', 'top-lane')).toBeLessThanOrEqual(d.aiTuning.pushJunglerDistance);
+    expect(pushOf('scuttle-top').stance).toBeUndefined();
+    expect(pushOf(null).stance).toBeUndefined();
+  });
 });
 
 test('AI stance: a laner whose move leaves its home lane goes back to Farm', () => {

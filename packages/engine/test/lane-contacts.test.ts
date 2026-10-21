@@ -161,6 +161,26 @@ describe('stances', () => {
     expect(get(state, 'blue', 'top').hp).toBe(Math.min(max, max - tradeWinnerLoss + regenPerRound));
   });
 
+  test('Push plays like Farm in an even lane contact: never all-in, and a Push loser against All-in survives', () => {
+    const s = lane();
+    const bt = get(s, 'blue', 'top');
+    const rt = get(s, 'red', 'top');
+    const vsFarm = ordersWith(s, [{ kind: 'move', champion: rt.id, to: 'top-lane', stance: 'push' }]);
+    expect(detectContacts(s, d, vsFarm).find((x) => x.position === 'top-lane')!.options).toEqual({ blue: ['farm'], red: ['farm'] });
+    const o = ordersWith(s, [
+      { kind: 'move', champion: bt.id, to: 'top-lane', stance: 'allin' },
+      { kind: 'move', champion: rt.id, to: 'top-lane', stance: 'push' },
+    ]);
+    validateOrders(s, d, 'red', o.red);
+    const c = detectContacts(s, d, o).find((x) => x.position === 'top-lane')!;
+    expect(c.options).toEqual({ blue: ['fight'], red: ['farm'] });
+    const { state, events } = resolveRound(s, d, o, {});
+    expect(events.some((e) => e.type === 'fight' || e.type === 'death')).toBe(false);
+    expect(events).toContainEqual({ type: 'trade', position: 'top-lane', lane: 'top', winner: 'blue' });
+    expect(alive(state, rt.id)).toBe(true);
+    expect(get(state, 'red', 'top').stance).toBe('push');
+  });
+
   test('a weaker All-in against Farm loses the trade, nobody dies', () => {
     const s = lane();
     const rt = get(s, 'red', 'top').id;

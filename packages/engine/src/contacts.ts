@@ -19,7 +19,13 @@ export function arrivalPositions(state: GameState, orders: Orders): Record<strin
   return out;
 }
 
-const STANCE_CHOICE: Record<Stance, Choice> = { farm: 'farm', trade: 'trade', allin: 'fight' };
+/** Push shoves the wave (see `updateLanes`) but plays a lane contact exactly like Farm: no trade, never all-in. */
+const STANCE_CHOICE: Record<Stance, Choice> = { push: 'farm', farm: 'farm', trade: 'trade', allin: 'fight' };
+
+/** A laner on this stance never dies in an even lane contact (Farm and Push play safe). */
+export function playsSafe(stance: Stance): boolean {
+  return STANCE_CHOICE[stance] === 'farm';
+}
 const AGGRESSION: Choice[] = ['farm', 'trade', 'fight'];
 
 /** A side's lane choice from its champions' stances (an order's `stance` first): the most aggressive one. */

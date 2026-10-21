@@ -32,7 +32,7 @@ function NextObjective({ store }: { store: Store }) {
   );
 }
 
-const STANCE_TEXT: Record<Stance, string> = { farm: 'farm', trade: 'trade', allin: 'all-in' };
+const STANCE_TEXT: Record<Stance, string> = { push: 'push', farm: 'farm', trade: 'trade', allin: 'all-in' };
 const stanceText = (s: Stance | undefined): string[] => (s ? [`posture ${STANCE_TEXT[s]}`] : []);
 
 function orderText(store: Store, c: ChampionState, o: Order | undefined): string {

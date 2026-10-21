@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData, matchupAdvantage } from '@lml/data';
 import type { Lane, Side } from '@lml/data/contracts';
-import { frontTower, lanePressure, level, newGame, roundWindow, totalRounds, updateLanes } from '@lml/engine';
+import { frontTower, laneExposure, lanePressure, level, newGame, roundWindow, totalRounds, updateLanes } from '@lml/engine';
 import type { ChampionState, GameEvent, GameState } from '@lml/engine/contracts';
 
 const d = loadGameData();
@@ -230,5 +230,75 @@ describe('lanePressure', () => {
     expect(lanePressure(s, d, 'top')).toBe('red');
     run(s);
     expect(s.waves.top as number).toBe(-1);
+  });
+});
+
+describe('Push stance', () => {
+  /** Blue and red tops on the lane middle, matchups and strength neutral: no fight-score push. */
+  const neutral = { ...d, matchups: [], rules: { ...d.rules, fight: { ...d.rules.fight, strength: 0 } } };
+  const even = (): GameState => {
+    const s = fresh();
+    get(s, 'blue', 'top').position = 'top-lane';
+    get(s, 'red', 'top').position = 'top-lane';
+    return s;
+  };
+
+  test('a side with a Push laner in its lane moves the wave one extra step toward the enemy', () => {
+    const s = even();
+    updateLanes(s, neutral, {}, []);
+    expect(s.waves.top).toBe(0);
+    const p = even();
+    get(p, 'red', 'top').stance = 'push';
+    const ev: GameEvent[] = [];
+    updateLanes(p, neutral, {}, ev);
+    expect(p.waves.top).toBe(-1);
+    expect(ev).toContainEqual({ type: 'wave', lane: 'top', from: 0, to: -1 });
+  });
+
+  test('both sides pushing cancel out; the extra step is clamped', () => {
+    const s = even();
+    get(s, 'blue', 'top').stance = 'push';
+    get(s, 'red', 'top').stance = 'push';
+    updateLanes(s, neutral, {}, []);
+    expect(s.waves.top).toBe(0);
+
+    const lone = fresh();
+    get(lone, 'blue', 'top').position = 'top-lane';
+    get(lone, 'blue', 'top').stance = 'push';
+    lone.waves.top = -1;
+    run(lone);
+    expect(lone.waves.top as number).toBe(1);
+    run(lone);
+    expect(lone.waves.top as number).toBe(1);
+  });
+
+  test('a Push laner on the pushed tower adds rules.lanes.pushBonus to the tower damage', () => {
+    const s = fresh();
+    get(s, 'blue', 'top').position = 'top-t1-red';
+    s.waves.top = 1;
+    run(s);
+    const plain = d.rules.towers.hp - s.towers['top-t1-red']!;
+    const p = fresh();
+    get(p, 'blue', 'top').position = 'top-t1-red';
+    get(p, 'blue', 'top').stance = 'push';
+    p.waves.top = 1;
+    run(p);
+    expect(d.rules.lanes.pushBonus).toBeGreaterThan(0);
+    expect(d.rules.towers.hp - p.towers['top-t1-red']!).toBeCloseTo(plain + d.rules.lanes.pushBonus);
+  });
+
+  test('laneExposure: the wave toward the enemy, +1 with a Push laner in the lane', () => {
+    const s = fresh();
+    get(s, 'blue', 'top').position = 'top-lane';
+    s.waves.top = 1;
+    expect(laneExposure(s, d, 'blue', 'top')).toBe(1);
+    expect(laneExposure(s, d, 'red', 'top')).toBe(-1);
+    get(s, 'blue', 'top').stance = 'push';
+    expect(laneExposure(s, d, 'blue', 'top')).toBe(2);
+    s.waves.top = -1;
+    expect(laneExposure(s, d, 'blue', 'top')).toBe(0);
+    // A Push laner out of the lane does not expose it.
+    get(s, 'blue', 'top').position = 'blue-base';
+    expect(laneExposure(s, d, 'blue', 'top')).toBe(-1);
   });
 });

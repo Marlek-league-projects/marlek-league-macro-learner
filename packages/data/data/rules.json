@@ -9,6 +9,7 @@
   "moves": { "laner": 1, "jungler": 2, "junglerObjectiveReach": true },
   "wards": { "perRound": 3, "unwardPerRound": 1, "unwardRoles": ["jungle", "support"] },
   "towers": { "hp": 5, "pushDamage": [1, 1, 2, 3, 4], "heraldDamage": 3, "platesGoldUntil": 840, "plateGold": 160, "towerGold": 250, "absentLanerChip": 0.5 },
+  "lanes": { "pushBonus": 0.5 },
   "buffs": { "grubsMult": 1.5, "baronMult": 2, "baronRounds": 3, "dragonLead": 250 },
   "objectives": {
     "scuttle": { "firstSpawn": 210, "respawn": 150, "despawnAt": null, "minChampions": 1, "extraRound": false, "instantAt": null, "gold": 100, "xp": 100, "value": 450 },

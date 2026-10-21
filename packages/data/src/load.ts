@@ -73,6 +73,10 @@ export function validateRules(rules: Rules): void {
   if (typeof share !== 'number' || !Number.isFinite(share) || share < 0 || share > 1) {
     fail('rules.economy', `pressureFarmShare = ${String(share)} is not a number in 0..1`);
   }
+  const pushBonus = rules.lanes?.pushBonus;
+  if (typeof pushBonus !== 'number' || !Number.isFinite(pushBonus) || pushBonus < 0) {
+    fail('rules.lanes', `pushBonus = ${String(pushBonus)} is not a number >= 0`);
+  }
   const h = rules.health;
   const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
   if (!h || !isNum(h.max) || h.max <= 0) fail('rules.health', 'max must be a positive number');
@@ -112,6 +116,8 @@ export function validateAiTuning(t: AiTuning): void {
   num('presenceShare', t.presenceShare, 0, 1);
   num('allInMargin', t.allInMargin, 0);
   num('tradeMargin', t.tradeMargin, 0);
+  num('pushMargin', t.pushMargin, -Infinity);
+  num('pushJunglerDistance', t.pushJunglerDistance, 0);
   num('waveSacrificeCost', t.waveSacrificeCost, 0);
   num('laningPhaseUntil', t.laningPhaseUntil, 0);
   for (const id of AI_PRIORITIES) num(`priorities.${id}`, t.priorities?.[id], -Infinity);

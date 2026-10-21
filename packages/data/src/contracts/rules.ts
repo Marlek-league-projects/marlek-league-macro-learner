@@ -37,6 +37,10 @@ export interface Rules {
     towerGold: number;
     absentLanerChip: number;
   };
+  lanes: {
+    /** Extra tower HP a side deals when it pushes a tower with a laner on the Push stance. */
+    pushBonus: number;
+  };
   buffs: { grubsMult: number; baronMult: number; baronRounds: number; dragonLead: number };
   objectives: Record<ObjectiveId, ObjectiveRule>;
   camps: {
@@ -163,6 +167,13 @@ export interface AiTuning {
   allInMargin: number;
   /** Fight-score margin over which an even lane contact is traded instead of farmed. */
   tradeMargin: number;
+  /** Fight-score margin over which a laner that would Farm shoves the wave (Push) instead, if no enemy jungler threatens. */
+  pushMargin: number;
+  /**
+   * A known enemy jungler at most this graph distance from a laner's destination threatens it (no Push). An unknown
+   * (unseen) jungler always threatens.
+   */
+  pushJunglerDistance: number;
   /** Objective value over which a laner leaves its unpushed wave to rotate to the pit, if that gives the numbers. */
   waveSacrificeCost: number;
   /** Game time (s): rounds starting before it are the laning phase, where laners only farm their wave, recall or take a paying rotation. */
