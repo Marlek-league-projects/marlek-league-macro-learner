@@ -2,7 +2,7 @@ import type { AiProfile, GameData, Role, Rules, Side, Stage } from '@lml/data/co
 import type { Choice, Contact, ContactChoices } from './contacts';
 import type { GameEvent } from './events';
 import type { Order, Orders } from './orders';
-import type { GameState, Rng } from './state';
+import type { GameState, Rng, Ward } from './state';
 import type { Explanation } from './teaching';
 import type { EnemyEstimate, EnemyInfo, PlayerView } from './view';
 
@@ -48,5 +48,13 @@ export interface GameEngine {
   roundWindow(rules: Rules, round: number): RoundWindow;
   totalRounds(rules: Rules): number;
   level(xp: number, rules: Rules): number;
+  /** Steps a champion may take in `round`, from the round's length. */
+  stepBudget(rules: Rules, round: number): number;
+  /** A champion `distance` steps away acts on arrival (staying acts). */
+  canAct(distance: number, budget: number): boolean;
+  /** Deterministic shortest path, both ends included. */
+  route(data: GameData, from: string, to: string, side: Side): string[];
+  /** Rounds a ward stays active seen from `round` (1 = its last active round). */
+  wardRoundsLeft(ward: Ward, round: number, rules: Rules): number;
   teamScore(state: GameState, data: GameData, side: Side): number;
 }

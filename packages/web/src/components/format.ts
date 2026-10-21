@@ -1,11 +1,14 @@
 // French display helpers shared by the components.
 import type { GameData, Lane, ObjectiveId, Position, Role, Side } from '@lml/data/contracts';
-import type { Choice, ContactKind, GameEvent, PlayerView, WavePos } from '@lml/engine/contracts';
+import type { Choice, Contact, ContactKind, GameEvent, PlayerView, WavePos } from '@lml/engine/contracts';
 import type { Screen } from '../store';
 
 const ASSETS = './assets/';
 
 export const roleIcon = (role: Role): string => `${ASSETS}roles/${role}.png`;
+
+/** League's recall (B button) icon, drawn with an SVG `<image>`. */
+export const recallIcon = (): string => `${ASSETS}recall.png`;
 
 export const championImage = (data: GameData, id: string): string =>
   `${ASSETS}champions/${data.champions[id]?.image ?? `${id}.png`}`;
@@ -77,11 +80,56 @@ export const CONTACT_LABEL: Record<ContactKind, string> = {
   skirmish: 'Escarmouche',
 };
 
-const CHOICE_LABEL = { farm: 'Farmer', fight: 'Combattre', flee: 'Fuir', trade: 'Trade' } as const;
+const CHOICE_LABEL: Record<Choice, string> = {
+  farm: 'Farmer sous la tour',
+  fight: 'Combattre',
+  flee: 'Fuir',
+  trade: 'Trade',
+  objective: "Continuer l'objectif",
+};
 
-/** Button label of a choice: the fight is an "All-in" on a lane contact. */
+/** Button label of a choice: on an even lane contact the fight is an "All-in" and farming is plain "Farmer". */
 export function choiceLabel(kind: ContactKind, choice: Choice): string {
-  return choice === 'fight' && kind === 'trade' ? 'All-in' : CHOICE_LABEL[choice];
+  if (kind === 'trade' && choice === 'fight') return 'All-in';
+  if (kind === 'trade' && choice === 'farm') return 'Farmer';
+  return CHOICE_LABEL[choice];
+}
+
+const ZONE_LABEL: Record<string, string> = {
+  'lane-top': 'Lane top',
+  'lane-mid': 'Lane mid',
+  'lane-bot': 'Lane bot',
+  'river-top': 'Rivière haut',
+  'river-bot': 'Rivière bas',
+};
+
+const RIVER_PIT: Record<string, 'baron-pit' | 'dragon-pit'> = { 'river-top': 'baron-pit', 'river-bot': 'dragon-pit' };
+
+/**
+ * A contact's title from its zone: "Lane top", "Rivière haut (Carapateur + Nashor)" (the pit's objective up, or
+ * the next one it hosts at `now`), or the position's name for a camp zone.
+ */
+export function zoneTitle(contact: Pick<Contact, 'id' | 'position'>, view: Pick<PlayerView, 'pits'>, data: GameData, now: number): string {
+  const zone = ZONE_LABEL[contact.id];
+  if (!zone) return positionLabel(data, data.graph.positions[contact.id] ? contact.id : contact.position);
+  const pit = RIVER_PIT[contact.id];
+  if (!pit) return zone;
+  const objective = view.pits[pit].objective ?? pitObjectiveAt(data, pit, now);
+  return `${zone} (${OBJECTIVE_LABEL.scuttle} + ${OBJECTIVE_LABEL[objective]})`;
+}
+
+const OBJECTIVE_ARTICLE: Record<ObjectiveId, string> = {
+  scuttle: 'le',
+  dragon: 'le',
+  voidgrubs: 'les',
+  herald: 'le',
+  baron: 'le',
+};
+
+/** The objective prompt's main button: "Faire le Dragon", plus " + Carapateur" when the river's Scuttle is up too. */
+export function objectiveActionLabel(objective: ObjectiveId, withScuttle: boolean): string {
+  const main = `Faire ${OBJECTIVE_ARTICLE[objective]} ${OBJECTIVE_LABEL[objective]}`;
+  return withScuttle ? `${main} + ${OBJECTIVE_LABEL.scuttle}` : main;
 }
 
 const SIDE_LABEL: Record<Side, string> = { blue: 'Bleu', red: 'Rouge' };
@@ -97,7 +145,9 @@ export function eventText(e: GameEvent, data: GameData): string {
   const at = (id: string) => positionLabel(data, id);
   switch (e.type) {
     case 'moved':
-      return `${name(e.champion)} : ${at(e.from)} → ${at(e.to)}`;
+      return e.acted === false
+        ? `${name(e.champion)} arrive à ${at(e.to)} (sans action)`
+        : `${name(e.champion)} : ${at(e.from)} → ${at(e.to)}`;
     case 'fled':
       return `${name(e.champion)} fuit vers ${at(e.to)}`;
     case 'fight': {
@@ -128,7 +178,30 @@ export function eventText(e: GameEvent, data: GameData): string {
       return `Ward ${SIDE_LABEL[e.side].toLowerCase()} détruite à ${at(e.position)}`;
     case 'heraldLaunched':
       return `Herald lancé sur ${at(e.tower)}`;
+    case 'hpLost':
+      return `${name(e.champion)} −${num(e.amount)} PV`;
+    case 'wardSpotted':
+      return `Ward à ${at(e.position)} : ${name(e.champion)} repéré${e.to ? ` → ${at(e.to)}` : ''}`;
   }
+}
+
+/** The log's lines: one per event, except a move onto a camp and that champion clearing it, told as one line. */
+export function eventLines(events: GameEvent[], data: GameData): string[] {
+  const merged = new Set<GameEvent>();
+  const out: string[] = [];
+  for (const e of events) {
+    if (merged.has(e)) continue;
+    if (e.type === 'moved' && e.acted !== false) {
+      const cleared = events.find((x) => x.type === 'campCleared' && x.champion === e.champion && x.camp === e.to);
+      if (cleared) {
+        merged.add(cleared);
+        out.push(`${championName(data, e.champion)} se déplace vers ${positionLabel(data, e.to)} et tue le camp`);
+        continue;
+      }
+    }
+    out.push(eventText(e, data));
+  }
+  return out;
 }
 
 /** Engine validation errors (English) as a short French message. */

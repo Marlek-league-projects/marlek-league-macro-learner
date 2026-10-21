@@ -16,6 +16,7 @@ import type {
   Rng,
   RoundWindow,
   Stance,
+  Ward,
   WardSpot,
 } from '@lml/engine/contracts';
 
@@ -60,11 +61,25 @@ export interface Store {
   panelAt: Signal<{ x: number; y: number } | null>;
   /** The actions panel is being dragged: map clicks are ignored meanwhile. */
   panelDragging: Signal<boolean>;
+  /** Champions whose objective prompt was answered this order phase (shown once per round and champion). */
+  objectivePromptsClosed: Signal<string[]>;
   start(s: Settings): void;
   /** Back to the start screen, dropping the current game. */
   reset(): void;
   select(id: string | null): void;
   reachableForSelected(): Record<string, number>;
+  /** Steps every champion may take this round. */
+  stepBudget(): number;
+  /** A position `distance` steps away lets the champion act on arrival this round. */
+  canAct(distance: number): boolean;
+  /** The player's side's deterministic shortest path, both ends included. */
+  route(from: string, to: string): string[];
+  /** Rounds an own ward stays active, seen from the view's round (1 = its last active round). */
+  wardRoundsLeft(ward: Ward): number;
+  /** Stays on the pit to take its objective, and closes the champion's objective prompt. */
+  doObjective(champion: string): void;
+  /** Closes the champion's objective prompt and selects it for another order. */
+  otherOrder(champion: string): void;
   setMove(champion: string, to: string): void;
   setWard(champion: string, spot: WardSpot | null): void;
   setUnward(champion: string, spot: 'from' | 'to' | null): void;
@@ -116,6 +131,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
   const recalled = signal<string[]>([]);
   const panelAt = signal<{ x: number; y: number } | null>(null);
   const panelDragging = signal(false);
+  const objectivePromptsClosed = signal<string[]>([]);
 
   // The full state never leaves the store; components only see `view`.
   let state: GameState | null = null;
@@ -236,7 +252,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
 
   return {
     data, screen, view, previousView, replaying, replayRun, selected, pending, contacts, choices, lastEvents, explanations, settings, recalled,
-    panelAt, panelDragging,
+    panelAt, panelDragging, objectivePromptsClosed,
 
     start(s) {
       settings.value = s;
@@ -253,6 +269,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       lastEvents.value = [];
       explanations.value = [];
       recalled.value = [];
+      objectivePromptsClosed.value = [];
       previousView.value = null;
       stopReplay();
       panelDragging.value = false;
@@ -271,6 +288,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       lastEvents.value = [];
       explanations.value = [];
       recalled.value = [];
+      objectivePromptsClosed.value = [];
       previousView.value = null;
       stopReplay();
       panelDragging.value = false;
@@ -287,6 +305,32 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       if (!id || !state) return {};
       const c = state.champions.find((x) => x.id === id && x.side === PLAYER);
       return c && c.status === 'alive' ? engine.reachable(state, data, id) : {};
+    },
+
+    stepBudget() {
+      return engine.stepBudget(data.rules, current().round);
+    },
+
+    canAct(distance) {
+      return engine.canAct(distance, engine.stepBudget(data.rules, current().round));
+    },
+
+    route(from, to) {
+      return engine.route(data, from, to, PLAYER);
+    },
+
+    wardRoundsLeft(ward) {
+      return engine.wardRoundsLeft(ward, view.value?.round ?? current().round, data.rules);
+    },
+
+    doObjective(id) {
+      this.setMove(id, champion(id).position);
+      objectivePromptsClosed.value = [...objectivePromptsClosed.value, id];
+    },
+
+    otherOrder(id) {
+      objectivePromptsClosed.value = [...objectivePromptsClosed.value, id];
+      selected.value = id;
     },
 
     setMove(id, to) {
@@ -334,7 +378,9 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       if (prev?.kind === 'recall') return;
       const order: Extract<Order, { kind: 'recall' }> = { kind: 'recall', champion: id };
       if (prev?.kind === 'move') {
-        const step = data.graph.distance(champion(id).position, prev.to) === 1;
+        // The recall is the action: its step must leave a step of the budget for it.
+        const d = data.graph.distance(champion(id).position, prev.to);
+        const step = d > 0 && engine.canAct(d, engine.stepBudget(data.rules, current().round));
         if (prev.ward === 'from' || (prev.ward === 'to' && step)) order.ward = prev.ward;
         if (prev.unward !== undefined && (step || prev.unward === 'from')) order.unward = prev.unward;
         if (step) order.to = prev.to;
@@ -399,6 +445,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       selected.value = null;
       contacts.value = [];
       choices.value = {};
+      objectivePromptsClosed.value = [];
       previousView.value = null;
       stopReplay();
       panelDragging.value = false;

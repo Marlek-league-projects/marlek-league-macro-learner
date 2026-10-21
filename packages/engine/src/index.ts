@@ -10,6 +10,7 @@ import { newGame } from './setup';
 import { explainRound } from './teaching';
 import { eventsFor, viewFor } from './vision';
 import { estimateEnemy } from './estimate';
+import { canAct, route, stepBudget, wardRoundsLeft } from './task5-shims';
 
 export const ENGINE_PACKAGE = '@lml/engine';
 export { createRng } from './rng';
@@ -32,5 +33,6 @@ export function createEngine(): GameEngine {
   return {
     newGame, defaultOrders, reachable, bestVia, isLaneChange, spawnPoints, validateOrders, detectContacts, resolveRound, viewFor, eventsFor, estimateEnemy,
     aiOrders, aiContactChoice, explainRound, createRng, roundWindow, totalRounds, level, teamScore,
+    stepBudget, canAct, route, wardRoundsLeft, // TEMPORARY: Task 5 worktree shims (task5-shims.ts)
   };
 }

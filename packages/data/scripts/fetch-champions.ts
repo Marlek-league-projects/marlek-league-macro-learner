@@ -84,3 +84,7 @@ console.log('downloaded 5 role icons');
 
 await download(`${CDRAGON}/game/assets/maps/info/map11/2dlevelminimap_base_baron1.png`, join(ASSETS_DIR, 'minimap.png'));
 console.log('downloaded minimap');
+
+// League's recall (B button) icon, 64×64.
+await download(`${CDRAGON}/game/assets/spells/icons2d/icon_spell_summonerspell_recall_01.png`, join(ASSETS_DIR, 'recall.png'));
+console.log('downloaded recall icon');
