@@ -45,6 +45,49 @@ describe('health', () => {
     expect(get(state, 'blue', 'mid').hp).toBe(H.max);
   });
 
+  test('a tied trade costs no HP', () => {
+    const s = lane();
+    const bt = get(s, 'blue', 'top');
+    const rt = get(s, 'red', 'top');
+    bt.bonusLead = 0;
+    bt.hp = 50;
+    rt.hp = 50;
+    const orig = d.champions[rt.id]!;
+    d.champions[rt.id] = { ...d.champions[bt.id]!, id: rt.id };
+    try {
+      const o = ordersWith(s, [
+        { kind: 'move', champion: bt.id, to: 'top-lane', stance: 'trade' },
+        { kind: 'move', champion: rt.id, to: 'top-lane', stance: 'trade' },
+      ]);
+      const { state, events } = resolveRound(s, d, o, {});
+      expect(events).toContainEqual({ type: 'trade', position: 'top-lane', lane: 'top', winner: null });
+      expect(get(state, 'blue', 'top').hp).toBe(50 + H.regenPerRound);
+      expect(get(state, 'red', 'top').hp).toBe(50 + H.regenPerRound);
+    } finally {
+      d.champions[rt.id] = orig;
+    }
+  });
+
+  test('a trade won because the other side fled costs no HP', () => {
+    const s = newGame(d, 7);
+    s.round = 10;
+    place(s, 'blue', 'top', 'top-t1-blue');
+    place(s, 'red', 'top', 'top-t1-red');
+    place(s, 'red', 'jungle', 'scuttle-top');
+    for (const c of s.champions) c.hp = 50;
+    const bt = get(s, 'blue', 'top').id;
+    const o = ordersWith(s, [
+      { kind: 'move', champion: bt, to: 'top-lane' },
+      { kind: 'move', champion: get(s, 'red', 'top').id, to: 'top-lane' },
+      { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'top-lane' },
+    ]);
+    const { state, events } = resolveRound(s, d, o, {});
+    expect(events).toContainEqual({ type: 'fled', champion: bt, to: 'top-t1-blue' });
+    expect(events.some((e) => e.type === 'trade' && e.winner === 'red')).toBe(true);
+    for (const role of ['top', 'jungle']) expect(get(state, 'red', role).hp).toBe(50 + H.regenPerRound);
+    expect(get(state, 'blue', 'top').hp).toBe(50 + H.regenPerRound);
+  });
+
   test('health is clamped to 0..max and never kills by itself', () => {
     const s = lane();
     get(s, 'red', 'top').hp = 5;

@@ -183,7 +183,7 @@ describe('stances', () => {
     expect(alive(state, rt)).toBe(false);
   });
 
-  test('a side with mixed stances (farm + All-in) plays its most aggressive one', () => {
+  test('a side with mixed stances (farm + All-in) plays its most aggressive one; a losing Farm laner survives', () => {
     const s = setup(10, [
       ['blue', 'adc', 'bot-lane'],
       ['blue', 'support', 'bot-lane'],
@@ -200,6 +200,31 @@ describe('stances', () => {
     const { state, events } = resolveRound(s, d, ordersWith(s), {});
     expect(events.some((e) => e.type === 'fight' && e.winner === 'blue')).toBe(true);
     expect(alive(state, get(s, 'red', 'adc').id)).toBe(false);
+    const rs = get(state, 'red', 'support');
+    expect(rs.status).toBe('alive');
+    expect(rs.hp).toBe(d.rules.health.max - d.rules.health.tradeLoss + d.rules.health.regenPerRound);
+  });
+
+  test('2v2: a Farm adc whose All-in support loses the fight to a Trade duo survives; the support dies', () => {
+    const s = setup(10, [
+      ['blue', 'adc', 'bot-lane'],
+      ['blue', 'support', 'bot-lane'],
+      ['red', 'adc', 'bot-lane'],
+      ['red', 'support', 'bot-lane'],
+    ]);
+    s.waves.bot = 0;
+    get(s, 'red', 'adc').bonusLead += 100_000;
+    get(s, 'blue', 'support').stance = 'allin';
+    get(s, 'red', 'adc').stance = 'trade';
+    get(s, 'red', 'support').stance = 'trade';
+    const { state, events } = resolveRound(s, d, ordersWith(s), {});
+    expect(events.some((e) => e.type === 'fight' && e.winner === 'red')).toBe(true);
+    const ba = get(state, 'blue', 'adc');
+    expect(ba.status).toBe('alive');
+    expect(ba.hp).toBe(d.rules.health.max - d.rules.health.tradeLoss + d.rules.health.regenPerRound);
+    expect(events.some((e) => e.type === 'death' && e.champion === ba.id)).toBe(false);
+    expect(alive(state, get(s, 'blue', 'support').id)).toBe(false);
+    expect(alive(state, get(s, 'red', 'adc').id) && alive(state, get(s, 'red', 'support').id)).toBe(true);
   });
 
   test('a stance persists across rounds until an order changes it', () => {

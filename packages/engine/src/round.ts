@@ -124,7 +124,11 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     if (winner === null) {
       goBack([...contact.blue, ...contact.red]);
     } else {
-      applyKill(s, data, ids[other(winner)], ids[winner], events);
+      // Farm is per champion: in an even lane, a loser on Farm survives the fight and loses HP as a trade loser.
+      const losers = ids[other(winner)];
+      const safe = contact.kind === 'trade' ? losers.filter((id) => byId(id).stance === 'farm') : [];
+      for (const id of safe) changeHp(byId(id), data.rules, -data.rules.health.tradeLoss);
+      applyKill(s, data, losers.filter((id) => !safe.includes(id)), ids[winner], events);
     }
   }
 

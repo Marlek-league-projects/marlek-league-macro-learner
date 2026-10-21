@@ -598,4 +598,18 @@ describe('AI recall', () => {
     const healthy = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
     expect(orderOf(healthy, top.id).kind).not.toBe('recall');
   });
+
+  test('a gold-rank laner under recallHp also recalls on a pushed wave', () => {
+    const s = newGame(d, 7);
+    s.round = 10;
+    s.pits['dragon-pit'].nextSpawn = 600;
+    s.waves.top = 1;
+    place(s, 'blue', 'top', 'top-t1-blue');
+    const top = get(s, 'blue', 'top');
+    top.gold = 0;
+    top.hp = d.aiTuning.recallHp - 1;
+    const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('gold'), stubRng(() => 0.99));
+    validateOrders(s, d, 'blue', orders);
+    expect(orderOf(orders, top.id).kind).toBe('recall');
+  });
 });
