@@ -188,6 +188,7 @@ The map positions form a graph, and a move is one step on it. Starting values:
 - **Changing lane ends the move**: going from one lane to another (e.g. mid T1 → top T1) is 1 move, and the champion stops there for the round.
 - **Along a lane**: a laner can go from the enemy T1 back to its own T1 (or forward) in one move.
 - **Lane to Scuttle**: from the T1s or the middle of a lane, the nearest Scuttle is 1 move away (top → top Scuttle, bot → bottom Scuttle, mid → both).
+- **Pits**: the Baron pit and the Dragon pit are reachable from exactly the same positions as their nearby Scuttle.
 - **River to jungle**: from a river position (both Scuttles and both pits), any jungle camp on either side is 1 move away.
 - **Crossing your own jungle**: from the top-side camps to the bot-side camps (e.g. Wolves → Krugs) the path goes through the mid T1 (2 moves), not through the river.
 - **Ganks from the outer camps**: an outer camp is 1 move from its nearby lane (Gromp and Blue Buff → top lane, Krugs and Red Buff → bot lane on the blue side, and the mirror on the red side), so a jungler can gank from there in one round.

@@ -82,7 +82,7 @@ describe('store', () => {
   test('unreachable move throws /reach/', () => {
     const store = started();
     expect(() => store.setMove(blue(store, 'top').id, 'base-blue')).toThrow(/reach/);
-    expect(() => store.setMove(blue(store, 'top').id, 'baron-pit')).toThrow(/reach/);
+    expect(() => store.setMove(blue(store, 'top').id, 'dragon-pit')).toThrow(/reach/);
   });
 
   test('a 2-step move gets a via on a shortest path', () => {

@@ -186,8 +186,8 @@ describe('aiOrders', () => {
     const o = midOrder(late);
     expect(o.kind).toBe('move');
     const to = (o as Extract<Order, { kind: 'move' }>).to;
-    expect(d.graph.distance(to, 'dragon-pit')).toBe(1);
-    expect(d.graph.positions[to]!.lane).toBeUndefined();
+    // The mid T1 reaches the pit in 1 move, like the Scuttle: it steps straight into it.
+    expect(to).toBe('dragon-pit');
   });
 
   test('below Emerald the mid does not sacrifice its wave, even with no mistake rolled', () => {
@@ -371,7 +371,7 @@ describe('laning phase', () => {
     validateOrders(s, d, 'blue', orders);
     return orderOf(orders, get(s, 'blue', 'adc').id);
   };
-  /** Off the lane, a move closer to the Dragon pit than `from` (bot-t1-red is two moves from it, bot-lane one). */
+  /** Off the lane, a move closer to the Dragon pit than `from` (bot-t1-red reaches it in one move, like the Scuttle). */
   const towardDragon = (o: Order, from = 'bot-t1-red'): boolean =>
     o.kind === 'move' &&
     d.graph.positions[o.to]!.lane === undefined &&
@@ -406,7 +406,7 @@ describe('laning phase', () => {
     // The red group just seen at the pit would win the fight there: no rotation into it.
     expect(adcRotates(late, 'diamond', onlyMistake())).toBe(false);
     for (const role of ['jungle', 'adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 20;
-    expect(adcOrder(late, 'diamond', onlyMistake())).toMatchObject({ kind: 'move', to: 'bot-lane' });
+    expect(adcOrder(late, 'diamond', onlyMistake())).toMatchObject({ kind: 'move', to: 'dragon-pit' });
     expect(adcRotates(late, 'diamond', onlyMistake())).toBe(true);
   });
 
@@ -440,20 +440,16 @@ describe('laning phase', () => {
     expect(midRotates(-1)).toBe(false);
   });
 
-  test('a laner rotating to a pit walks the lane, not through a camp, when both routes are as short', () => {
+  test('a laner rotating to a pit steps straight into it from its T1, like the Scuttle', () => {
     const s = newGame(d, 7);
     s.round = 14; // Voidgrubs up; no enemy seen, so the top's wave sacrifice gives the numbers
     s.pits['baron-pit'] = { objective: 'voidgrubs', nextSpawn: null, capture: null };
     place(s, 'blue', 'top', 'top-t1-blue');
     place(s, 'blue', 'jungle', 'bluebuff-blue');
-    // Both are one move from the top T1 and one from the pit; bluebuff-blue sorts first by id.
-    for (const via of ['top-lane', 'bluebuff-blue']) {
-      expect(d.graph.distance('top-t1-blue', via)).toBe(1);
-      expect(d.graph.distance(via, 'baron-pit')).toBe(1);
-    }
+    expect(d.graph.distance('top-t1-blue', 'baron-pit')).toBe(1);
     const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('diamond'), onlyMistake());
     validateOrders(s, d, 'blue', orders);
-    expect(orderOf(orders, get(s, 'blue', 'top').id)).toMatchObject({ kind: 'move', to: 'top-lane' });
+    expect(orderOf(orders, get(s, 'blue', 'top').id)).toMatchObject({ kind: 'move', to: 'baron-pit' });
   });
 
   test('rotateWithoutPriority still breaks the laning-phase rule', () => {

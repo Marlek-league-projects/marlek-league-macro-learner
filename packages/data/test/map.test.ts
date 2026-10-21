@@ -73,3 +73,10 @@ test('a laner goes from either T1 of its lane to the other in one move, in top, 
   }
   for (const [a, ns] of Object.entries(g.adj)) for (const b of ns) expect(g.adj[mirrorId(a)]).toContain(mirrorId(b));
 });
+
+test('pits are reachable from the same positions as their Scuttle', () => {
+  for (const [scuttle, pit] of [['scuttle-top', 'baron-pit'], ['scuttle-bot', 'dragon-pit']] as const) {
+    expect(g.adj[scuttle]).toContain(pit);
+    for (const n of g.adj[scuttle]!) if (n !== pit) expect(g.distance(n, pit)).toBe(1);
+  }
+});

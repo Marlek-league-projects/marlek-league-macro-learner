@@ -188,13 +188,13 @@ describe('jungler objective reach', () => {
     j.position = 'top-t3-blue';
     expect(reachable(s, d, j.id)['dragon-pit']).toBeUndefined();
   });
-  test('mid T1 reaches neither pit in 1 move', () => {
+  test('mid T1 reaches both pits in 1 move, like both Scuttles', () => {
     const s = fresh();
     const mid = get(s, 'blue', 'mid');
     mid.position = 'mid-t1-blue';
     const r = reachable(s, d, mid.id);
-    expect(r['baron-pit']).toBeUndefined();
-    expect(r['dragon-pit']).toBeUndefined();
+    expect(r['baron-pit']).toBe(1);
+    expect(r['dragon-pit']).toBe(1);
   });
   test('the bonus distance is the move budget', () => {
     const s = fresh();
