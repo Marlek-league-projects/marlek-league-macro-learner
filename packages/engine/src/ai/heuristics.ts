@@ -3,8 +3,8 @@ import type { AiProfile, GameData, Lane, MistakeId, ObjectiveId, Role, Side } fr
 import type { ChampionState, Choice, Contact, EnemyInfo, GameState, Order, PlayerView, Rng, Stance } from '../contracts';
 import { gankedSide } from '../contacts';
 import { resolveFight } from '../fight';
-import { reachableFrom, spawnPointsFor, stepBudget } from '../movement';
-import type { PitId } from '../objectives';
+import { canAct, reachableFrom, spawnPointsFor, stepBudget } from '../movement';
+import { type PitId, SCUTTLE_PIT } from '../objectives';
 import { roundWindow } from '../time';
 import { other, ourWave, PITS, pitTiming } from './evaluate';
 import { stateFromView } from './simulate';
@@ -97,8 +97,27 @@ function front(ctx: Ctx, side: Side, lane: Lane): string | null {
 /** Steps every champion may take in the view's round. */
 const budget = (ctx: Ctx): number => stepBudget(ctx.data.rules, ctx.view.round);
 
+/**
+ * Hard rule, never a mistake: an AI champion ends on a standing enemy tower only when it is that lane's front tower
+ * and the AI's wave is at it. A destroyed tower's position is no longer under a tower.
+ */
+export function towerAllowed(ctx: Ctx, position: string): boolean {
+  const p = ctx.data.graph.positions[position];
+  if (p?.kind !== 'tower' || p.side !== ctx.enemy || (ctx.view.towers[position] ?? 0) <= 0) return true;
+  return position === front(ctx, ctx.enemy, p.lane!) && ourWave(ctx.view, p.lane!) === 1;
+}
+
+/** Positions `c` may end on this round (`towerAllowed`), with their distance; with none, its own position. */
 function reach(ctx: Ctx, c: ChampionState): Record<string, number> {
-  return reachableFrom(ctx.data, c.position, budget(ctx), c.side);
+  const all = reachableFrom(ctx.data, c.position, budget(ctx), c.side);
+  const out = Object.fromEntries(Object.entries(all).filter(([p]) => towerAllowed(ctx, p)));
+  return Object.keys(out).length > 0 ? out : { [c.position]: 0 };
+}
+
+/** `c` reaches `pos` this round with a step left to act there (clear, take, farm). */
+function actsOn(ctx: Ctx, c: ChampionState, pos: string): boolean {
+  const d = reach(ctx, c)[pos];
+  return d !== undefined && canAct(d, budget(ctx));
 }
 
 /**
@@ -113,16 +132,33 @@ function routeRank(ctx: Ctx, c: ChampionState, pos: string): number {
   return p.side === ctx.side ? 2 : 3;
 }
 
-/** Reachable position closest to `target`; ties: fewest moves, then `routeRank`, then id. */
-function step(ctx: Ctx, c: ChampionState, target: string): string {
+/**
+ * Reachable position closest to `target` among those passing `where`, or null; ties: fewest moves, then
+ * `routeRank`, then id.
+ */
+function closest(ctx: Ctx, c: ChampionState, target: string, where: (pos: string, steps: number) => boolean): string | null {
   const r = reach(ctx, c);
-  return Object.keys(r).sort(
-    (a, b) =>
-      dist(ctx.data, a, target) - dist(ctx.data, b, target) ||
-      r[a]! - r[b]! ||
-      routeRank(ctx, c, a) - routeRank(ctx, c, b) ||
-      a.localeCompare(b),
-  )[0]!;
+  return (
+    Object.keys(r)
+      .filter((p) => where(p, r[p]!))
+      .sort(
+        (a, b) =>
+          dist(ctx.data, a, target) - dist(ctx.data, b, target) ||
+          r[a]! - r[b]! ||
+          routeRank(ctx, c, a) - routeRank(ctx, c, b) ||
+          a.localeCompare(b),
+      )[0] ?? null
+  );
+}
+
+/** Reachable position closest to `target` (a walk toward it: arriving may leave no step to act). */
+function step(ctx: Ctx, c: ChampionState, target: string): string {
+  return closest(ctx, c, target, () => true)!;
+}
+
+/** Position closest to `target` among those passing `where` where `c` still has a step left to act, or null. */
+function actStep(ctx: Ctx, c: ChampionState, target: string, where: (pos: string) => boolean): string | null {
+  return closest(ctx, c, target, (p, steps) => canAct(steps, budget(ctx)) && where(p));
 }
 
 const moveTo = (c: ChampionState, to: string): Order => ({ kind: 'move', champion: c.id, to });
@@ -187,22 +223,36 @@ function home(ctx: Ctx, c: ChampionState): Order {
   return moveTo(c, step(ctx, c, camps[0] ?? c.position));
 }
 
-/** `pointlessPlay`: a random invade (jungler) or roam. */
-function pointless(ctx: Ctx, c: ChampionState, rng: Rng): Order {
-  const r = Object.keys(reach(ctx, c)).sort();
-  const invades = r.filter((p) => ctx.data.graph.positions[p]?.kind === 'camp' && ctx.data.graph.positions[p]!.side === ctx.enemy);
-  const roams = r.filter((p) => p !== c.position);
-  const pool = c.role === 'jungle' && invades.length > 0 ? invades : roams.length > 0 ? roams : r;
-  return moveTo(c, rng.pick(pool));
+/** Where `pointlessPlay` wanders: its own side's camps, the river (Scuttles, pits) and its own lane's positions. */
+function wanderSpot(ctx: Ctx, c: ChampionState, pos: string): boolean {
+  const p = ctx.data.graph.positions[pos]!;
+  if (p.kind === 'camp') return p.side === ctx.side;
+  if (p.kind === 'scuttle' || p.kind === 'pit') return true;
+  return c.role !== 'jungle' && p.lane === HOME_LANE[c.role];
 }
 
+/**
+ * `pointlessPlay`: a random move within the champion's `wanderSpot`s (and `towerAllowed`); with none, it stays, or
+ * goes to the closest allowed position.
+ */
+function pointless(ctx: Ctx, c: ChampionState, rng: Rng): Order {
+  const pool = Object.keys(reach(ctx, c))
+    .sort()
+    .filter((p) => p !== c.position && wanderSpot(ctx, c, p));
+  return moveTo(c, pool.length > 0 ? rng.pick(pool) : step(ctx, c, c.position));
+}
+
+/**
+ * Launch the Herald on an enemy front tower in reach where the wave is (`towerAllowed`), otherwise walk toward the
+ * nearest one.
+ */
 function herald(ctx: Ctx, c: ChampionState): Order {
   const r = reach(ctx, c);
   const targets = LANES.map((l) => front(ctx, ctx.enemy, l)).filter((t): t is string => t !== null);
   const inRange = targets.find((t) => r[t] !== undefined);
   if (inRange) return { kind: 'move', champion: c.id, to: inRange, launchHerald: true };
   const nearest = [...targets].sort((a, b) => dist(ctx.data, c.position, a) - dist(ctx.data, c.position, b))[0];
-  return moveTo(c, nearest ? step(ctx, c, nearest) : c.position);
+  return moveTo(c, nearest ? step(ctx, c, nearest) : step(ctx, c, c.position));
 }
 
 /**
@@ -273,7 +323,10 @@ function objectives(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: numb
       (m.has('rotateWithoutPriority') || (!held && ourWave(ctx.view, lane) >= 0));
     const pays = !assigned && (!held || laningRotation(ctx, c, pit)) && rotationPays(ctx, c, pit, t.objective);
     if ((!assigned && !pays) || pitLost(ctx, c, pit)) continue;
-    add(ctx.data.aiTuning.priorities.objective, moveTo(c, step(ctx, c, pit)), pays ? { committed: true } : undefined);
+    // A live objective is taken by acting on the pit; arriving there with no step left loses the round.
+    const lost = t.live && !actsOn(ctx, c, pit);
+    const score = ctx.data.aiTuning.priorities.objective - (lost ? ctx.data.aiTuning.walkPenalty : 0);
+    add(score, moveTo(c, step(ctx, c, pit)), pays ? { committed: true } : undefined);
   }
 }
 
@@ -340,7 +393,11 @@ function conversion(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: numb
   add(data.aiTuning.priorities.convert, m.has('noConversion') ? home(ctx, c) : moveTo(c, step(ctx, c, target)));
 }
 
-/** Laner: farm in lane, step onto the enemy front tower when the wave is there and the enemy jungler is known far. */
+/**
+ * Laner: farm in lane, step onto the enemy front tower when the wave is there and the enemy jungler is known far.
+ * Farming needs a step left: the laner stops on the lane position closest to its spot where it still acts, or walks
+ * toward the spot with `walkPenalty` when it acts on no position of its lane. Pushing a tower only needs presence.
+ */
 function laning(ctx: Ctx, c: ChampionState, lane: Lane, m: Set<MistakeId>, add: (s: number, o: Order) => void): void {
   const { view, data } = ctx;
   const wave = ourWave(view, lane);
@@ -353,8 +410,14 @@ function laning(ctx: Ctx, c: ChampionState, lane: Lane, m: Set<MistakeId>, add: 
   if (wave === 1 && enemyFront && pushSafe(ctx, lane, m)) spot = enemyFront;
   else if (wave === 1 && !threatened) spot = mid;
   else spot = own;
-  add(ctx.data.aiTuning.priorities.lane, moveTo(c, step(ctx, c, spot)));
-  add(ctx.data.aiTuning.priorities.laneAlt, moveTo(c, step(ctx, c, spot === own ? mid : own)));
+  const { priorities, walkPenalty } = ctx.data.aiTuning;
+  const farm = (target: string, priority: number): void => {
+    if (target === enemyFront) return add(priority, moveTo(c, step(ctx, c, target)));
+    const at = actStep(ctx, c, target, (p) => laneOf(data, p) === lane);
+    add(at ? priority : priority - walkPenalty, moveTo(c, at ?? step(ctx, c, target)));
+  };
+  farm(spot, priorities.lane);
+  farm(spot === own ? mid : own, priorities.laneAlt);
   if (ctx.gank?.lane === lane && reach(ctx, c)[ctx.gank.target] !== undefined) {
     add(ctx.data.aiTuning.priorities.joinGank, moveTo(c, ctx.gank.target));
   }
@@ -384,26 +447,33 @@ function jungling(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number
     if (target && allies.length + 1 > enemies.length) add(ctx.data.aiTuning.priorities.gank, moveTo(c, target.position!), { gank: lane });
   }
 
+  // Clearing a camp or taking a Scuttle needs a step left; one only arrived at is a walk that loses the round.
+  const take = (pos: string, priority: number): void => {
+    if (r[pos] === undefined) return;
+    add(actsOn(ctx, c, pos) ? priority : priority - ctx.data.aiTuning.walkPenalty, moveTo(c, pos));
+  };
   for (const id of SCUTTLES) {
-    if (view.scuttles[id] <= ctx.end && r[id] !== undefined) add(ctx.data.aiTuning.priorities.scuttle, moveTo(c, id));
+    if (view.scuttles[id] <= ctx.end) take(id, ctx.data.aiTuning.priorities.scuttle);
   }
   for (const [camp, t] of ownCamps(ctx)) {
-    if (t > ctx.end || r[camp] === undefined) continue;
+    if (t > ctx.end) continue;
     const buff = /^(blue|red)buff-/.test(camp);
-    add(buff ? ctx.data.aiTuning.priorities.buff : ctx.data.aiTuning.priorities.camp, moveTo(c, camp));
+    take(camp, buff ? ctx.data.aiTuning.priorities.buff : ctx.data.aiTuning.priorities.camp);
   }
   if (jgKnown) {
+    // Enemy camps known to be down (their timer is known) are not invaded.
     const opposite = half(data, jg.position);
     for (const p of Object.keys(r).sort()) {
       const pos = data.graph.positions[p]!;
       const h = half(data, p);
-      if (pos.kind === 'camp' && pos.side === ctx.enemy && opposite !== null && h !== null && h !== opposite) {
-        add(ctx.data.aiTuning.priorities.invade, moveTo(c, p));
+      const up = (view.camps[p] ?? 0) <= ctx.end;
+      if (pos.kind === 'camp' && pos.side === ctx.enemy && up && opposite !== null && h !== null && h !== opposite) {
+        take(p, ctx.data.aiTuning.priorities.invade);
       }
     }
   }
   const soonest = ownCamps(ctx).sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))[0];
-  add(ctx.data.aiTuning.priorities.wait, moveTo(c, soonest ? step(ctx, c, soonest[0]) : c.position));
+  add(ctx.data.aiTuning.priorities.wait, moveTo(c, soonest ? step(ctx, c, soonest[0]) : step(ctx, c, c.position)));
 }
 
 /** Scored candidate orders for one champion, best first, without duplicates. */
@@ -539,18 +609,43 @@ export function bestOrders(view: PlayerView, data: GameData, rng: Rng, waveSacri
   return assignStances(ctx, assignWards(ctx, candidateSets(planCandidates(ctx, none, rng), 1)[0]!, none));
 }
 
+/** Something to take in a river contact's zone: its Scuttle up this round, or its pit objective up. */
+function riverUp(view: PlayerView, data: GameData, contact: Contact): boolean {
+  const end = roundWindow(data.rules, view.round).end;
+  return (Object.keys(SCUTTLE_PIT) as (keyof typeof SCUTTLE_PIT)[]).some((scuttle) => {
+    const pit = SCUTTLE_PIT[scuttle];
+    const here = contact.positions.includes(scuttle) || contact.positions.includes(pit);
+    return here && (view.scuttles[scuttle] <= end || view.pits[pit].objective !== null);
+  });
+}
+
 /**
- * Contact choice for a prompted contact: fight when the fight is won with what `view.side` knows, otherwise flee,
- * unless `chase` and outnumbered. A contact with a single option (lane contacts resolved from stances) takes it.
+ * Contact choice for a prompted contact, with what `view.side` knows:
+ * - `objective` (keep taking the river objective) when there is one to take and the fight scored at
+ *   `fight.objectiveFocus` of our strength is still won;
+ * - otherwise `fight` when the fight is won, or when `chase` and outnumbered;
+ * - otherwise `farm` under our tower when it is offered and no ganker came (pressure), unless the bigger side would
+ *   win by more than `aiTuning.allInMargin` (it would kill us);
+ * - otherwise `flee`.
+ * A contact with a single option (lane contacts resolved from stances) takes it.
  */
 export function contactChoice(view: PlayerView, data: GameData, contact: Contact, chase: boolean): Choice {
   const side = view.side;
+  const enemy = other(side);
   const options = contact.options[side];
   if (options.length === 1) return options[0]!;
   const state = stateFromView(view, data);
   const stage = roundWindow(data.rules, view.round).stage;
-  const { winner } = resolveFight(state, data, contact.position, contact.blue, contact.red, stage, gankedSide(contact));
-  const outnumbered = contact[side].length < contact[other(side)].length;
-  const choice: Choice = winner === side || (chase && outnumbered) ? 'fight' : 'flee';
-  return options.includes(choice) ? choice : contact.defaults[side];
+  const fight = (focus: Partial<Record<Side, number>> = {}) =>
+    resolveFight(state, data, contact.position, contact.blue, contact.red, stage, gankedSide(contact), focus);
+  const pick = (choice: Choice): Choice => (options.includes(choice) ? choice : contact.defaults[side]);
+  if (options.includes('objective') && riverUp(view, data, contact)) {
+    if (fight({ [side]: data.rules.fight.objectiveFocus }).winner === side) return 'objective';
+  }
+  const { winner, scores } = fight();
+  const outnumbered = contact[side].length < contact[enemy].length;
+  if (winner === side || (chase && outnumbered)) return pick('fight');
+  const safe = scores[enemy] - scores[side] <= data.aiTuning.allInMargin;
+  if (options.includes('farm') && contact.kind !== 'gank' && safe) return 'farm';
+  return pick('flee');
 }

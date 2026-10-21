@@ -187,6 +187,11 @@ export interface AiTuning {
   waveSacrificeCost: number;
   /** Game time (s): rounds starting before it are the laning phase, where laners only farm their wave, recall or take a paying rotation. */
   laningPhaseUntil: number;
+  /**
+   * Subtracted from a candidate whose target needs an action (a camp, a Scuttle, a live pit objective, a laner's farm)
+   * when the champion only arrives there this round, with no step left to act: the round is lost.
+   */
+  walkPenalty: number;
   /** Candidate priorities, higher first. */
   priorities: Record<AiPriority, number>;
 }

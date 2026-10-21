@@ -5,7 +5,7 @@
     "mistakes": {
       "greed": 0.6,
       "objectiveTiming": 0.6,
-      "pointlessPlay": 0.6,
+      "pointlessPlay": 0.3,
       "chasingKills": 0.6,
       "rotateWithoutPriority": 0.48,
       "badRecall": 0.48,
@@ -22,7 +22,7 @@
     "mistakes": {
       "greed": 0.5,
       "objectiveTiming": 0.5,
-      "pointlessPlay": 0.5,
+      "pointlessPlay": 0.25,
       "chasingKills": 0.5,
       "rotateWithoutPriority": 0.4,
       "badRecall": 0.4,
@@ -39,7 +39,7 @@
     "mistakes": {
       "greed": 0.4,
       "objectiveTiming": 0.4,
-      "pointlessPlay": 0.4,
+      "pointlessPlay": 0.2,
       "chasingKills": 0.4,
       "rotateWithoutPriority": 0.32,
       "badRecall": 0.32,

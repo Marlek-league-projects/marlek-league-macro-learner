@@ -129,6 +129,7 @@ export function validateAiTuning(t: AiTuning): void {
   num('pushJunglerDistance', t.pushJunglerDistance, 0);
   num('waveSacrificeCost', t.waveSacrificeCost, 0);
   num('laningPhaseUntil', t.laningPhaseUntil, 0);
+  num('walkPenalty', t.walkPenalty, 0);
   for (const id of AI_PRIORITIES) num(`priorities.${id}`, t.priorities?.[id], -Infinity);
 }
 

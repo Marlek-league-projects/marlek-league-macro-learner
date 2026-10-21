@@ -98,6 +98,9 @@ test('validateAiTuning rejects bad tuning', () => {
   const g = structuredClone(data.aiTuning);
   delete (g as Partial<typeof g>).recallHp;
   expect(() => validateAiTuning(g)).toThrow(/aiTuning.*recallHp/);
+  const h = structuredClone(data.aiTuning);
+  h.walkPenalty = -1;
+  expect(() => validateAiTuning(h)).toThrow(/aiTuning.*walkPenalty/);
 });
 
 test('validateAiProfiles and validateTeaching reject bad data', () => {

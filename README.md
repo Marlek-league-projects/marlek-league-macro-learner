@@ -290,7 +290,7 @@ Each level is a data profile with a frequency per mistake (for example, Iron gre
 |---|---|---|---|---|---|---|
 | **Greed / overextend** | Stays shoved with no vision, keeps pushing a tower with the enemy missing | very often | often | sometimes | rarely | very rarely |
 | **Objective timing** | Shows up late to a spawn, starts it without priority, forgets respawn timers | very often | often | sometimes | rarely | very rarely |
-| **Pointless plays** | Fights or invades when nothing is up on the map | very often | often | sometimes | rarely | very rarely |
+| **Pointless plays** | Wanders for no reason: a random move within its own jungle, the river or its own lane | very often | often | sometimes | rarely | very rarely |
 | **Chasing kills** | Picks fight over flee when outnumbered | very often | often | sometimes | rarely | very rarely |
 | **Rotating without priority** | Leaves lane to help without the wave pushed | often | often | sometimes | rarely | very rarely |
 | **Bad recall** | Recalls with the wave crashing into its own tower, right before a spawn, or sits on gold | often | often | sometimes | rarely | very rarely |
@@ -301,6 +301,17 @@ Each level is a data profile with a frequency per mistake (for example, Iron gre
 **Laning phase.** Until 14:00 (plates), AI laners stay in their lane and follow their wave: the normal role and priority rotations to objectives are off for laners. Only the jungler roams. The exceptions are recalls and the Emerald+ wave sacrifice, limited to the pit on the laner's half of the map (top to the Baron pit, bot to the Dragon). The mid laner, as far from both pits, never sacrifices its wave in this phase: it only rotates with priority (its wave pushed toward the enemy tower). Mistakes (rotating without priority, pointless plays) can still break the rule.
 
 At any time, the AI skips an objective when the enemies it knows near the pit would win the fight against the group it could bring there, instead of walking in only to flee.
+
+**Range and action.** The AI plays by the same step budget as you (see *Movement*). A target that needs an action (clearing a camp, taking a Scuttle, a live Dragon or Nashor, a laner's farm) counts as reached only where the AI still has a step left to act. One it can only arrive at is a walk toward it, scored lower (`aiTuning.walkPenalty`) because the round is lost: a jungler clears the camp in action range before walking to a farther buff, and a laner stops on the lane position where it still farms. Pushing a tower only needs presence. The AI invades only enemy camps whose timer it does not know to be down.
+
+**Never under a tower without its wave** *(hard rule, never a mistake)*. An AI champion ends its move on a standing enemy tower only when it is that lane's front tower and the AI's wave is at it. This covers pushing, taking a tower after a won fight, Herald launches (the Herald waits for the wave) and pointless plays. When nothing else is allowed, the champion stays where it is.
+
+**Contacts.** The AI answers a prompted contact with what it knows:
+
+- on a contested river with something to take, it keeps taking the objective when its fight score × `fight.objectiveFocus` still wins;
+- otherwise it fights when it wins the fight (or, rolling *Chasing kills*, when outnumbered);
+- outnumbered under its own tower with no ganker (lane pressure), it stays and farms, unless the bigger side would win by more than `aiTuning.allInMargin` and kill it;
+- otherwise (a gank it would lose, for example) it flees.
 
 Master, Grandmaster and Challenger keep a small mistake rate that goes down with each rank, and they also differ in how many rounds ahead they plan.
 
