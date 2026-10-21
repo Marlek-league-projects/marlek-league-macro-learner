@@ -66,6 +66,10 @@ export function validateRules(rules: Rules): void {
       fail('rules.moves', `budgetBySeconds has no positive integer step budget for ${p.roundSeconds}s rounds`);
     }
   }
+  const duration = rules.wards?.duration;
+  if (typeof duration !== 'number' || !Number.isInteger(duration) || duration < 1) {
+    fail('rules.wards', `duration = ${String(duration)} is not a positive integer`);
+  }
   checkPerStage('rules.towers.pushDamage', rules.towers.pushDamage);
   checkPerStage('rules.fight.numbers', rules.fight.numbers);
   const f = rules.fight;

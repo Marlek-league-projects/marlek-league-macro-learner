@@ -1,14 +1,40 @@
-import type { GameData, Lane, Side } from '@lml/data/contracts';
-import type { ChampionState, EnemyInfo, GameEvent, GameState, PlayerView, Scoreboard } from './contracts';
+import type { GameData, Lane, Rules, Side } from '@lml/data/contracts';
+import type { ChampionState, EnemyInfo, GameEvent, GameState, PlayerView, Scoreboard, Ward } from './contracts';
 import { level } from './economy';
 import { estimateEnemy } from './estimate';
 import { lanePressure } from './lanes';
+import { route } from './movement';
+import { SCUTTLE_PIT } from './objectives';
 
 type ScuttleId = keyof GameState['scuttles'];
 
 const LANES: Lane[] = ['top', 'mid', 'bot'];
 const SIDES: Side[] = ['blue', 'red'];
 const SCUTTLES: ScuttleId[] = ['scuttle-top', 'scuttle-bot'];
+
+/**
+ * A ward placed in round N gives vision while rounds N+1 … N+`wards.duration` resolve. A scuttle ward also sees the
+ * end of the round it is taken in (it is put down during that resolution).
+ */
+function wardActive(w: Ward, round: number, rules: Rules): boolean {
+  const started = w.placedRound < round || (w.scuttle === true && w.placedRound === round);
+  return started && round <= w.placedRound + rules.wards.duration;
+}
+
+/**
+ * Rounds of vision left to a ward, seen from `round` (the round being ordered or about to resolve), counting that
+ * one: `wards.duration` for a ward placed this round or the last one, down to 1 on its last active round, 0 once spent.
+ */
+export function wardRoundsLeft(ward: Ward, round: number, rules: Rules): number {
+  const { duration } = rules.wards;
+  return Math.max(0, Math.min(duration, ward.placedRound + duration - round + 1));
+}
+
+/** Positions a ward sees: its own, plus the pit next to a scuttle ward. */
+function wardSees(w: Ward): string[] {
+  const pit = w.scuttle === true ? SCUTTLE_PIT[w.position as ScuttleId] : undefined;
+  return pit ? [w.position, pit] : [w.position];
+}
 
 /** Positions of every lane holding one of `champions`, plus their own positions. */
 function lanesAndPositions(data: GameData, champions: ChampionState[]): Set<string> {
@@ -20,16 +46,18 @@ function lanesAndPositions(data: GameData, champions: ChampionState[]): Set<stri
   return seen;
 }
 
+/** `side`'s wards giving vision while `state.round` resolves. */
+function activeWards(state: GameState, data: GameData, side: Side): Ward[] {
+  return state.wards.filter((w) => w.side === side && wardActive(w, state.round, data.rules));
+}
+
 /**
  * Positions `side` sees while `state.round` resolves: lanes holding an alive ally, allies' positions,
- * and the side's active wards (placed last round, or a scuttle ward placed this round).
+ * and what the side's active wards see.
  */
 function seenPositions(state: GameState, data: GameData, side: Side): Set<string> {
   const seen = lanesAndPositions(data, state.champions.filter((c) => c.side === side && c.status === 'alive'));
-  for (const w of state.wards) {
-    const active = w.placedRound === state.round - 1 || (w.scuttle === true && w.placedRound === state.round);
-    if (w.side === side && active) seen.add(w.position);
-  }
+  for (const w of activeWards(state, data, side)) for (const p of wardSees(w)) seen.add(p);
   return seen;
 }
 
@@ -39,6 +67,43 @@ export function visibleEnemies(state: GameState, data: GameData, side: Side): st
   return state.champions
     .filter((c) => c.side !== side && c.status === 'alive' && seen.has(c.position))
     .map((c) => c.id);
+}
+
+/**
+ * After the round's moves: every enemy whose route this round (both ends included) crosses what an active ward of
+ * `side` sees emits `wardSpotted` for `side`, once per champion and ward position. `to` is its end-of-round position
+ * when `side` sees it there, else null; an enemy not seen at the end is last seen on the last warded position of
+ * its route (`spotted`, so it never shows as visible). Only moves spot: an enemy staying put on a ward is simply seen.
+ */
+export function spotByWards(state: GameState, data: GameData, events: GameEvent[]): void {
+  const moves = events.flatMap((e) => (e.type === 'moved' ? [e] : []));
+  const out: GameEvent[] = [];
+  for (const side of SIDES) {
+    const wards = activeWards(state, data, side);
+    if (wards.length === 0) continue;
+    const visible = new Set(visibleEnemies(state, data, side));
+    for (const m of moves) {
+      const c = state.champions.find((x) => x.id === m.champion)!;
+      if (c.side === side) continue;
+      // A spawn appears on its spawn point: only that point can be warded.
+      const path = m.from === `base-${c.side}` ? [m.to] : route(data, m.from, m.to, c.side);
+      const spottedAt: string[] = [];
+      let lastWarded: string | null = null;
+      for (const p of path) {
+        for (const w of wards) {
+          if (!wardSees(w).includes(p)) continue;
+          if (!spottedAt.includes(w.position)) spottedAt.push(w.position);
+          lastWarded = p;
+        }
+      }
+      const seen = visible.has(c.id);
+      for (const position of spottedAt) out.push({ type: 'wardSpotted', side, position, champion: c.id, to: seen ? c.position : null });
+      if (lastWarded !== null && !seen && c.status === 'alive') {
+        state.lastSeen[side][c.id] = { position: lastWarded, round: state.round, spotted: true };
+      }
+    }
+  }
+  events.push(...out);
 }
 
 /**
@@ -55,15 +120,17 @@ export function updateVision(state: GameState, data: GameData): void {
     for (const id of SCUTTLES) if (seen.has(id)) state.scuttlesSeen[side][id] = state.scuttles[id];
     for (const [id, t] of Object.entries(state.camps)) if (seen.has(id)) state.campsSeen[side][id] = t;
   }
-  state.wards = state.wards.filter((w) => w.placedRound >= state.round);
+  state.wards = state.wards.filter((w) => w.placedRound + data.rules.wards.duration > state.round);
 }
 
-/** Enemy id to position, for enemies `side` saw when the previous round resolved. */
+/** Enemy id to position, for enemies `side` saw at the end of the previous round (not only passing a ward). */
 function seenLastRound(state: GameState, side: Side): Map<string, string> {
   const out = new Map<string, string>();
   for (const c of state.champions) {
     const last = state.lastSeen[side][c.id];
-    if (c.side !== side && c.status === 'alive' && last && last.round === state.round - 1) out.set(c.id, last.position);
+    if (c.side !== side && c.status === 'alive' && last && last.round === state.round - 1 && !last.spotted) {
+      out.set(c.id, last.position);
+    }
   }
   return out;
 }
@@ -73,7 +140,8 @@ function seenLastRound(state: GameState, side: Side): Map<string, string> {
  * - enemies seen when the previous round resolved show where they are, the others their last seen position;
  * - an enemy pit capture shows only if an enemy was seen on that pit;
  * - scuttle timers are the side's last seen ones, so an unseen enemy take leaves the scuttle shown as before;
- * - own camp timers likewise (seen with an own champion or active ward on the camp, or cleared by the side).
+ * - camp timers likewise, own and enemy (seen with an own champion or active ward on the camp, or cleared by the
+ *   side), so an unseen enemy clear or invade leaves the timer shown as before.
  */
 export function viewFor(state: GameState, data: GameData, side: Side): PlayerView {
   const visible = seenLastRound(state, side);
@@ -92,10 +160,7 @@ export function viewFor(state: GameState, data: GameData, side: Side): PlayerVie
         hp: seen ? c.hp : null,
       };
     });
-  const camps: GameState['camps'] = {};
-  for (const [id, t] of Object.entries(state.campsSeen[side])) {
-    if (data.graph.positions[id]?.side === side) camps[id] = t;
-  }
+  const camps: GameState['camps'] = { ...state.campsSeen[side] };
   const s = structuredClone(state);
   const enemyOn = new Set(visible.values());
   for (const [id, pit] of Object.entries(s.pits)) {
@@ -196,6 +261,8 @@ export function eventsFor(events: GameEvent[], after: GameState, data: GameData,
       case 'wardPlaced':
       case 'wardCleared':
         return e.side === side || seen.has(e.position);
+      case 'wardSpotted':
+        return e.side === side;
       case 'hpLost':
         return enemySeen(e.champion);
     }

@@ -7,7 +7,7 @@ import { updateLanes } from './lanes';
 import { canAct, reachableFrom, retreatStep, stepBudget, validateOrders } from './movement';
 import { captureObjectives, clearCamps, launchHeralds, spawnObjectives } from './objectives';
 import { roundWindow } from './time';
-import { updateVision } from './vision';
+import { spotByWards, updateVision } from './vision';
 
 const SIDES: Side[] = ['blue', 'red'];
 const other = (s: Side): Side => (s === 'blue' ? 'red' : 'blue');
@@ -243,7 +243,8 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     events.push({ type: 'wardPlaced', side: c.side, position });
   }
 
-  // 11. vision
+  // 11. vision: wards spot enemies passing by, then what each side sees at the end of the round
+  spotByWards(s, data, events);
   updateVision(s, data);
 
   // 12. health regeneration, then next round; `rngState` is carried over untouched for the AI

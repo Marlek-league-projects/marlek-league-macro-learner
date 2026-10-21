@@ -44,6 +44,14 @@ describe('grouped river', () => {
     expect(s.scuttles['scuttle-bot']).toBeGreaterThan(roundWindow(d.rules, 11).end);
   });
 
+  test('a Scuttle taken with the pit objective also puts the scuttle ward on the Scuttle', () => {
+    const s = fresh(11);
+    s.wards = [{ side: 'blue', position: 'scuttle-bot', placedRound: 5, scuttle: true }];
+    for (const r of ['jungle', 'mid', 'adc', 'support']) get(s, 'blue', r).position = 'dragon-pit';
+    capture(s);
+    expect(s.wards).toEqual([{ side: 'blue', position: 'scuttle-bot', placedRound: 11, scuttle: true }]);
+  });
+
   test('starting the Dragon does not take the Scuttle', () => {
     const s = fresh(11);
     get(s, 'blue', 'jungle').position = 'dragon-pit';
@@ -240,16 +248,34 @@ describe('pit objectives', () => {
 });
 
 describe('scuttles', () => {
-  test('scuttle is taken on arrival and grants a pit ward', () => {
+  test('scuttle is taken on arrival and grants a ward on the scuttle', () => {
     const s = fresh(7);
     const jg = get(s, 'red', 'jungle');
     jg.position = 'scuttle-bot';
     const ev = capture(s);
     expect(jg.gold).toBe(d.rules.objectives.scuttle.gold);
     expect(s.objectivesTaken.red.scuttle).toBe(1);
-    expect(s.wards).toEqual([{ side: 'red', position: 'dragon-pit', placedRound: 7, scuttle: true }]);
+    expect(s.wards).toEqual([{ side: 'red', position: 'scuttle-bot', placedRound: 7, scuttle: true }]);
     expect(s.scuttles['scuttle-bot']).toBe(roundWindow(d.rules, 7).end + d.rules.objectives.scuttle.respawn!);
     expect(ev).toContainEqual({ type: 'objectiveTaken', objective: 'scuttle', side: 'red', position: 'scuttle-bot', champions: [jg.id] });
+  });
+
+  test('a scuttle ward replaces only the same side\'s previous scuttle ward there', () => {
+    const s = fresh(7);
+    s.wards = [
+      { side: 'red', position: 'scuttle-bot', placedRound: 2, scuttle: true },
+      { side: 'red', position: 'scuttle-bot', placedRound: 6 },
+      { side: 'blue', position: 'scuttle-bot', placedRound: 6, scuttle: true },
+      { side: 'red', position: 'scuttle-top', placedRound: 6, scuttle: true },
+    ];
+    get(s, 'red', 'jungle').position = 'scuttle-bot';
+    capture(s);
+    expect(s.wards).toEqual([
+      { side: 'red', position: 'scuttle-bot', placedRound: 6 },
+      { side: 'blue', position: 'scuttle-bot', placedRound: 6, scuttle: true },
+      { side: 'red', position: 'scuttle-top', placedRound: 6, scuttle: true },
+      { side: 'red', position: 'scuttle-bot', placedRound: 7, scuttle: true },
+    ]);
   });
 
   test('scuttle is not taken by a champion with no step left', () => {

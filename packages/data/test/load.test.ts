@@ -50,6 +50,14 @@ test('validateRules rejects a round length with no step budget', () => {
   expect(() => validateRules(r)).toThrow(/rules\.moves.*40s/);
 });
 
+test('validateRules rejects a ward duration that is not a positive integer', () => {
+  const r = structuredClone(data.rules);
+  r.wards.duration = 0;
+  expect(() => validateRules(r)).toThrow(/rules\.wards.*duration/);
+  r.wards.duration = 1.5;
+  expect(() => validateRules(r)).toThrow(/rules\.wards.*duration/);
+});
+
 test('validateRules rejects a pressureFarmShare outside 0..1', () => {
   const r = structuredClone(data.rules);
   r.economy.pressureFarmShare = 1.5;

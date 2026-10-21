@@ -159,6 +159,11 @@ export function rollMistakes(view: PlayerView, profile: AiProfile, rng: Rng): Mi
 
 // ---------- rules ----------
 
+/** The view's own-side camp timers (the view also holds the enemy camp timers the side knows). */
+function ownCamps(ctx: Ctx): [string, number][] {
+  return Object.entries(ctx.view.camps).filter(([id]) => ctx.data.graph.positions[id]?.side === ctx.side);
+}
+
 function spawnOrder(ctx: Ctx, c: ChampionState): Order {
   const points = spawnPointsFor(ctx.view, ctx.data, c.id);
   let to: string;
@@ -178,7 +183,7 @@ function home(ctx: Ctx, c: ChampionState): Order {
     const lane = HOME_LANE[c.role];
     return moveTo(c, step(ctx, c, front(ctx, ctx.side, lane) ?? laneMid(ctx.data, lane)));
   }
-  const camps = Object.keys(ctx.view.camps).sort((a, b) => dist(ctx.data, c.position, a) - dist(ctx.data, c.position, b));
+  const camps = ownCamps(ctx).map(([id]) => id).sort((a, b) => dist(ctx.data, c.position, a) - dist(ctx.data, c.position, b));
   return moveTo(c, step(ctx, c, camps[0] ?? c.position));
 }
 
@@ -382,7 +387,7 @@ function jungling(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number
   for (const id of SCUTTLES) {
     if (view.scuttles[id] <= ctx.end && r[id] !== undefined) add(ctx.data.aiTuning.priorities.scuttle, moveTo(c, id));
   }
-  for (const [camp, t] of Object.entries(view.camps)) {
+  for (const [camp, t] of ownCamps(ctx)) {
     if (t > ctx.end || r[camp] === undefined) continue;
     const buff = /^(blue|red)buff-/.test(camp);
     add(buff ? ctx.data.aiTuning.priorities.buff : ctx.data.aiTuning.priorities.camp, moveTo(c, camp));
@@ -397,7 +402,7 @@ function jungling(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number
       }
     }
   }
-  const soonest = Object.entries(view.camps).sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))[0];
+  const soonest = ownCamps(ctx).sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))[0];
   add(ctx.data.aiTuning.priorities.wait, moveTo(c, soonest ? step(ctx, c, soonest[0]) : c.position));
 }
 

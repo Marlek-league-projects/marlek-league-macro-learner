@@ -11,7 +11,7 @@ import { other } from './evaluate';
 /**
  * A full state built from what `view.side` knows: its own champions as they are, enemies alive at their
  * last seen position (their base if never seen, or not seen within `aiTuning.knownRounds`) with estimated stats,
- * enemy camps mirroring ours.
+ * enemy camps at their known timers (mirroring ours where unknown).
  */
 export function stateFromView(view: PlayerView, data: GameData): GameState {
   const enemy = other(view.side);
@@ -26,7 +26,7 @@ export function stateFromView(view: PlayerView, data: GameData): GameState {
     };
   });
   const camps = { ...view.camps };
-  for (const [id, t] of Object.entries(view.camps)) camps[mirrorId(id)] = t;
+  for (const [id, t] of Object.entries(view.camps)) camps[mirrorId(id)] ??= t;
   const lastSeen: GameState['lastSeen'] = { blue: {}, red: {} };
   for (const e of view.enemies) {
     lastSeen[view.side][e.id] =

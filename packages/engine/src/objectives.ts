@@ -13,8 +13,8 @@ const PIT_SEQUENCE: Record<PitId, ObjectiveId[]> = {
   'dragon-pit': ['dragon'],
   'baron-pit': ['voidgrubs', 'herald', 'baron'],
 };
-/** Pit a scuttle's vision ward covers. */
-const SCUTTLE_PIT: Record<ScuttleId, PitId> = { 'scuttle-top': 'baron-pit', 'scuttle-bot': 'dragon-pit' };
+/** Pit next to each scuttle, which the scuttle's ward also sees. */
+export const SCUTTLE_PIT: Record<ScuttleId, PitId> = { 'scuttle-top': 'baron-pit', 'scuttle-bot': 'dragon-pit' };
 const BUFF_CAMPS = new Set(['bluebuff', 'redbuff']);
 
 /** Objective of `pit` alive at time `t`: the first in its sequence not yet despawned. */
@@ -107,9 +107,9 @@ function takeScuttle(state: GameState, data: GameData, id: ScuttleId, side: Side
   const end = roundWindow(data.rules, state.round).end;
   reward(state, data, 'scuttle', side, takers);
   state.scuttles[id] = end + (data.rules.objectives.scuttle.respawn ?? Infinity);
-  const wardAt = SCUTTLE_PIT[id];
-  state.wards = state.wards.filter((w) => !(w.scuttle && w.side === side && w.position === wardAt));
-  state.wards.push({ side, position: wardAt, placedRound: state.round, scuttle: true });
+  // The scuttle ward sits on the scuttle; it replaces only this side's previous scuttle ward there.
+  state.wards = state.wards.filter((w) => !(w.scuttle && w.side === side && w.position === id));
+  state.wards.push({ side, position: id, placedRound: state.round, scuttle: true });
   events.push({ type: 'objectiveTaken', objective: 'scuttle', side, position: id, champions: takers.map((c) => c.id) });
 }
 
