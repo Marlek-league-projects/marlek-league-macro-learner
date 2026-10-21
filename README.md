@@ -183,6 +183,7 @@ The map positions form a graph, and a move is one step on it. Starting values:
 
 - **Laners**: 1 move per round. Going from a lane to another lane, or to a Scuttle, counts as 1 move.
 - **Junglers**: 2 moves per round. For example, Raptors → Krugs, Raptors → mid lane, or Raptors → enemy Blue Buff.
+- **Along a lane**: a laner can go from the enemy T1 back to its own T1 (or forward) in one move.
 - **Lane to Scuttle**: from the T1s or the middle of a lane, the nearest Scuttle is 1 move away (top → top Scuttle, bot → bottom Scuttle, mid → both).
 - **River to jungle**: from a river position (both Scuttles and both pits), any jungle camp on either side is 1 move away.
 - **Ganks from the outer camps**: an outer camp is 1 move from its nearby lane (Gromp and Blue Buff → top lane, Krugs and Red Buff → bot lane on the blue side, and the mirror on the red side), so a jungler can gank from there in one round.
