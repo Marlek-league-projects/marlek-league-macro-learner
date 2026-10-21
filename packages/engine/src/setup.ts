@@ -39,7 +39,7 @@ export function newGame(data: GameData, seed: number, draft?: Draft): GameState 
         role === 'jungle' ? `${rng.pick(JUNGLE_START_CAMPS)}-${side}` : laneStart(side, role);
       champions.push({
         id: picks[side][role], side, role, position, previous: position,
-        status: 'alive', respawnRound: null, xp: 0, gold: 0, items: 0, bonusLead: 0, goldEarned: 0, hasHerald: false,
+        status: 'alive', respawnRound: null, xp: 0, gold: 0, items: 0, bonusLead: 0, hp: 100, goldEarned: 0, hasHerald: false,
         stance: 'farm',
       });
     }

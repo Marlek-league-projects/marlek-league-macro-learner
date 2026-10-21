@@ -12,6 +12,8 @@ export interface EnemyInfo {
   lastSeenRound: number | null;
   /** Only known while visible. */
   level: number | null;
+  /** Health 0..100, only known while visible. */
+  hp: number | null;
 }
 
 /** What a side assumes an enemy has (fog of war: never its true lead), as the AI and lane pressure estimate it. */

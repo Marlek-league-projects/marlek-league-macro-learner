@@ -21,7 +21,7 @@ export function stateFromView(view: PlayerView, data: GameData): GameState {
     const position = current ? e.position! : `base-${enemy}`;
     return {
       id: e.id, side: enemy, role: e.role, position, previous: position, status: 'alive', respawnRound: null,
-      xp: est.xp, gold: 0, items: est.items, bonusLead: est.bonusLead, goldEarned: est.items, hasHerald: false,
+      xp: est.xp, gold: 0, items: est.items, bonusLead: est.bonusLead, hp: e.hp ?? 100, goldEarned: est.items, hasHerald: false,
       stance: 'farm',
     };
   });

@@ -28,6 +28,8 @@ export interface ChampionState {
   gold: number;
   items: number;
   bonusLead: number;
+  /** Health, 0..100. */
+  hp: number;
   goldEarned: number;
   hasHerald: boolean;
   /** Kept until an order changes it. */
