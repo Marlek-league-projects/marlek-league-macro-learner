@@ -86,7 +86,7 @@ When a contact happens, resolution pauses and each player involved chooses to **
 
 **Lane stance.** Each laner has a persistent **stance**, set once in its actions and kept until changed: **Farm** (default), **Trade** or **All-in**. Even lane contacts resolve automatically from both stances, with no prompt each round. The game only asks for a choice on real events: a gank, a contested objective, an invade.
 
-**Laners follow their wave.** A laner with no order follows its lane's wave automatically: it stands where the wave is (in front of its tower, in the middle, or in front of the enemy tower) and farms.
+**Laners follow their wave.** A laner with no order stays in its lane on Farm (safe), and follows its lane's wave automatically: it stands where the wave is (in front of its tower, in the middle, or in front of the enemy tower) and farms.
 
 **Lane pressure is computed.** Each lane's pressure comes from the matchup, the levels and the lead of the laners present. It pushes the wave. The map shows it as an arrow, which is **your estimate**: your champions as they are, and the enemies you see with the stats you would estimate for them (see *AI opponent*), never their true lead.
 
@@ -98,7 +98,7 @@ When a contact happens, resolution pauses and each player involved chooses to **
 
 **Flee** is not offered on these automatic even-lane contacts: the stances decide. To leave the lane, give the laner another order.
 
-Nobody can die in lane unless at least one side picks **All-in**. Farm against Trade is a trade. The AI only goes all-in with a large advantage (threshold in data).
+Nobody can die in lane unless at least one side picks **All-in**, and a laner on **Farm plays safe**: in an even lane contact (1v1, 2v2) it never dies, even against All-in. The All-in side only wins the trade (wave and lead). Only a laner on Trade or All-in can be killed in an even lane. Ganks and outnumbered lanes stay dangerous. Farm against Trade is a trade. The AI only goes all-in with a large advantage (threshold in data).
 
 **Invading** enemy jungle is a commitment, with no option to flee. If you meet an enemy and lose the fight, you die.
 
@@ -171,6 +171,10 @@ Each champion has a **lead gauge** made of two parts:
 
 **End-of-game verdict** *(design call)*: each team scores its gold (including the value of items) plus fixed values for each objective and each tower plate or tower. The values live in data. The higher score wins.
 
+**Health.** Every champion has **100 HP**. A lost trade costs HP, the winner loses a little; a champion regains some HP every round; a recall or a respawn restores full HP. A wounded champion weighs less in fights. Values live in data.
+
+**Death.** A champion who dies also spends its unspent gold on items, as on a recall.
+
 Recalling is how you **cash in** your advantage. A champion sitting on a lot of gold is weaker than its gold says until it goes back to base. Picking the right moment to recall is a tempo decision: it costs rounds, but it turns gold into strength.
 
 ## Movement
@@ -220,11 +224,11 @@ Vision is revealed when the round resolves, so you use what you saw this round t
 - **Round banner** (very top, large): round N/37, game time window of the round and phase. While you give orders it also holds a **Valider le round** button, so confirming never needs a scroll. **Enter** does the same when no field or button has the focus.
 - **Scoreboard** (top centre, like League): kills blue – red, towers, Dragons and Barons per team, and the team **gold advantage** ("+1.2k" or "−800"). Kills, towers and objectives are public, as in the real game. The gold advantage is a learning aid and uses the enemy's real gold. It also feeds the estimates of enemies you can't fully see: the AI, the pressure arrows and the strength bars size an enemy on your own champion of the same role, with its items scaled by the gold ratio (see *AI opponent*).
 - **Teams on the sides, like League**: your team in a column left of the map, the enemy team in a column right of the map. One card per champion with role icon, name, level, XP bar, lead bar and unspent gold (own team), or last seen position (enemy).
-- **Strength bar**: above every visible token, a small bar shows its strength (level and lead), so you can compare yourself with a visible enemy.
+- **Above every visible token**: its HP bar, its power score (level and lead), its level and its XP bar, so you can compare yourself with a visible enemy. The team cards show the same, plus unspent gold for your own champions.
 - **Center**: a flat map showing every playable position, with a tooltip on hover. One token per champion, with the official League role icon above it (from CommunityDragon) and its name below. Fog of war covers what you can't see. The map takes the full available height, and every position and token has a click target larger than its drawing.
   - Each neutral objective and jungle camp shows, on its own position, the time left before it spawns, or that it is up. A cleared camp is greyed out with its respawn timer.
   - Each lane shows its **wave** marker (near the blue tower, in the middle or near the red tower), so you can read lane priority.
-- **Actions** (a small panel next to the selected token): the selected token's options, including a laner's stance. Place a ward or clear one, each on the starting or arrival position. Recall.
+- **Actions** (a small panel next to the selected token, opened on the side where it hides the fewest positions, and **draggable** by its title; it keeps its position between rounds): the selected token's options, including a laner's stance. Place a ward or clear one, each on the starting or arrival position. Recall.
 - **Round summary** (below the map): current phase, round and game time, next objective spawn, the list of this round's orders, the **Confirm round** button, and teaching-mode explanations after the round resolves.
 - **Contact prompts**: when a contact needs an answer during resolution, the fight or flee choices appear in an overlay docked on the map, next to the contacts.
 - **Round replay**: after a round resolves, a short animation (about 2 s, with replay and skip buttons) plays it on the map: visible tokens slide to their destination, fights flash, deaths and taken objectives appear. Only what you saw is shown. The text log stays below.
