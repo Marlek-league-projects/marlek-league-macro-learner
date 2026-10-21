@@ -160,7 +160,8 @@ export function createStore(data: GameData, engine: GameEngine): Store {
   const viaFor = (id: string, to: string): string | undefined => {
     const c = champion(id);
     const { graph, rules } = data;
-    if (graph.distance(c.position, to) !== 2) return undefined;
+    const best = engine.bestVia(current(), data, id, to);
+    if (best === undefined) return undefined;
     const mids = (graph.adj[c.position] ?? []).filter((n) => n !== `base-${ENEMY}` && graph.distance(n, to) === 1 && !engine.isLaneChange(data, c.position, n));
     const fast = c.role === 'jungle' && (data.champions[id]?.clearSpeed ?? 0) >= rules.camps.fastClearAt;
     if (fast) {
@@ -170,7 +171,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       });
       if (camp) return camp;
     }
-    return mids[0];
+    return best;
   };
 
   const existingMove = (id: string): Extract<Order, { kind: 'move' }> | null => {
@@ -304,9 +305,9 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     setWard(id, spot) {
       const prev = pending.value[id];
       if (prev?.kind === 'recall') {
-        if (spot !== null && spot !== 'from') throw new Error(`${id}: a recall can only ward its own position`);
+        if (spot !== null && spot !== 'from' && spot !== 'to') throw new Error(`${id}: a recall can only ward its start or step position`);
         const { ward: _drop, ...rest } = prev;
-        place(spot === null ? rest : { ...rest, ward: 'from' });
+        place(spot === null ? rest : { ...rest, ward: spot });
         return;
       }
       const base = moveBase(id);
@@ -316,6 +317,12 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     },
 
     setUnward(id, spot) {
+      const prev = pending.value[id];
+      if (prev?.kind === 'recall') {
+        const { unward: _drop, ...rest } = prev;
+        place(spot === null ? rest : { ...rest, unward: spot });
+        return;
+      }
       const base = moveBase(id);
       delete base.unward;
       if (spot !== null) base.unward = spot;
@@ -328,6 +335,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       const order: Extract<Order, { kind: 'recall' }> = { kind: 'recall', champion: id };
       if (prev?.kind === 'move') {
         if (prev.ward === 'from') order.ward = 'from';
+        if (prev.unward === 'from') order.unward = 'from';
         if (data.graph.distance(champion(id).position, prev.to) === 1) order.to = prev.to;
       }
       if (prev?.stance !== undefined) order.stance = prev.stance;

@@ -24,6 +24,13 @@ test('jungler examples in 2', () => {
   expect(g.distance('raptors-blue', 'krugs-blue')).toBe(2);
   expect(g.distance('raptors-blue', 'bluebuff-red')).toBe(2);
 });
+test('crossing the own jungle goes through the mid T1, on both sides', () => {
+  for (const [a, b, m] of [['wolves-blue', 'krugs-blue', 'mid-t1-blue'], ['wolves-red', 'krugs-red', 'mid-t1-red']] as const) {
+    expect(g.distance(a, b)).toBe(2);
+    expect(g.adj[m]).toContain(b);
+    expect(g.adj[m]).toContain(a);
+  }
+});
 test('towers ordered T1..T3', () => expect(g.towers('red', 'top')).toEqual(['top-t1-red', 'top-t2-red', 'top-t3-red']));
 test('lanePositions(top) = 7 towers/laneMid, no camps', () => expect(g.lanePositions('top')).toHaveLength(7));
 test('outer camps gank their lane in 1 move, on both sides', () => {

@@ -130,6 +130,18 @@ describe('resolveRound', () => {
     expect(after.position).toBe((spawn as { to: string }).to);
   });
 
+  test('a recall with a step can ward and unward the step position', () => {
+    const s = newGame(d, 3);
+    const bj = get(s, 'blue', 'jungle');
+    bj.position = 'raptors-blue';
+    s.wards.push({ side: 'red', position: 'mid-t1-blue', placedRound: 0 });
+    const o = ordersWith(s, [{ kind: 'recall', champion: bj.id, to: 'mid-t1-blue', ward: 'to', unward: 'to' }]);
+    const r = resolveRound(s, d, o, {});
+    expect(r.events).toContainEqual({ type: 'wardCleared', side: 'red', position: 'mid-t1-blue' });
+    expect(r.events).toContainEqual({ type: 'wardPlaced', side: 'blue', position: 'mid-t1-blue' });
+    expect(r.state.wards.filter((w) => w.position === 'mid-t1-blue').map((w) => w.side)).toEqual(['blue']);
+  });
+
   test('a champion killed in round N can spawn in round respawnRound', () => {
     const { s, o } = scuttleScenario();
     const bj = get(s, 'blue', 'jungle').id;

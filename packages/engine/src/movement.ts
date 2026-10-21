@@ -110,6 +110,24 @@ export function retreatStep(data: GameData, side: Side, position: string): strin
   return best !== undefined && graph.distance(best, base) < graph.distance(position, base) ? best : position;
 }
 
+const rank = (data: GameData, id: string): number => {
+  const kind = data.graph.positions[id]?.kind;
+  return kind === 'tower' || kind === 'laneMid' ? 0 : kind === 'camp' ? 1 : 2;
+};
+
+/**
+ * The intermediate step of a 2-step move (undefined when `to` is not exactly 2 steps away). Among the valid
+ * ones a lane position (tower, lane middle) beats a camp, which beats a river position (scuttle, pit); ties by id.
+ */
+export function bestVia(state: GameState, data: GameData, championId: string, to: string): string | undefined {
+  const c = find(state, championId);
+  const { graph } = data;
+  if (graph.distance(c.position, to) !== 2) return undefined;
+  return (graph.adj[c.position] ?? [])
+    .filter((n) => n !== enemyBase(c.side) && graph.distance(n, to) === 1 && !isLaneChange(data, c.position, n))
+    .sort((a, b) => rank(data, a) - rank(data, b) || a.localeCompare(b))[0];
+}
+
 function fail(champion: string, reason: string): never {
   throw new Error(`${champion}: ${reason}`);
 }
@@ -126,7 +144,15 @@ function validateOne(state: GameState, data: GameData, c: ChampionState, o: Orde
   if (o.kind === 'spawn') fail(c.id, 'cannot spawn while alive');
 
   if (o.kind === 'recall') {
-    if (o.ward) ctx.wards++;
+    if (o.ward) {
+      ctx.wards++;
+      if (o.ward === 'to' && o.to === undefined) fail(c.id, 'recall ward at the step needs a step position');
+    }
+    if (o.unward !== undefined) {
+      ctx.unwards++;
+      if (!rules.wards.unwardRoles.includes(c.role)) fail(c.id, `${c.role} cannot unward`);
+      if (o.unward === 'to' && o.to === undefined) fail(c.id, 'recall unward at the step needs a step position');
+    }
     // The step before a recall is 1 move for everyone, never into the enemy base.
     if (o.to !== undefined && reachableFrom(data, c.position, 1, c.side)[o.to] === undefined) {
       fail(c.id, `recall step to ${o.to} is out of range`);
