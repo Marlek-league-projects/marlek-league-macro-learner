@@ -78,8 +78,6 @@ const pushing = (cs: ChampionState[]): boolean => cs.some((c) => c.stance === 'p
  * 0 in the middle, 1 in front of the enemy tower), +1 when one of its alive champions in the lane is on Push.
  */
 export function laneExposure(state: GameState, data: GameData, side: Side, lane: Lane): number {
-  // TODO(combat): the gank lane-position bonus (fight.ts / round.ts) reads the wave position only; plug
-  // `laneExposure` in there so a Push laner (standing forward) is more exposed to ganks.
   const wave = state.waves[lane] * -waveToward(side);
   return wave + (pushing(presentIn(state, data, lane)[side]) ? 1 : 0);
 }

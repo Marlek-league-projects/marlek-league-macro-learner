@@ -1,6 +1,7 @@
 import { MISTAKE_IDS } from '@lml/data';
 import type { AiProfile, GameData, Lane, MistakeId, ObjectiveId, Role, Side } from '@lml/data/contracts';
 import type { ChampionState, Choice, Contact, EnemyInfo, GameState, Order, PlayerView, Rng, Stance } from '../contracts';
+import { gankedSide } from '../contacts';
 import { resolveFight } from '../fight';
 import { movesFor, reachableFrom, spawnPointsFor } from '../movement';
 import type { PitId } from '../objectives';
@@ -540,7 +541,7 @@ export function contactChoice(view: PlayerView, data: GameData, contact: Contact
   if (options.length === 1) return options[0]!;
   const state = stateFromView(view, data);
   const stage = roundWindow(data.rules, view.round).stage;
-  const { winner } = resolveFight(state, data, contact.position, contact.blue, contact.red, stage);
+  const { winner } = resolveFight(state, data, contact.position, contact.blue, contact.red, stage, gankedSide(contact));
   const outnumbered = contact[side].length < contact[other(side)].length;
   const choice: Choice = winner === side || (chase && outnumbered) ? 'fight' : 'flee';
   return options.includes(choice) ? choice : contact.defaults[side];

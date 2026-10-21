@@ -1,6 +1,7 @@
 import { matchupAdvantage } from '@lml/data';
 import type { GameData, Rules, Side, Stage } from '@lml/data/contracts';
 import type { ChampionState, GameState } from './contracts';
+import { laneExposure } from './lanes';
 
 const EPSILON = 1e-9;
 
@@ -55,14 +56,14 @@ export function fightScore(
 }
 
 /**
- * Fight-score modifier of the `ganked` side at `position`: `-fight.gankExposed` when its lane's wave is pushed toward
- * the enemy tower, 0 in the middle or at its own tower (the tower already counts).
+ * Fight-score modifier of the `ganked` side at `position`: `-fight.gankExposed` when its `laneExposure` is positive
+ * (wave pushed toward the enemy tower, or a laner on Push standing forward with the wave in the middle), 0 otherwise
+ * (under its own tower, the tower already counts).
  */
 export function gankModifier(state: GameState, data: GameData, position: string, ganked: Side): number {
   const lane = data.graph.positions[position]?.lane;
   if (!lane) return 0;
-  const enemyTower = ganked === 'blue' ? 1 : -1;
-  return state.waves[lane] === enemyTower ? -data.rules.fight.gankExposed : 0;
+  return laneExposure(state, data, ganked, lane) > 0 ? -data.rules.fight.gankExposed : 0;
 }
 
 /** `ganked` is the defending side of a gank contact, whose score gets `gankModifier`. */

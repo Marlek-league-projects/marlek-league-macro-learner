@@ -1,6 +1,6 @@
 import type { GameData, Lane, Side } from '@lml/data/contracts';
 import type { ChampionState, ContactChoices, GameEvent, GameState, Order, Orders, RoundResult } from './contracts';
-import { detectContacts, resolveChoice } from './contacts';
+import { detectContacts, gankedSide, playsSafe, resolveChoice } from './contacts';
 import { advanceRespawns, applyKill, changeHp, completeRecall, finishIfOver } from './economy';
 import { fightVictims, resolveFight } from './fight';
 import { updateLanes } from './lanes';
@@ -90,9 +90,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     const contactLane = data.graph.positions[contact.position]!.lane;
     if (contact.kind === 'gank' && contactLane) ganked.add(contactLane);
     const ids: Record<Side, string[]> = { blue: contact.blue, red: contact.red };
-    // The ganked side is the smaller one, caught by a champion arriving from elsewhere.
-    const gankedSide: Side | null =
-      contact.kind === 'gank' ? (contact.blue.length < contact.red.length ? 'blue' : 'red') : null;
+    const defender = gankedSide(contact);
     const fleeing = SIDES.filter((side) => choice[side] === 'flee');
     if (fleeing.length > 0) {
       for (const side of fleeing) {
@@ -104,8 +102,8 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
         for (const id of ids[side]) events.push({ type: 'fled', champion: id, to: byId(id).position });
       }
       // Fleeing a gank the gankers committed to still costs HP.
-      if (gankedSide && fleeing.length === 1 && fleeing[0] === gankedSide) {
-        for (const id of ids[gankedSide]) changeHp(byId(id), data.rules, -data.rules.fight.gankHpLoss);
+      if (defender && fleeing.length === 1 && fleeing[0] === defender) {
+        for (const id of ids[defender]) changeHp(byId(id), data.rules, -data.rules.fight.gankHpLoss);
       }
       // In lane, the side that stayed (to trade or fight) wins the trade.
       const lane = data.graph.positions[contact.position]!.lane;
@@ -133,7 +131,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     // A fight with deaths needs both sides on Trade or All-in and at least one All-in: Farm plays safe in an even
     // lane, so Farm against All-in is only a trade (prompted contacts never offer Farm).
     const allIn = SIDES.some((side) => choice[side] === 'fight') && SIDES.every((side) => choice[side] !== 'farm');
-    const { winner, scores } = resolveFight(s, data, contact.position, contact.blue, contact.red, stage, gankedSide);
+    const { winner, scores } = resolveFight(s, data, contact.position, contact.blue, contact.red, stage, defender);
     if (!allIn) {
       const lane = data.graph.positions[contact.position]!.lane!;
       tradeWinners[lane] = winner;
@@ -149,10 +147,11 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     if (winner === null) {
       goBack([...contact.blue, ...contact.red]);
     } else {
-      // Farm is per champion: in an even lane, a loser on Farm is never a victim (it only loses HP as a survivor).
+      // Farm and Push are per champion: in an even lane, a loser playing safe is never a victim (it only loses HP as
+      // a survivor).
       const losers = ids[other(winner)];
-      const eligible = contact.kind === 'trade' ? losers.filter((id) => byId(id).stance !== 'farm') : losers;
-      settle(winner, losers, eligible, scores[winner] - scores[other(winner)], ids[winner], gankedSide);
+      const eligible = contact.kind === 'trade' ? losers.filter((id) => !playsSafe(byId(id).stance)) : losers;
+      settle(winner, losers, eligible, scores[winner] - scores[other(winner)], ids[winner], defender);
     }
   }
 

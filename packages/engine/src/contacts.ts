@@ -26,6 +26,12 @@ const STANCE_CHOICE: Record<Stance, Choice> = { push: 'farm', farm: 'farm', trad
 export function playsSafe(stance: Stance): boolean {
   return STANCE_CHOICE[stance] === 'farm';
 }
+/** The ganked side of a gank contact: the smaller one, caught by a champion arriving from elsewhere. Null otherwise. */
+export function gankedSide(contact: Contact): Side | null {
+  if (contact.kind !== 'gank') return null;
+  return contact.blue.length < contact.red.length ? 'blue' : 'red';
+}
+
 const AGGRESSION: Choice[] = ['farm', 'trade', 'fight'];
 
 /** A side's lane choice from its champions' stances (an order's `stance` first): the most aggressive one. */

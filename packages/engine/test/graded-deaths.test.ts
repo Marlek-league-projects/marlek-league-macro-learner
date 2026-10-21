@@ -145,6 +145,17 @@ describe('ganks and lane position', () => {
     expect(plain.blue).toBeCloseTo(score(0).blue, 9);
   });
 
+  test('a ganked laner on Push stands forward: exposed even with the wave in the middle', () => {
+    const { s, blue, red } = gank(0);
+    const neutral = resolveFight(s, d, 'top-lane', blue, red, stageOf(s), 'blue').scores;
+    get(s, 'blue', 'top').stance = 'push';
+    const pushed = resolveFight(s, d, 'top-lane', blue, red, stageOf(s), 'blue').scores;
+    expect(pushed.blue).toBeCloseTo(neutral.blue - W.gankExposed, 9);
+    // Under its own tower, Push only brings it back to neutral.
+    s.waves.top = -1;
+    expect(resolveFight(s, d, 'top-lane', blue, red, stageOf(s), 'blue').scores.blue).toBeCloseTo(neutral.blue, 9);
+  });
+
   test('exposure changes the outcome: the same gank kills only when the laner is pushed up', () => {
     const run = (wave: -1 | 0 | 1) => {
       const { s, o, blue, red } = gank(wave);

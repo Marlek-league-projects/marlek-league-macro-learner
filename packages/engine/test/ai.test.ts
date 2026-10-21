@@ -645,3 +645,51 @@ describe('AI recall', () => {
     expect(orderOf(orders, top.id).kind).toBe('recall');
   });
 });
+
+describe('AI gank choice and lane exposure', () => {
+  /** Red jungle ganks blue top on top-lane; red's top stays home, so it is 1 jungler vs 1 top. */
+  function gank(wave: -1 | 0 | 1, lead: number): { s: GameState; orders: Orders } {
+    const s = newGame(d, 7);
+    s.round = 10;
+    for (const c of s.champions) {
+      c.xp = 0; c.items = 0; c.bonusLead = 0;
+    }
+    place(s, 'blue', 'top', 'top-t1-blue');
+    place(s, 'red', 'jungle', 'scuttle-top');
+    place(s, 'red', 'top', 'top-t1-red');
+    s.waves.top = wave;
+    get(s, 'red', 'jungle').bonusLead = lead;
+    const over: Order[] = [
+      { kind: 'move', champion: get(s, 'blue', 'top').id, to: 'top-lane' },
+      { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'top-lane' },
+      { kind: 'move', champion: get(s, 'red', 'top').id, to: 'top-lane' },
+    ];
+    const f = (side: 'blue' | 'red'): Order[] =>
+      defaultOrders(s, d, side).map((o) => over.find((x) => x.champion === o.champion) ?? o);
+    return { s, orders: { blue: f('blue'), red: f('red') } };
+  }
+  const noChase = stubRng(() => 0.999);
+  const redChoice = (wave: -1 | 0 | 1, lead: number) => {
+    const { s, orders } = gank(wave, lead);
+    const c = detectContacts(s, d, orders).find((x) => x.position === 'top-lane' && x.kind === 'gank')!;
+    expect(c.options.red.length).toBeGreaterThan(1);
+    return aiContactChoice(viewFor(s, d, 'red'), d, c, profile('challenger'), noChase);
+  };
+  /** Smallest red jungle lead (to 1 unit) at which the red ganker commits. */
+  const threshold = (wave: -1 | 0 | 1): number => {
+    let lo = -1_000_000;
+    let hi = 1_000_000;
+    while (hi - lo > 1) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (redChoice(wave, mid) === 'fight') hi = mid;
+      else lo = mid;
+    }
+    return hi;
+  };
+
+  test('the ganker counts the ganked laner pushed up as exposed: it commits with less lead', () => {
+    const neutral = threshold(0);
+    expect(threshold(1)).toBeLessThan(neutral);
+    expect(threshold(-1)).toBe(neutral);
+  });
+});
