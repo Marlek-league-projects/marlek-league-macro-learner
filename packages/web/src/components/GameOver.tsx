@@ -42,7 +42,7 @@ export function GameOver({ store }: { store: Store }) {
         <h3>Dernier round</h3>
         {store.previousView.value && (
           <div class="replay-ctl">
-            <button onClick={() => store.replay()}>Rejouer</button>
+            <button onClick={() => store.replay()} title="Rejouer l'animation du tour">Revoir le tour</button>
             <button onClick={() => store.skipReplay()} disabled={!store.replaying.value}>Passer</button>
           </div>
         )}

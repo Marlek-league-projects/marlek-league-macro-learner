@@ -106,7 +106,7 @@ export function RoundPanel({ store }: { store: Store }) {
         <>
           {store.previousView.value && (
             <div class="replay-ctl">
-              <button onClick={() => store.replay()}>Rejouer</button>
+              <button onClick={() => store.replay()} title="Rejouer l'animation du tour">Revoir le tour</button>
               <button onClick={() => store.skipReplay()} disabled={!store.replaying.value}>Passer</button>
             </div>
           )}
