@@ -270,7 +270,7 @@ export function MapView({ store }: { store: Store }) {
     const i = group.indexOf(pawn);
     return { x: p.x + (i - (group.length - 1) / 2) * 42, y: p.y };
   };
-  const strength = strengthFills(view, store.estimateEnemy);
+  const strength = strengthFills(view, data, store.level, store.estimateEnemy);
   const selectedPawn = pawns.find((pawn) => pawn.ally && pawn.id === selected?.id);
   const anchor = selectedPawn ? pawnPoint(selectedPawn) : null;
 

@@ -71,14 +71,21 @@ export function strengthFill(strength: number, strongest: number): number {
 
 /**
  * Strength bar fill of every pawn on the map, keyed by champion id: its fight lead (xp + items + bonus lead,
- * the fight score's lead). Allies show their own. A visible enemy shows what this side assumes it has, the
- * engine's shared estimate (its level, the expected farm, its side's Dragons), never its true lead.
+ * the fight score's lead), xp counted at its level's floor so allies and enemies compare on what both show.
+ * Allies show their own items and lead. A visible enemy shows what this side assumes it has, the engine's
+ * shared estimate (sized on its own-side mirror and the scoreboard gold), never its true lead.
  */
-export function strengthFills(view: PlayerView, estimate: (enemy: EnemyInfo) => EnemyEstimate): Record<string, number> {
+export function strengthFills(
+  view: PlayerView,
+  data: GameData,
+  level: (xp: number) => number,
+  estimate: (enemy: EnemyInfo) => EnemyEstimate,
+): Record<string, number> {
+  const floor = (lvl: number) => data.rules.economy.levelXp[lvl - 1] ?? 0;
   const strengths: Record<string, number> = {};
   for (const c of view.allies) {
     if (c.status === 'dead') continue;
-    strengths[c.id] = c.xp + c.items + c.bonusLead;
+    strengths[c.id] = floor(level(c.xp)) + c.items + c.bonusLead;
   }
   for (const e of view.enemies) {
     if (!e.visible || !e.position || e.level === null) continue;

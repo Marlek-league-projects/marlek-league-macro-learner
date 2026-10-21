@@ -50,7 +50,7 @@ describe('strengthFills', () => {
   test('every alive ally and only visible enemies, the strongest at 1', () => {
     const store = started();
     const v = structuredClone(store.view.value!);
-    const fills = strengthFills(v, store.estimateEnemy);
+    const fills = strengthFills(v, data, store.level, store.estimateEnemy);
     for (const c of v.allies) expect(fills[c.id]).toBeDefined();
     for (const e of v.enemies) expect(fills[e.id] !== undefined).toBe(e.visible && e.level !== null);
     expect(Math.max(...Object.values(fills))).toBe(1);
@@ -64,10 +64,10 @@ describe('strengthFills', () => {
     a!.bonusLead = b!.bonusLead = 0;
     a!.items = 2000;
     b!.items = 1000;
-    const fills = strengthFills(v, store.estimateEnemy);
+    const fills = strengthFills(v, data, store.level, store.estimateEnemy);
     expect(fills[a!.id]!).toBeGreaterThan(fills[b!.id]!);
     b!.status = 'dead';
-    expect(strengthFills(v, store.estimateEnemy)[b!.id]).toBeUndefined();
+    expect(strengthFills(v, data, store.level, store.estimateEnemy)[b!.id]).toBeUndefined();
   });
 
   test("a visible enemy's bar is the engine's estimate, not its team's average gold", () => {
@@ -82,9 +82,21 @@ describe('strengthFills', () => {
     const est = engine.estimateEnemy(v, data, enemy);
     expect(est.items).toBe(0);
     top.items = 2 * (est.xp + est.items + est.bonusLead);
-    const fills = strengthFills(v, (e) => engine.estimateEnemy(v, data, e));
+    const fills = strengthFills(v, data, store.level, (e) => engine.estimateEnemy(v, data, e));
     expect(fills[top.id]).toBe(1);
     expect(fills[enemy.id]).toBeCloseTo(0.5);
+  });
+
+  test('same level and items as the mirror: an ally and a visible enemy show the same bar', () => {
+    const store = started();
+    const v = structuredClone(store.view.value!);
+    const mid = v.allies.find((c) => c.role === 'mid')!;
+    // Mid-level xp (not a level floor) still compares on the floor, as the enemy's level is all that shows.
+    Object.assign(mid, { xp: data.rules.economy.levelXp[3]! + 50, items: 1200, bonusLead: 0 });
+    const enemy = v.enemies.find((e) => e.role === 'mid')!;
+    Object.assign(enemy, { visible: true, position: mid.position, level: store.level(mid.xp) });
+    const fills = strengthFills(v, data, store.level, (e) => engine.estimateEnemy(v, data, e));
+    expect(fills[enemy.id]).toBeCloseTo(fills[mid.id]!);
   });
 });
 
