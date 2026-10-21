@@ -932,7 +932,7 @@ describe('AI contact choices', () => {
     s.scuttles = { 'scuttle-top': 900, 'scuttle-bot': 900 };
     s.scuttlesSeen = { blue: { ...s.scuttles }, red: { ...s.scuttles } };
     const c = detectContacts(s, tuned, orders).find((x) => x.id === 'river-bot')!;
-    expect(c.options.blue).toContain('objective');
+    expect(c.options.blue).not.toContain('objective');
     expect(aiContactChoice(viewFor(s, tuned, 'blue'), tuned, c, profile('challenger'), noChase)).toBe('fight');
   });
 });

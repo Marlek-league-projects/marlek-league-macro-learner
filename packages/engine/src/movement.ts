@@ -255,13 +255,21 @@ function followWave(state: GameState, data: GameData, c: ChampionState): string 
   )[0]!;
 }
 
-/** Alive laners follow their wave, other alive champions stay put; respawning ones take their first spawn point. */
+/** Default respawn: a laner's frontmost standing tower of its home lane, the jungler's first camp. */
+function defaultSpawn(state: GameState, data: GameData, c: ChampionState): string {
+  const points = spawnPoints(state, data, c.id);
+  if (c.role === 'jungle') return points[0]!;
+  const home = data.graph.towers(c.side, HOME_LANE[c.role]).find((t) => (state.towers[t] ?? 0) > 0);
+  return home ?? points[0]!;
+}
+
+/** Alive laners follow their wave, other alive champions stay put; respawning ones take their default spawn. */
 export function defaultOrders(state: GameState, data: GameData, side: Side): Order[] {
   const out: Order[] = [];
   for (const c of state.champions.filter((x) => x.side === side)) {
     if (c.status === 'alive') out.push({ kind: 'move', champion: c.id, to: followWave(state, data, c) });
     else if (c.status === 'respawning') {
-      out.push({ kind: 'spawn', champion: c.id, to: spawnPoints(state, data, c.id)[0]! });
+      out.push({ kind: 'spawn', champion: c.id, to: defaultSpawn(state, data, c) });
     }
   }
   return out;

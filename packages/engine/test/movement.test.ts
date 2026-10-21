@@ -284,3 +284,17 @@ describe('changing lane ends the move', () => {
     expect(reachableFrom(d, 'scuttle-top', 2, 'blue')['bot-t1-blue']).toBe(2);
   });
 });
+
+describe('default respawn', () => {
+  for (const [role, lane] of [['adc', 'bot'], ['support', 'bot'], ['mid', 'mid'], ['top', 'top']] as const) {
+    test(`${role} respawns on its ${lane} front tower`, () => {
+      const s = newGame(d, 3);
+      const c = s.champions.find((x) => x.side === 'blue' && x.role === role)!;
+      c.status = 'respawning';
+      const to = () => defaultOrders(s, d, 'blue').find((o) => o.champion === c.id)!.to;
+      expect(to()).toBe(`${lane}-t1-blue`);
+      s.towers[`${lane}-t1-blue`] = 0;
+      expect(to()).toBe(`${lane}-t2-blue`);
+    });
+  }
+});

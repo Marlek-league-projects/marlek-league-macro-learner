@@ -132,6 +132,7 @@ describe('zone contacts', () => {
 
   test('blue on scuttle-bot and red on dragon-pit is one river-bot contact; acting sides may keep taking the objective', () => {
     const s = setup([['blue', 'jungle', 'krugs-blue'], ['red', 'jungle', 'bluebuff-red']]);
+    s.scuttles['scuttle-bot'] = 0;
     const bj = get(s, 'blue', 'jungle').id;
     const rj = get(s, 'red', 'jungle').id;
     const o = stay(s, [{ kind: 'move', champion: bj, to: 'scuttle-bot' }, { kind: 'move', champion: rj, to: 'dragon-pit' }]);
@@ -143,6 +144,7 @@ describe('zone contacts', () => {
 
   test('an arrival-only champion on the pit cannot choose objective, and still fights', () => {
     const s = setup([['blue', 'jungle', 'krugs-blue'], ['red', 'jungle', 'scuttle-bot']]);
+    s.scuttles['scuttle-bot'] = 0;
     const bj = get(s, 'blue', 'jungle').id;
     const o = stay(s, [{ kind: 'move', champion: bj, to: 'dragon-pit' }]);
     const c = detectContacts(s, d, o).find((x) => x.id === 'river-bot')!;
@@ -176,10 +178,26 @@ describe('resolveChoice', () => {
 
 test('a recalling champion on the pit cannot choose objective', () => {
   const s = setup([['blue', 'jungle', 'dragon-pit'], ['red', 'jungle', 'bluebuff-red']]);
+  s.scuttles['scuttle-bot'] = 0;
   const bj = get(s, 'blue', 'jungle').id;
   const rj = get(s, 'red', 'jungle').id;
   const o = stay(s, [{ kind: 'recall', champion: bj }, { kind: 'move', champion: rj, to: 'dragon-pit' }]);
   const c = detectContacts(s, d, o).find((x) => x.id === 'river-bot')!;
   expect(c.options.blue).toEqual(['fight', 'flee']);
   expect(c.options.red).toEqual(['fight', 'flee', 'objective']);
+});
+
+describe('river objective option', () => {
+  const river = (scuttleUp: boolean) => {
+    const s = setup([['blue', 'jungle', 'dragon-pit'], ['red', 'jungle', 'dragon-pit']]);
+    s.round = 10;
+    s.scuttles['scuttle-bot'] = scuttleUp ? 0 : Infinity;
+    return detectContacts(s, d, stay(s)).find((x) => x.id === 'river-bot')!;
+  };
+  test('nothing to take: no objective option', () => {
+    expect(river(false).options.blue).toEqual(['fight', 'flee']);
+  });
+  test('Scuttle up: objective option', () => {
+    expect(river(true).options.blue).toContain('objective');
+  });
 });

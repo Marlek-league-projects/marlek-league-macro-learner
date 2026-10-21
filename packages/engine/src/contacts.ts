@@ -1,6 +1,7 @@
 import type { GameData, Side } from '@lml/data/contracts';
 import type { ChampionState, Choice, Contact, ContactChoices, ContactKind, GameState, Orders, Stance } from './contracts';
 import { canAct, HOME_LANE, reachableFrom, stepBudget } from './movement';
+import { roundWindow } from './time';
 
 const SIDES: Side[] = ['blue', 'red'];
 const other = (s: Side): Side => (s === 'blue' ? 'red' : 'blue');
@@ -120,6 +121,14 @@ function laneContact(state: GameState, data: GameData, orders: Orders, arrival: 
   return build(kind, zone, null, onOwnTower ? { [smaller]: 'farm' } : {});
 }
 
+/** Whether the river's pit objective is up (or spawns by this round's end) or its Scuttle is: else nothing to continue. */
+function riverHasObjective(state: GameState, data: GameData, zone: string): boolean {
+  const end = roundWindow(data.rules, state.round).end;
+  const [pitId, scuttleId] = zone === 'river-top' ? (['baron-pit', 'scuttle-top'] as const) : (['dragon-pit', 'scuttle-bot'] as const);
+  const pit = state.pits[pitId];
+  return pit.objective !== null || (pit.nextSpawn !== null && pit.nextSpawn <= end) || state.scuttles[scuttleId] <= end;
+}
+
 /**
  * Enemies ending the round in the same zone (a lane, a river, a camp; never a base). Crossing on an edge is not a
  * contact. Contacts are sorted by zone id.
@@ -157,7 +166,7 @@ export function detectContacts(state: GameState, data: GameData, orders: Orders)
       out.push(laneContact(state, data, orders, arrival, zone));
     } else if (id.startsWith('river-')) {
       const extra: Partial<Record<Side, Choice>> = {};
-      for (const s of SIDES) if (zone[s].some(acts)) extra[s] = 'objective';
+      if (riverHasObjective(state, data, id)) for (const s of SIDES) if (zone[s].some(acts)) extra[s] = 'objective';
       out.push(build('objective', zone, null, extra));
     } else if (p.kind === 'camp' && p.side) {
       out.push(build('invade', zone, other(p.side)));
