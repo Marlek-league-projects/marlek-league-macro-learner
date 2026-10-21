@@ -316,6 +316,36 @@ describe('ward spotting', () => {
     const r = resolveRound(s, d, stayWith(s, [{ kind: 'move', champion: bj, to: 'redbuff-blue' }]), {});
     expect(r.events.some((e) => e.type === 'wardSpotted')).toBe(false);
   });
+
+  test('an enemy pulled into a lane fight is spotted once per ward, with its arrival position as `to`', () => {
+    // Round 1 (budget 2): the red jungler arrives on a warded top-t1-red, then is pulled to the top-lane skirmish.
+    const s = newGame(d, 5);
+    s.round = 1;
+    place(s, 'blue', 'top', 'top-lane');
+    place(s, 'blue', 'jungle', 'top-lane');
+    place(s, 'red', 'top', 'top-lane');
+    place(s, 'red', 'jungle', 'krugs-red');
+    get(s, 'red', 'jungle').bonusLead += 100_000;
+    get(s, 'red', 'top').bonusLead += 100_000;
+    s.wards.push({ side: 'blue', position: 'top-t1-red', placedRound: 0 });
+    const rj = get(s, 'red', 'jungle').id;
+    const r = resolveRound(s, d, stayWith(s, [{ kind: 'move', champion: rj, to: 'top-t1-red' }]), { 'lane-top': { blue: 'fight', red: 'fight' } });
+    expect(r.events.filter((e) => e.type === 'moved' && e.champion === rj)).toHaveLength(2);
+    expect(r.state.champions.find((c) => c.id === rj)!.position).toBe('top-lane');
+    const spotted = r.events.filter((e) => e.type === 'wardSpotted');
+    expect(spotted).toEqual([{ type: 'wardSpotted', side: 'blue', position: 'top-t1-red', champion: rj, to: 'top-t1-red' }]);
+  });
+
+  test('a scuttle ward taken this round does not spot moves of the same round', () => {
+    const s = newGame(d, 5);
+    s.round = 7;
+    place(s, 'blue', 'jungle', 'scuttle-bot');
+    place(s, 'red', 'jungle', 'dragon-pit');
+    const rj = get(s, 'red', 'jungle').id;
+    const r = resolveRound(s, d, stayWith(s, [{ kind: 'move', champion: rj, to: 'bluebuff-red' }]), {});
+    expect(r.events).toContainEqual(expect.objectContaining({ type: 'objectiveTaken', objective: 'scuttle', side: 'blue' }));
+    expect(r.events.some((e) => e.type === 'wardSpotted')).toBe(false);
+  });
 });
 
 function runScuttle(ward: boolean): ReturnType<typeof resolveRound> {

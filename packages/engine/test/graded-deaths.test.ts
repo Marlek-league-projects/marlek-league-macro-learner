@@ -192,8 +192,8 @@ describe('ganks and lane position', () => {
 });
 
 describe('surviving losers retreat like a flee', () => {
-  test('a Dragon fight won with a small gap: the losers leave, the winners start the capture', () => {
-    // redbuff-blue is 1 step from the pit, so blue has a step left to start the capture.
+  test('a Dragon fight won with a small gap: the losers leave, a plain fight winner does not start the capture', () => {
+    // redbuff-blue is 1 step from the pit, so blue has a step left, but only the objective choice starts a capture.
     const s = setup([
       ['blue', 'jungle', 'redbuff-blue'],
       ['red', 'jungle', 'raptors-red'],
@@ -212,8 +212,8 @@ describe('surviving losers retreat like a flee', () => {
     expect(byId(state, rj.id)).toMatchObject({ status: 'alive', position: 'raptors-red' });
     expect(events).toContainEqual({ type: 'fled', champion: rj.id, to: 'raptors-red' });
     expect(byId(state, bj.id).position).toBe('dragon-pit');
-    expect(state.pits['dragon-pit'].capture).toEqual({ side: 'blue', startedRound: s.round });
-    expect(events).toContainEqual(expect.objectContaining({ type: 'objectiveStarted', objective: 'dragon', side: 'blue' }));
+    expect(state.pits['dragon-pit'].capture).toBeNull();
+    expect(events.some((e) => e.type === 'objectiveStarted')).toBe(false);
   });
 
   test('an invade lost without a death: the invader leaves the camp', () => {

@@ -63,6 +63,15 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
       c.position = o.to;
     }
   }
+  /** Where each champion arrived, before any pull-in, flee or retreat. */
+  const arrival: Record<string, string> = {};
+  /** Champions with a step left on arrival: they act there, or wherever a lane fight pulls them. */
+  const arrivedActing = new Set<string>();
+  for (const c of s.champions) {
+    if (c.status === 'respawning') continue;
+    arrival[c.id] = c.position;
+    if (canAct(stepsTo(c, c.previous, c.position), budget)) arrivedActing.add(c.id);
+  }
 
   // 5. contacts
   const stage = roundWindow(data.rules, s.round).stage;
@@ -75,6 +84,8 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   const tradeWinners: Partial<Record<Lane, Side | null>> = {};
   /** Lanes whose uneven presence is not lane pressure: only a smaller side staying to farm farms at a reduced share. */
   const noPressure = new Set<Lane>();
+  /** In a contested river without choosing the objective: no pit objective this round (the Scuttle is unaffected). */
+  const offPit = new Set<string>();
   const loseHp = (id: string, amount: number): void => {
     const c = byId(id);
     const before = c.hp;
@@ -134,6 +145,8 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     const smaller: Side | null = n.blue < n.red ? 'blue' : n.red < n.blue ? 'red' : null;
     const defender = gankedSide(contact);
     const fleeing = SIDES.filter((side) => choice[side] === 'flee');
+    // In a contested river, only a side keeping on the objective may start, continue or take the pit objective.
+    if (contact.kind === 'objective') for (const side of SIDES) if (choice[side] !== 'objective') for (const id of ids[side]) offPit.add(id);
     if (lane && !contact.auto) {
       // Without a flee, both sides meet where the fight happens.
       if (fleeing.length === 0) for (const side of SIDES) pullIn(ids[side], contact.position);
@@ -220,17 +233,18 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
 
   // 7-9. herald, camps, objectives, lanes
   launchHeralds(s, data, orders, events);
-  // Only a champion with a step left where it stands, who did not flee, retreat or have its recall interrupted, acts:
-  // clears its camp, takes its objective, farms its wave.
+  // Only a champion back where it stood, or with a step left on arrival (a lane fight's pull-in neither gives nor takes
+  // it), who did not flee, retreat or have its recall interrupted, acts: clears its camp, takes its objective, farms its
+  // wave.
   const acting = new Set(
     s.champions
-      .filter((c) => c.status === 'alive' && !forfeited.has(c.id) && canAct(stepsTo(c, c.previous, c.position), budget))
+      .filter((c) => c.status === 'alive' && !forfeited.has(c.id) && (c.position === c.previous || arrivedActing.has(c.id)))
       .map((c) => c.id),
   );
   // `moved.acted` tells the result after contacts (a completed recall is the action).
   for (const e of events) if (e.type === 'moved') e.acted = acting.has(e.champion) || recalled.has(e.champion);
   clearCamps(s, data, acting, events);
-  captureObjectives(s, data, events, acting);
+  captureObjectives(s, data, events, acting, new Set([...acting].filter((id) => !offPit.has(id))));
   updateLanes(s, data, tradeWinners, events, noPressure, acting);
 
   // 10. new wards
@@ -244,7 +258,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   }
 
   // 11. vision: wards spot enemies passing by, then what each side sees at the end of the round
-  spotByWards(s, data, events);
+  spotByWards(s, data, events, arrival);
   updateVision(s, data);
 
   // 12. health regeneration, then next round; `rngState` is carried over untouched for the AI

@@ -529,3 +529,70 @@ describe('HP losses are visible', () => {
     ]);
   });
 });
+
+describe('acting after a lane pull-in', () => {
+  /** Round 1 (budget 2): a top skirmish at top-lane, blue winning; the blue jungler goes `from` → `to`, pulled to top-lane. */
+  function pulled(from: string, to: string): { r: ReturnType<typeof resolveRound>; bj: string; xpBefore: number } {
+    const s = setup(1, [
+      ['blue', 'top', 'top-lane'],
+      ['blue', 'jungle', from],
+      ['red', 'top', 'top-lane'],
+      ['red', 'jungle', 'top-lane'],
+    ]);
+    for (const role of ['top', 'jungle']) get(s, 'blue', role).bonusLead += 100_000;
+    const bj = get(s, 'blue', 'jungle').id;
+    const stay = (side: string, role: string): Order => ({ kind: 'move', champion: get(s, side, role).id, to: get(s, side, role).position });
+    const o = ordersWith(s, [stay('blue', 'top'), stay('red', 'top'), stay('red', 'jungle'), { kind: 'move', champion: bj, to }]);
+    const xpBefore = get(s, 'blue', 'jungle').xp;
+    return { r: resolveRound(s, d, o, { 'lane-top': { blue: 'fight', red: 'fight' } }), bj, xpBefore };
+  }
+  const killXpShare = (events: GameEvent[]): number =>
+    (events.filter((e) => e.type === 'death').length * d.rules.economy.killXp) / 2;
+
+  test('an arrival-only champion pulled back to the fight gains no action and does not farm', () => {
+    const { r, bj, xpBefore } = pulled('top-t1-blue', 'top-t1-red');
+    expect(r.events.some((e) => e.type === 'fight' && e.winner === 'blue')).toBe(true);
+    expect(get(r.state, 'blue', 'jungle').position).toBe('top-lane');
+    expect(r.events.filter((e) => e.type === 'moved' && e.champion === bj).every((e) => e.type === 'moved' && !e.acted)).toBe(true);
+    expect(get(r.state, 'blue', 'jungle').xp - xpBefore).toBeCloseTo(killXpShare(r.events), 9);
+  });
+
+  test('an acting champion pulled away keeps its action and farms', () => {
+    const { r, bj, xpBefore } = pulled('krugs-red', 'top-t1-red');
+    expect(get(r.state, 'blue', 'jungle').position).toBe('top-lane');
+    expect(r.events.filter((e) => e.type === 'moved' && e.champion === bj).every((e) => e.type === 'moved' && e.acted)).toBe(true);
+    expect(get(r.state, 'blue', 'jungle').xp - xpBefore).toBeGreaterThan(killXpShare(r.events) + 1e-9);
+  });
+});
+
+describe('a plain fight on a pit', () => {
+  function river(): { s: GameState; o: Orders } {
+    const s = setup(11, [
+      ['blue', 'jungle', 'dragon-pit'],
+      ['red', 'jungle', 'bluebuff-red'],
+    ]);
+    s.pits['dragon-pit'] = { objective: 'dragon', nextSpawn: null, capture: { side: 'blue', startedRound: 10 } };
+    get(s, 'blue', 'jungle').bonusLead += 100_000;
+    const o = ordersWith(s, [
+      { kind: 'move', champion: get(s, 'blue', 'jungle').id, to: 'dragon-pit' },
+      { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'scuttle-bot' },
+    ]);
+    return { s, o };
+  }
+  const noDragon = (r: ReturnType<typeof resolveRound>): void => {
+    expect(r.events.some((e) => (e.type === 'objectiveTaken' || e.type === 'objectiveStarted') && e.objective === 'dragon')).toBe(false);
+    expect(r.state.pits['dragon-pit']).toMatchObject({ objective: 'dragon', capture: null });
+  };
+
+  test('a fight winner does not continue or take the pit objective', () => {
+    const { s, o } = river();
+    const r = resolveRound(s, d, o, { 'river-bot': { blue: 'fight', red: 'fight' } });
+    expect(r.events).toContainEqual(expect.objectContaining({ type: 'death', champion: get(s, 'red', 'jungle').id }));
+    noDragon(r);
+  });
+
+  test('fight against flee: the fighting side does not take the pit objective', () => {
+    const { s, o } = river();
+    noDragon(resolveRound(s, d, o, { 'river-bot': { blue: 'fight', red: 'flee' } }));
+  });
+});

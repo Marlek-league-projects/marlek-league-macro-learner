@@ -173,3 +173,13 @@ describe('resolveChoice', () => {
     expect(resolveChoice(c, {})).toEqual({ blue: 'fight', red: 'fight' });
   });
 });
+
+test('a recalling champion on the pit cannot choose objective', () => {
+  const s = setup([['blue', 'jungle', 'dragon-pit'], ['red', 'jungle', 'bluebuff-red']]);
+  const bj = get(s, 'blue', 'jungle').id;
+  const rj = get(s, 'red', 'jungle').id;
+  const o = stay(s, [{ kind: 'recall', champion: bj }, { kind: 'move', champion: rj, to: 'dragon-pit' }]);
+  const c = detectContacts(s, d, o).find((x) => x.id === 'river-bot')!;
+  expect(c.options.blue).toEqual(['fight', 'flee']);
+  expect(c.options.red).toEqual(['fight', 'flee', 'objective']);
+});

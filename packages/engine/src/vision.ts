@@ -70,36 +70,45 @@ export function visibleEnemies(state: GameState, data: GameData, side: Side): st
 }
 
 /**
- * After the round's moves: every enemy whose route this round (both ends included) crosses what an active ward of
- * `side` sees emits `wardSpotted` for `side`, once per champion and ward position. `to` is its end-of-round position
- * when `side` sees it there, else null; an enemy not seen at the end is last seen on the last warded position of
- * its route (`spotted`, so it never shows as visible). Only moves spot: an enemy staying put on a ward is simply seen.
+ * After the round's moves: every enemy whose routes this round (the order move, then any pull-in; both ends included)
+ * cross what an active ward of `side` sees emits `wardSpotted` for `side`, once per champion and ward position. A
+ * scuttle ward taken this round spots nothing yet. `to` is the enemy's `arrival` position (before any pull-in, flee or
+ * retreat) when `side` sees that position at the end of the round, else null; an enemy not seen at the end is last
+ * seen on the last warded position of its routes (`spotted`, so it never shows as visible). Only moves spot: an enemy
+ * staying put on a ward is simply seen.
  */
-export function spotByWards(state: GameState, data: GameData, events: GameEvent[]): void {
+export function spotByWards(state: GameState, data: GameData, events: GameEvent[], arrival: Readonly<Record<string, string>>): void {
   const moves = events.flatMap((e) => (e.type === 'moved' ? [e] : []));
   const out: GameEvent[] = [];
   for (const side of SIDES) {
-    const wards = activeWards(state, data, side);
+    const wards = activeWards(state, data, side).filter((w) => w.placedRound < state.round);
     if (wards.length === 0) continue;
     const visible = new Set(visibleEnemies(state, data, side));
+    const seenAt = seenPositions(state, data, side);
+    const spottedAt = new Map<string, string[]>();
+    const lastWarded = new Map<string, string>();
     for (const m of moves) {
       const c = state.champions.find((x) => x.id === m.champion)!;
       if (c.side === side) continue;
       // A spawn appears on its spawn point: only that point can be warded.
       const path = m.from === `base-${c.side}` ? [m.to] : route(data, m.from, m.to, c.side);
-      const spottedAt: string[] = [];
-      let lastWarded: string | null = null;
+      const at = spottedAt.get(c.id) ?? [];
       for (const p of path) {
         for (const w of wards) {
           if (!wardSees(w).includes(p)) continue;
-          if (!spottedAt.includes(w.position)) spottedAt.push(w.position);
-          lastWarded = p;
+          if (!at.includes(w.position)) at.push(w.position);
+          lastWarded.set(c.id, p);
         }
       }
-      const seen = visible.has(c.id);
-      for (const position of spottedAt) out.push({ type: 'wardSpotted', side, position, champion: c.id, to: seen ? c.position : null });
-      if (lastWarded !== null && !seen && c.status === 'alive') {
-        state.lastSeen[side][c.id] = { position: lastWarded, round: state.round, spotted: true };
+      spottedAt.set(c.id, at);
+    }
+    for (const [id, at] of spottedAt) {
+      const to = arrival[id] !== undefined && seenAt.has(arrival[id]) ? arrival[id] : null;
+      for (const position of at) out.push({ type: 'wardSpotted', side, position, champion: id, to });
+      const c = state.champions.find((x) => x.id === id)!;
+      const last = lastWarded.get(id);
+      if (last !== undefined && !visible.has(id) && c.status === 'alive') {
+        state.lastSeen[side][id] = { position: last, round: state.round, spotted: true };
       }
     }
   }

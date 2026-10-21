@@ -84,14 +84,14 @@ Bases are never contacts.
 | Both sides in a river | Objective | Smaller side flees, otherwise fight. See *Neutral objectives*. |
 | An enemy camp | Invade | The invader can only fight |
 
-**Where the fight happens.** On the position of the smaller side (the one with most of its champions if they are spread), or with even numbers on the zone position holding the most champions; remaining ties go to the lowest position id. In a lane, when nobody flees, every champion of the contact is moved onto that position, and a standing tower there counts for its defenders. *(design call)* Automatic lane trades and river contacts move nobody: in a river, each champion stays on the pit or the Scuttle it arrived on.
+**Where the fight happens.** On the position of the smaller side (the one with most of its champions if they are spread), or with even numbers on the zone position holding the most champions; remaining ties go to the lowest position id. In a lane, when nobody flees, every champion of the contact is moved onto that position, and a standing tower there counts for its defenders. Being moved there neither gives nor takes an action: a champion acts there only if it had a step left on arrival. *(design call)* Automatic lane trades and river contacts move nobody: in a river, each champion stays on the pit or the Scuttle it arrived on.
 
 **Staying under your tower.** In a lane, a smaller side whose champions all stand on their own standing tower may also choose **farm**: it stays and farms at `economy.pressureFarmShare` (half) of a normal round. If the bigger side fights, each of them loses `fight.pressureHpLoss` (10) HP, and they die only if the bigger side wins by more than `aiTuning.allInMargin`.
 
 - **Flee**: the champion survives and goes back to its previous position. On an objective, it gives the objective up. *(design call)* A champion who did not move this round (or just spawned there) retreats one step toward its base instead: along its lane to the next own tower (T1 → T2 → T3 → base), elsewhere to the neighbouring position closest to its base. It no longer defends the tile it left. A champion who flees or retreats **forfeits its action** this round: no camp, no Scuttle or objective, no farm. So does a champion whose recall a fight interrupted.
 - An outnumbered side that flees a side that fights loses `fight.gankHpLoss` HP.
-- **Fight**: the winner takes the objective or the kill. Losers **die**.
-- If both sides flee, nobody takes the objective and it stays up for the next round. If one side flees and the other fights, the fighting side takes it without a fight.
+- **Fight**: the winner takes the kill. Losers **die**. On a pit objective, only a side that chose to keep taking it takes it (see *Neutral objectives*).
+- If both sides flee, nobody takes the objective and it stays up for the next round. If one side flees and the other keeps taking the objective, that side takes it without a fight.
 - *(design call)* In lane, if one side flees and the other trades or fights, the side that stayed wins the trade (wave and lead).
 
 **Lane pressure without a gank.** When a lane is uneven and nobody arrived from elsewhere (for example someone left it, or a laner walked back to its own lane), the contact is prompted like a gank, but the ganked side's exposure plays no part. The bigger side pushes the wave and hits the tower (plates). A smaller side that stays to farm under its tower farms at a reduced share (see *Staying under your tower*).
@@ -179,7 +179,8 @@ Tower damage bonuses stack: Voidgrubs plus Baron gives ×3. The Herald launch is
   - *objective* against *flee*: the objective (and the Scuttle) proceeds;
   - *objective* against *fight*: a fight where the objective side's score is multiplied by `fight.objectiveFocus` (0.8); if it still wins, it takes the objective this round as well as the kills;
   - *objective* against *objective*: a race. The higher fight score keeps taking it and the other side leaves; nobody dies or loses HP. On a tie, both stay and nobody takes it.
-  - A champion arriving on its last step (no action left) cannot choose the objective, but still fights.
+  - *fight* (won, or against *flee*): the winner takes the kills but does not start, continue or take the pit objective this round; a capture in progress is lost. A champion on the Scuttle with a step left still takes the Scuttle.
+  - A champion arriving on its last step (no action left), or recalling, cannot choose the objective, but still fights.
 - Jungle camps respawn on their real timers and give gold and XP to whoever clears them: one camp per round, the one the champion stands on with a step left (see [Movement](#movement)). `clearSpeed` no longer lets a jungler clear a second camp on the way. Clearing an enemy camp works like your own, and you then know its respawn timer.
 
 ## Lead, gold and recall
@@ -239,7 +240,7 @@ Vision is revealed when the round resolves, so you use what you saw this round t
 - A champion can place a ward in addition to its move, **either on its starting position or on its arrival position** (the player chooses).
 - Each team can place up to **3 wards per round**.
 - A ward lasts **2 rounds** (`wards.duration`): placed in round N, it gives vision when rounds N+1 and N+2 resolve, then fades. Its marker shows the rounds it has left.
-- **Spotting.** An enemy whose path this round (its start, every step and its arrival) crosses one of your active wards is reported in your log: *"Ward à {position} : {champion} repéré"*, with its arrival when you see it there. Otherwise its last seen position becomes the last warded position on its path. An enemy standing still on a ward is simply visible. Only the ward's team gets the report.
+- **Spotting.** An enemy whose path this round (its start, every step and its arrival) crosses one of your active wards is reported in your log: *"Ward à {position} : {champion} repéré"*, with its arrival position this round (before any fight pulls it, or it flees) when you see that position. A Scuttle ward taken this round spots only from the next round. Otherwise its last seen position becomes the last warded position on its path. An enemy standing still on a ward is simply visible. Only the ward's team gets the report.
 - The **Scuttle ward** (see [Neutral objectives](#neutral-objectives)) shows on the dead Scuttle.
 - First round: depending on their starting side, the jungler can place their ward at the **Blue Buff** or at the **Raptors**.
 

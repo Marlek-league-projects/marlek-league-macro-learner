@@ -116,21 +116,28 @@ function takeScuttle(state: GameState, data: GameData, id: ScuttleId, side: Side
 /**
  * End of round: pit objectives started, captured or their capture reset, then scuttles taken. A river (a pit and its
  * Scuttle) is contested by any alive enemy in it; otherwise only `acting` champions (a step left on arrival) act
- * there. On the pit they start or continue its objective, and taking it also takes the river's Scuttle if it is up
- * (shared by the same takers). On the Scuttle they take only the Scuttle, never the pit objective.
+ * there. On the pit those also in `pitActing` (default: all of `acting`) start or continue its objective, and taking it
+ * also takes the river's Scuttle if it is up (shared by the same takers). On the Scuttle they take only the Scuttle,
+ * never the pit objective.
  */
-export function captureObjectives(state: GameState, data: GameData, events: GameEvent[], acting: ReadonlySet<string>): void {
+export function captureObjectives(
+  state: GameState,
+  data: GameData,
+  events: GameEvent[],
+  acting: ReadonlySet<string>,
+  pitActing: ReadonlySet<string> = acting,
+): void {
   const { rules } = data;
   const end = roundWindow(rules, state.round).end;
   const scuttleUp = (id: ScuttleId): boolean => state.scuttles[id] <= end;
-  /** The only side present in the river of `pit`, with at least `min` acting champions on `position`: those take it. */
-  const takersAt = (pit: PitId, position: string, min: number): { side: Side; takers: ChampionState[] } | null => {
+  /** The only side present in the river of `pit`, with at least `min` `able` champions on `position`: those take it. */
+  const takersAt = (pit: PitId, position: string, min: number, able: ReadonlySet<string>): { side: Side; takers: ChampionState[] } | null => {
     const inPit = presentAt(state, pit);
     const onScuttle = presentAt(state, PIT_SCUTTLE[pit]);
     const sides = SIDES.filter((s) => inPit[s].length + onScuttle[s].length > 0);
     if (sides.length !== 1) return null;
     const side = sides[0]!;
-    const takers = presentAt(state, position)[side].filter((c) => acting.has(c.id));
+    const takers = presentAt(state, position)[side].filter((c) => able.has(c.id));
     return takers.length >= min ? { side, takers } : null;
   };
 
@@ -141,7 +148,7 @@ export function captureObjectives(state: GameState, data: GameData, events: Game
       continue;
     }
     const rule = rules.objectives[pit.objective];
-    const taken = takersAt(id, id, rule.minChampions);
+    const taken = takersAt(id, id, rule.minChampions, pitActing);
     if (!taken) {
       pit.capture = null;
       continue;
@@ -160,7 +167,7 @@ export function captureObjectives(state: GameState, data: GameData, events: Game
 
   for (const id of Object.keys(SCUTTLE_PIT) as ScuttleId[]) {
     if (!scuttleUp(id)) continue;
-    const taken = takersAt(SCUTTLE_PIT[id], id, rules.objectives.scuttle.minChampions);
+    const taken = takersAt(SCUTTLE_PIT[id], id, rules.objectives.scuttle.minChampions, acting);
     if (taken) takeScuttle(state, data, id, taken.side, taken.takers, events);
   }
 }

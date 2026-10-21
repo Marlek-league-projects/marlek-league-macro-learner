@@ -137,10 +137,12 @@ export function detectContacts(state: GameState, data: GameData, orders: Orders)
     zones.set(zone, entry);
   }
   const budget = stepBudget(data.rules, state.round);
-  /** A step left on arrival (a spawn always acts), as in `resolveRound`. */
+  /** A step left on arrival (a spawn always acts, a recall never: the recall is its action), as in `resolveRound`. */
   const acts = (id: string): boolean => {
     const c = state.champions.find((x) => x.id === id)!;
-    if (orders[c.side].find((o) => o.champion === id)?.kind === 'spawn') return true;
+    const kind = orders[c.side].find((o) => o.champion === id)?.kind;
+    if (kind === 'spawn') return true;
+    if (kind === 'recall') return false;
     return canAct(reachableFrom(data, c.position, budget, c.side)[arrival[id]!] ?? budget, budget);
   };
   const out: Contact[] = [];
