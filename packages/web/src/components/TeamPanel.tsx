@@ -1,6 +1,6 @@
 import type { ChampionState, EnemyInfo, PlayerView } from '@lml/engine/contracts';
 import type { Store } from '../store';
-import type { GameData } from '@lml/data/contracts';
+import { type Hud, HP_MAX, hpColor, hudValues } from './hud';
 import { championImage, championName, num, objectiveScore, positionLabel, roleIcon } from './format';
 
 interface Props {
@@ -11,13 +11,13 @@ interface Props {
 const pct = (share: number): string => `${Math.round(share * 100)}%`;
 const tone = (n: number): string => (n > 0 ? 'pos' : n < 0 ? 'neg' : '');
 
-/** 0..1 progress through the current level. */
-function levelProgress(data: GameData, xp: number, level: number): number {
-  const table = data.rules.economy.levelXp;
-  const from = table[level - 1] ?? 0;
-  const to = table[level];
-  if (to === undefined) return 1;
-  return Math.min(1, Math.max(0, (xp - from) / (to - from)));
+/** HP bar, filled and coloured by the share of health left. */
+function HpBar({ hp }: { hp: number }) {
+  return (
+    <div class="bar hp" title={`PV ${Math.round(hp * HP_MAX)} / ${HP_MAX}`}>
+      <i style={{ width: pct(hp), background: hpColor(hp) }} />
+    </div>
+  );
 }
 
 export function TeamPanel({ store, team }: Props) {
@@ -45,7 +45,7 @@ function CardTitle({ store, id, role, level }: { store: Store; id: string; role:
         <img class="sq" src={championImage(store.data, id)} alt="" />
         {championName(store.data, id)}
       </span>
-      <span class="muted">niv {level ?? '?'}</span>
+      <span class="muted">niv {level ?? '—'}</span>
     </div>
   );
 }
@@ -61,6 +61,7 @@ function AllyTeam({ store, view }: { store: Store; view: PlayerView }) {
   const wardsUsed = Object.values(store.pending.value).filter((o) => o.kind !== 'spawn' && o.ward !== undefined).length;
   const canSelect = store.screen.value === 'orders';
   const recalled = store.recalled.value;
+  const hud = hudValues(view, data, store.level, store.estimateEnemy);
   return (
     <div class="team ally">
       <div class="teamhead">
@@ -75,7 +76,7 @@ function AllyTeam({ store, view }: { store: Store; view: PlayerView }) {
       </div>
       <div class="cards">
         {view.allies.map((c) => {
-          const level = store.level(c.xp);
+          const h = hud[c.id]!;
           const out = c.status !== 'alive';
           return (
             <div
@@ -83,8 +84,9 @@ function AllyTeam({ store, view }: { store: Store; view: PlayerView }) {
               class={`card${store.selected.value === c.id ? ' sel' : ''}${canSelect && c.status !== 'dead' ? ' pick' : ''}`}
               onClick={() => canSelect && c.status !== 'dead' && store.select(store.selected.value === c.id ? null : c.id)}
             >
-              <CardTitle store={store} id={c.id} role={c.role} level={level} />
-              <div class="bar xp"><i style={{ width: pct(levelProgress(data, c.xp, level)) }} /></div>
+              <CardTitle store={store} id={c.id} role={c.role} level={h.level} />
+              <HpBar hp={h.hp} />
+              <div class="bar xp" title="XP vers le niveau suivant"><i style={{ width: pct(h.xp ?? 0) }} /></div>
               <div class="bar lead" title={`Or gagné ${num(c.goldEarned)}`}>
                 <i style={{ width: pct(c.goldEarned / bestGold) }} />
               </div>
@@ -93,12 +95,22 @@ function AllyTeam({ store, view }: { store: Store; view: PlayerView }) {
                   {recalled.includes(c.id) ? 'À la base' : 'Mort'} (retour round {c.respawnRound ?? view.round})
                 </span>
               ) : (
-                <span class="muted">Or non dépensé {num(c.gold)}{c.hasHerald ? ' · Herald' : ''}</span>
+                <span class="muted">Or en poche {num(c.gold)}{c.hasHerald ? ' · Herald' : ''}</span>
               )}
+              <Power hud={h} />
             </div>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** The card's power line; a dash when unknown. */
+function Power({ hud }: { hud: Hud | undefined }) {
+  return (
+    <div class="muted" title="Puissance : niveau et avance (estimée pour un adversaire)">
+      Puissance <strong>{hud ? hud.power : '—'}</strong>
     </div>
   );
 }
@@ -113,8 +125,8 @@ function seenText(store: Store, e: EnemyInfo): string {
 }
 
 function EnemyTeam({ store, view }: { store: Store; view: PlayerView }) {
-  const { data } = store;
   const enemySide = view.side === 'blue' ? 'red' : 'blue';
+  const hud = hudValues(view, store.data, store.level, store.estimateEnemy);
   return (
     <div class="team enemy">
       <div class="teamhead">
@@ -123,12 +135,13 @@ function EnemyTeam({ store, view }: { store: Store; view: PlayerView }) {
       </div>
       <div class="cards">
         {view.enemies.map((e) => {
+          // Fog of war: HP, level and power only while the enemy is visible.
+          const h = hud[e.id];
           return (
             <div key={e.id} class="card">
-              <CardTitle store={store} id={e.id} role={e.role} level={e.level} />
-              <div class="bar xp">
-                <i style={{ width: pct((e.level ?? 0) / data.rules.economy.levelXp.length) }} />
-              </div>
+              <CardTitle store={store} id={e.id} role={e.role} level={h?.level ?? null} />
+              {h ? <HpBar hp={h.hp} /> : <div class="muted">PV —</div>}
+              <Power hud={h} />
               <div class="muted">{seenText(store, e)}</div>
             </div>
           );

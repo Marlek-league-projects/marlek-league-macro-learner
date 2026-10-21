@@ -3,8 +3,9 @@ import { loadGameData } from '@lml/data';
 import { createEngine } from '@lml/engine';
 import type { Contact } from '@lml/engine/contracts';
 import { goldLead } from '../src/components/format';
-import { MIN_STRENGTH_FILL, pressureDirection, strengthFill, strengthFills } from '../src/components/map-marks';
-import { contactDock, placePopover, POPOVER_GAP } from '../src/components/popover';
+import { HUD_DROP, HUD_RISE, hpColor, hpShare, hudTop, hudValues, powerOf, POWER_UNIT, strengths, xpProgress } from '../src/components/hud';
+import { pressureDirection } from '../src/components/map-marks';
+import { clampInside, contactDock, placePopover, POPOVER_GAP, visibleRegion } from '../src/components/popover';
 import { createStore, promptContacts } from '../src/store';
 
 const data = loadGameData();
@@ -31,72 +32,102 @@ describe('goldLead', () => {
   });
 });
 
-describe('strengthFill', () => {
-  test('share of the strongest, capped at 1', () => {
-    expect(strengthFill(50, 100)).toBe(0.5);
-    expect(strengthFill(100, 100)).toBe(1);
-    expect(strengthFill(120, 100)).toBe(1);
-  });
-
-  test('never below the minimum sliver; nothing to compare gives a full bar', () => {
-    expect(strengthFill(0, 100)).toBe(MIN_STRENGTH_FILL);
-    expect(strengthFill(0, 0)).toBe(1);
-  });
-});
-
-describe('strengthFills', () => {
+describe('strengths', () => {
   const engine = createEngine();
 
-  test('every alive ally and only visible enemies, the strongest at 1', () => {
+  test('every ally (dead ones too, for their card) and only visible enemies', () => {
     const store = started();
     const v = structuredClone(store.view.value!);
-    const fills = strengthFills(v, data, store.level, store.estimateEnemy);
-    for (const c of v.allies) expect(fills[c.id]).toBeDefined();
-    for (const e of v.enemies) expect(fills[e.id] !== undefined).toBe(e.visible && e.level !== null);
-    expect(Math.max(...Object.values(fills))).toBe(1);
+    v.allies[0]!.status = 'dead';
+    const s = strengths(v, data, store.level, store.estimateEnemy);
+    for (const c of v.allies) expect(s[c.id]).toBeDefined();
+    for (const e of v.enemies) expect(s[e.id] !== undefined).toBe(e.visible && e.level !== null);
   });
 
-  test('more items means a fuller bar; a dead ally has none', () => {
+  test('xp at its level floor, plus items and bonus lead', () => {
     const store = started();
     const v = structuredClone(store.view.value!);
-    const [a, b] = v.allies.filter((c) => c.role !== 'jungle');
-    a!.xp = b!.xp = 0;
-    a!.bonusLead = b!.bonusLead = 0;
-    a!.items = 2000;
-    b!.items = 1000;
-    const fills = strengthFills(v, data, store.level, store.estimateEnemy);
-    expect(fills[a!.id]!).toBeGreaterThan(fills[b!.id]!);
-    b!.status = 'dead';
-    expect(strengthFills(v, data, store.level, store.estimateEnemy)[b!.id]).toBeUndefined();
+    const a = v.allies[0]!;
+    Object.assign(a, { xp: data.rules.economy.levelXp[3]! + 50, items: 2000, bonusLead: 100 });
+    expect(strengths(v, data, store.level, store.estimateEnemy)[a.id]).toBe(data.rules.economy.levelXp[3]! + 2100);
   });
 
-  test("a visible enemy's bar is the engine's estimate, not its team's average gold", () => {
+  test("a visible enemy's strength is the engine's estimate, not its team's gold", () => {
     const store = started();
     const v = structuredClone(store.view.value!);
     for (const c of v.allies) Object.assign(c, { xp: 0, items: 0, bonusLead: 0 });
     const top = v.allies.find((c) => c.role === 'top')!;
     const enemy = v.enemies.find((e) => e.role === 'mid')!;
-    Object.assign(enemy, { visible: true, position: top.position, level: 3 });
-    // A huge enemy gold total no longer inflates the bar by itself: the estimate sizes on the mirror's items (0 here).
+    Object.assign(enemy, { visible: true, position: top.position, level: 3, hp: 60 });
     v.scoreboard.goldEarned[v.side === 'blue' ? 'red' : 'blue'] = 1_000_000;
     const est = engine.estimateEnemy(v, data, enemy);
     expect(est.items).toBe(0);
-    top.items = 2 * (est.xp + est.items + est.bonusLead);
-    const fills = strengthFills(v, data, store.level, (e) => engine.estimateEnemy(v, data, e));
-    expect(fills[top.id]).toBe(1);
-    expect(fills[enemy.id]).toBeCloseTo(0.5);
+    expect(strengths(v, data, store.level, (e) => engine.estimateEnemy(v, data, e))[enemy.id])
+      .toBe(est.xp + est.items + est.bonusLead);
   });
 
-  test('same level and items as the mirror: an ally and a visible enemy show the same bar', () => {
+  test('same level and items as the mirror: an ally and a visible enemy show the same strength', () => {
     const store = started();
     const v = structuredClone(store.view.value!);
     const mid = v.allies.find((c) => c.role === 'mid')!;
     // Mid-level xp (not a level floor) still compares on the floor, as the enemy's level is all that shows.
     Object.assign(mid, { xp: data.rules.economy.levelXp[3]! + 50, items: 1200, bonusLead: 0 });
     const enemy = v.enemies.find((e) => e.role === 'mid')!;
-    Object.assign(enemy, { visible: true, position: mid.position, level: store.level(mid.xp) });
-    const fills = strengthFills(v, data, store.level, (e) => engine.estimateEnemy(v, data, e));
-    expect(fills[enemy.id]).toBeCloseTo(fills[mid.id]!);
+    Object.assign(enemy, { visible: true, position: mid.position, level: store.level(mid.xp), hp: 100 });
+    const s = strengths(v, data, store.level, (e) => engine.estimateEnemy(v, data, e));
+    expect(s[enemy.id]).toBeCloseTo(s[mid.id]!);
+  });
+});
+
+describe('HUD values', () => {
+  test('xpProgress: share of the way to the next level, full at the last level', () => {
+    const t = data.rules.economy.levelXp;
+    expect(xpProgress(data, t[2]!, 3)).toBe(0);
+    expect(xpProgress(data, (t[2]! + t[3]!) / 2, 3)).toBeCloseTo(0.5);
+    expect(xpProgress(data, t[t.length - 1]! + 999, t.length)).toBe(1);
+  });
+
+  test('hpShare clamps to 0..1; hpColor goes from green to red', () => {
+    expect(hpShare(50)).toBe(0.5);
+    expect(hpShare(-5)).toBe(0);
+    expect(hpShare(150)).toBe(1);
+    expect(hpColor(1)).toBe('hsl(120 75% 45%)');
+    expect(hpColor(0)).toBe('hsl(0 75% 45%)');
+    expect(hpColor(0.5)).toBe('hsl(60 75% 45%)');
+  });
+
+  test('hudTop: above the token, below its name near the top edge so it stays on the map', () => {
+    expect(hudTop(300)).toBe(300 - HUD_RISE);
+    expect(hudTop(HUD_RISE)).toBe(0);
+    expect(hudTop(40)).toBe(40 + HUD_DROP);
+  });
+
+  test('power is the strength over the power unit, rounded', () => {
+    expect(powerOf(0)).toBe(0);
+    expect(powerOf(4549)).toBe(Math.round(4549 / POWER_UNIT));
+  });
+
+  test('ally: its HP, level, power and XP progress', () => {
+    const store = started();
+    const v = structuredClone(store.view.value!);
+    const a = v.allies[0]!;
+    const t = data.rules.economy.levelXp;
+    Object.assign(a, { xp: (t[4]! + t[5]!) / 2, items: 1000, bonusLead: 0, hp: 40 });
+    const h = hudValues(v, data, store.level, store.estimateEnemy)[a.id]!;
+    expect(h).toEqual({ hp: 0.4, level: 5, power: powerOf(t[4]! + 1000), xp: 0.5 });
+  });
+
+  test('fog of war: an unseen enemy has no HUD; a visible one shows HP and level, never XP progress', () => {
+    const store = started();
+    const v = structuredClone(store.view.value!);
+    const enemy = v.enemies[0]!;
+    Object.assign(enemy, { visible: false, level: null, hp: null });
+    expect(hudValues(v, data, store.level, store.estimateEnemy)[enemy.id]).toBeUndefined();
+    Object.assign(enemy, { visible: true, position: v.allies[0]!.position, level: 4, hp: 25 });
+    const h = hudValues(v, data, store.level, store.estimateEnemy)[enemy.id]!;
+    expect(h.hp).toBe(0.25);
+    expect(h.level).toBe(4);
+    expect(h.xp).toBeNull();
   });
 });
 
@@ -120,9 +151,14 @@ describe('placePopover', () => {
     expect(placePopover({ x: 400, y: 400 }, pop, box, both)).toEqual({ left: 300, top: 400 + POPOVER_GAP });
   });
 
-  test('clamped inside the box near the top and bottom edges', () => {
-    expect(placePopover({ x: 100, y: 10 }, pop, box).top).toBe(0);
-    expect(placePopover({ x: 100, y: 790 }, pop, box).top).toBe(640);
+  test('inside the box near the top and bottom edges', () => {
+    for (const y of [10, 790]) {
+      const at = placePopover({ x: 100, y }, pop, box);
+      expect(at.top).toBeGreaterThanOrEqual(0);
+      expect(at.top + pop.height).toBeLessThanOrEqual(box.height);
+    }
+    // Squeezed right of the pawn, clamped to the top edge, when the other sides cover more.
+    expect(placePopover({ x: 100, y: 10 }, pop, box, [{ x: 100, y: 100 }]).top).toBe(0);
   });
 
   test('a box too narrow for either side keeps it inside, pinned at the left edge when larger', () => {
@@ -131,6 +167,78 @@ describe('placePopover', () => {
     expect(at.left).toBeGreaterThanOrEqual(0);
     expect(at.left + pop.width).toBeLessThanOrEqual(narrow.width);
     expect(placePopover({ x: 50, y: 50 }, { width: 400, height: 900 }, narrow)).toEqual({ left: 0, top: 0 });
+  });
+
+  test('opens left of the pawn when the reachable positions are on its right', () => {
+    const reachable = [{ x: 450, y: 400 }, { x: 480, y: 360 }, { x: 520, y: 440 }];
+    expect(placePopover({ x: 400, y: 400 }, pop, box, reachable)).toEqual({ left: 400 - POPOVER_GAP - 200, top: 320 });
+  });
+
+  test('on a tie, the side the clamp moves least: above a pawn near the bottom edge, not squeezed beside it', () => {
+    // One reachable point on each side's spot: every side covers one, but right/left/below get clamped upward.
+    const anchor = { x: 400, y: 780 };
+    const reachable = [{ x: 600, y: 800 }, { x: 200, y: 800 }, { x: 400, y: 590 }];
+    expect(placePopover(anchor, pop, box, reachable)).toEqual({ left: 300, top: 780 - POPOVER_GAP - 160 });
+  });
+
+  test('stays inside the on-screen region when given one', () => {
+    const region = { left: 0, top: 100, right: 800, bottom: 600 };
+    const at = placePopover({ x: 100, y: 590 }, pop, region);
+    expect(at.top + pop.height).toBeLessThanOrEqual(600);
+    expect(placePopover({ x: 100, y: 105 }, pop, region).top).toBeGreaterThanOrEqual(100);
+  });
+
+  test('opens above when the reachable positions surround the pawn left, right and below', () => {
+    const reachable = [{ x: 300, y: 400 }, { x: 500, y: 400 }, { x: 400, y: 500 }];
+    expect(placePopover({ x: 400, y: 400 }, pop, box, reachable)).toEqual({ left: 300, top: 400 - POPOVER_GAP - 160 });
+  });
+});
+
+describe('dragged panel position in the store', () => {
+  test('starts next to the pawn and is kept for the session, across games', () => {
+    const store = started();
+    expect(store.panelAt.value).toBeNull();
+    store.panelAt.value = { x: 0.1, y: 0.2 };
+    store.reset();
+    store.start({ rank: 'gold', teaching: false, seed: 2 });
+    expect(store.panelAt.value).toEqual({ x: 0.1, y: 0.2 });
+    expect(store.panelDragging.value).toBe(false);
+  });
+});
+
+describe('dragged panel clamping', () => {
+  const box = { width: 800, height: 900 };
+  const pop = { width: 200, height: 160 };
+
+  test('visibleRegion: the whole box when it fits the viewport', () => {
+    expect(visibleRegion({ x: 300, y: 50 }, box, { width: 1440, height: 1000 }))
+      .toEqual({ left: 0, top: 0, right: 800, bottom: 900 });
+  });
+
+  test('visibleRegion: cut by the viewport bottom and a box scrolled above the top', () => {
+    expect(visibleRegion({ x: 300, y: 200 }, box, { width: 1440, height: 1000 }).bottom).toBe(800);
+    expect(visibleRegion({ x: 300, y: -100 }, box, { width: 1440, height: 1000 }))
+      .toEqual({ left: 0, top: 100, right: 800, bottom: 900 });
+    expect(visibleRegion({ x: 1000, y: 0 }, box, { width: 1440, height: 1000 }).right).toBe(440);
+  });
+
+  test('visibleRegion: the whole box when it lies outside the viewport', () => {
+    expect(visibleRegion({ x: 0, y: 2000 }, box, { width: 1440, height: 1000 }))
+      .toEqual({ left: 0, top: 0, right: 800, bottom: 900 });
+  });
+
+  test('clampInside: a drag past any edge stops at that edge', () => {
+    const r = { left: 0, top: 100, right: 800, bottom: 800 };
+    expect(clampInside({ left: -50, top: 300 }, pop, r)).toEqual({ left: 0, top: 300 });
+    expect(clampInside({ left: 900, top: 300 }, pop, r)).toEqual({ left: 600, top: 300 });
+    expect(clampInside({ left: 100, top: 0 }, pop, r)).toEqual({ left: 100, top: 100 });
+    expect(clampInside({ left: 100, top: 790 }, pop, r)).toEqual({ left: 100, top: 640 });
+    expect(clampInside({ left: 100, top: 300 }, pop, r)).toEqual({ left: 100, top: 300 });
+  });
+
+  test('clampInside: a panel larger than the region is pinned to its top-left corner', () => {
+    expect(clampInside({ left: 50, top: 50 }, { width: 900, height: 900 }, { left: 0, top: 100, right: 800, bottom: 800 }))
+      .toEqual({ left: 0, top: 100 });
   });
 });
 

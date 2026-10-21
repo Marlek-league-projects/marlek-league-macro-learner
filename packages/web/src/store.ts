@@ -56,6 +56,10 @@ export interface Store {
   settings: Signal<Settings>;
   /** Own champions back at base after a recall (respawning without a death). */
   recalled: Signal<string[]>;
+  /** Where the player dragged the actions panel (top-left, shares 0..1 of the map box), kept for the session; null: next to the pawn. */
+  panelAt: Signal<{ x: number; y: number } | null>;
+  /** The actions panel is being dragged: map clicks are ignored meanwhile. */
+  panelDragging: Signal<boolean>;
   start(s: Settings): void;
   /** Back to the start screen, dropping the current game. */
   reset(): void;
@@ -110,6 +114,8 @@ export function createStore(data: GameData, engine: GameEngine): Store {
   const explanations = signal<Explanation[]>([]);
   const settings = signal<Settings>({ rank: 'gold', teaching: true, seed: 1 });
   const recalled = signal<string[]>([]);
+  const panelAt = signal<{ x: number; y: number } | null>(null);
+  const panelDragging = signal(false);
 
   // The full state never leaves the store; components only see `view`.
   let state: GameState | null = null;
@@ -229,6 +235,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
 
   return {
     data, screen, view, previousView, replaying, replayRun, selected, pending, contacts, choices, lastEvents, explanations, settings, recalled,
+    panelAt, panelDragging,
 
     start(s) {
       settings.value = s;

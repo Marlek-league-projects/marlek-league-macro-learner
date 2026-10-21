@@ -1,6 +1,6 @@
 // Map geometry and timers, from the player's view only (fog of war holds).
 import type { GameData, Lane, Position, Side } from '@lml/data/contracts';
-import type { EnemyEstimate, EnemyInfo, PlayerView } from '@lml/engine/contracts';
+import type { PlayerView } from '@lml/engine/contracts';
 
 export interface Point {
   x: number;
@@ -24,6 +24,9 @@ export function spawnCountdown(view: PlayerView, data: GameData, id: string, now
   }
   return null;
 }
+
+/** Gap between the centres of tokens standing side by side on one position (room for their HUDs). */
+export const PAWN_SPREAD = 48;
 
 /** How far from a front tower toward the lane middle a wave pushed to that tower is drawn. */
 export const WAVE_NEAR_TOWER = 0.3;
@@ -58,42 +61,6 @@ export function dotRadius(p: Position): number {
 /** Radius of a position's invisible click circle: twice its dot (bases are already large). */
 export function hitRadius(p: Position): number {
   return p.kind === 'base' ? dotRadius(p) : 2 * dotRadius(p);
-}
-
-/** Smallest strength bar fill, so the weakest visible pawn still shows a sliver. */
-export const MIN_STRENGTH_FILL = 0.08;
-
-/** Bar fill (0..1) of a pawn of strength `strength` next to the strongest visible one. */
-export function strengthFill(strength: number, strongest: number): number {
-  if (strongest <= 0) return 1;
-  return Math.min(1, Math.max(MIN_STRENGTH_FILL, strength / strongest));
-}
-
-/**
- * Strength bar fill of every pawn on the map, keyed by champion id: its fight lead (xp + items + bonus lead,
- * the fight score's lead), xp counted at its level's floor so allies and enemies compare on what both show.
- * Allies show their own items and lead. A visible enemy shows what this side assumes it has, the engine's
- * shared estimate (sized on its own-side mirror and the scoreboard gold), never its true lead.
- */
-export function strengthFills(
-  view: PlayerView,
-  data: GameData,
-  level: (xp: number) => number,
-  estimate: (enemy: EnemyInfo) => EnemyEstimate,
-): Record<string, number> {
-  const floor = (lvl: number) => data.rules.economy.levelXp[lvl - 1] ?? 0;
-  const strengths: Record<string, number> = {};
-  for (const c of view.allies) {
-    if (c.status === 'dead') continue;
-    strengths[c.id] = floor(level(c.xp)) + c.items + c.bonusLead;
-  }
-  for (const e of view.enemies) {
-    if (!e.visible || !e.position || e.level === null) continue;
-    const est = estimate(e);
-    strengths[e.id] = est.xp + est.items + est.bonusLead;
-  }
-  const strongest = Math.max(0, ...Object.values(strengths));
-  return Object.fromEntries(Object.entries(strengths).map(([id, s]) => [id, strengthFill(s, strongest)]));
 }
 
 /** Unit vector along the lane pointing the way `side` pushes it (blue pushes toward red's towers). */
