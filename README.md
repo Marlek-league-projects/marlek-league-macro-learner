@@ -72,7 +72,7 @@ When a contact happens, resolution pauses and each player involved chooses to **
 | Situation | Default choice |
 |---|---|
 | Even numbers in lane (1v1, 2v2) | **Farm** (play the lane normally). See *Lane contacts* below. |
-| Ganked (an enemy **arrives** in your lane this round from elsewhere and outnumbers you) | **Flee** |
+| Ganked (an enemy **arrives** in your lane this round from elsewhere and outnumbers you; a laner coming back to its own lane is not a ganker) | **Flee** |
 | Outnumbered without a gank (e.g. the enemy support roamed away, so it is 2v1) | No prompt: **lane pressure** (see below) |
 | The ganker | Asked to choose: commit to the fight or not |
 | Neutral objective with an enemy already there | Asked to choose: fight or flee |
@@ -82,20 +82,21 @@ When a contact happens, resolution pauses and each player involved chooses to **
 - If both sides flee, nobody takes the objective and it stays up for the next round. If one side flees and the other fights, the fighting side takes it without a fight.
 - *(design call)* In lane, if one side flees and the other trades or fights, the side that stayed wins the trade (wave and lead).
 
-**Lane pressure without a gank.** When a lane is uneven only because someone left it (nobody arrived from elsewhere), nothing is asked. The bigger side pushes the wave and hits the tower (plates). The lone laner farms under its tower and loses gold and XP. It only dies if the bigger side's posture is All-in and it has enough advantage.
+**Lane pressure without a gank.** When a lane is uneven and nobody arrived from elsewhere (for example someone left it, or a laner walked back to its own lane), nothing is asked. The bigger side pushes the wave and hits the tower (plates). In any uneven lane without a gank, the smaller side farms at a reduced share of a normal round's gold and XP (`economy.pressureFarmShare`, half). It only dies if the bigger side's posture is All-in and it has enough advantage.
 
 **Lane stance.** Each laner has a persistent **stance**, set once in its actions and kept until changed: **Farm** (default), **Trade** or **All-in**. Even lane contacts resolve automatically from both stances, with no prompt each round. The game only asks for a choice on real events: a gank, a contested objective, an invade.
 
 **Laners follow their wave.** A laner with no order follows its lane's wave automatically: it stands where the wave is (in front of its tower, in the middle, or in front of the enemy tower) and farms.
 
-**Lane pressure is computed.** Each lane's pressure comes from the matchup, the levels and the lead of the laners present. It pushes the wave and is shown on the map.
+**Lane pressure is computed.** Each lane's pressure comes from the matchup, the levels and the lead of the laners present. It pushes the wave. The map shows it as an arrow, which is **your estimate**: your champions as they are, and the enemies you see with the stats you would estimate for them (see *AI opponent*), never their true lead.
 
-**Lane contacts.** With even numbers in lane, each side's stance (or choice) is one of:
+**Lane contacts.** With even numbers in lane, each side's stance decides, with no prompt. A stance is one of:
 
 - **Farm** (default): play the lane normally, with no trade. The wave moves by matchup and lead, as when the laners don't meet.
 - **Trade**: exchange spells without going for the kill. Nobody dies. The trade winner (fight score) gains lead and pushes the wave.
 - **All-in**: go for the kill, which turns the contact into a fight where the losers die.
-- **Flee**: leave the lane. The side that stayed wins the trade.
+
+**Flee** is not offered on these automatic even-lane contacts: the stances decide. To leave the lane, give the laner another order.
 
 Nobody can die in lane unless at least one side picks **All-in**. Farm against Trade is a trade. The AI only goes all-in with a large advantage (threshold in data).
 
@@ -216,17 +217,18 @@ Vision is revealed when the round resolves, so you use what you saw this round t
 
 ## Game screen
 
-- **Round banner** (very top, large): round N/37, game time window of the round and phase.
-- **Scoreboard** (top centre, like League): kills blue – red, towers, Dragons and Barons per team, and the team **gold advantage** ("+1.2k" or "−800"). Kills, towers and objectives are public, as in the real game. The gold advantage is a learning aid and uses the enemy's real gold.
+- **Round banner** (very top, large): round N/37, game time window of the round and phase. While you give orders it also holds a **Valider le round** button, so confirming never needs a scroll. **Enter** does the same when no field or button has the focus.
+- **Scoreboard** (top centre, like League): kills blue – red, towers, Dragons and Barons per team, and the team **gold advantage** ("+1.2k" or "−800"). Kills, towers and objectives are public, as in the real game. The gold advantage is a learning aid and uses the enemy's real gold. It also feeds the estimates of enemies you can't fully see: the AI, the pressure arrows and the strength bars size an enemy on your own champion of the same role, with its items scaled by the gold ratio (see *AI opponent*).
 - **Teams on the sides, like League**: your team in a column left of the map, the enemy team in a column right of the map. One card per champion with role icon, name, level, XP bar, lead bar and unspent gold (own team), or last seen position (enemy).
 - **Strength bar**: above every visible token, a small bar shows its strength (level and lead), so you can compare yourself with a visible enemy.
 - **Center**: a flat map showing every playable position, with a tooltip on hover. One token per champion, with the official League role icon above it (from CommunityDragon) and its name below. Fog of war covers what you can't see. The map takes the full available height, and every position and token has a click target larger than its drawing.
   - Each neutral objective and jungle camp shows, on its own position, the time left before it spawns, or that it is up. A cleared camp is greyed out with its respawn timer.
   - Each lane shows its **wave** marker (near the blue tower, in the middle or near the red tower), so you can read lane priority.
 - **Actions** (a small panel next to the selected token): the selected token's options, including a laner's stance. Place a ward or clear one, each on the starting or arrival position. Recall.
-- **Round summary** (below the map): current phase, round and game time, next objective spawn, the list of this round's orders, the **Confirm round** button, the fight or flee prompts when a contact happens during resolution, and teaching-mode explanations after the round resolves.
+- **Round summary** (below the map): current phase, round and game time, next objective spawn, the list of this round's orders, the **Confirm round** button, and teaching-mode explanations after the round resolves.
+- **Contact prompts**: when a contact needs an answer during resolution, the fight or flee choices appear in an overlay docked on the map, next to the contacts.
 - **Round replay**: after a round resolves, a short animation (about 2 s, with replay and skip buttons) plays it on the map: visible tokens slide to their destination, fights flash, deaths and taken objectives appear. Only what you saw is shown. The text log stays below.
-- **Giving orders**: click a token, and only the positions it can reach this round light up. Then click its next position. A dashed arrow shows the move. A token with no order stays where it is.
+- **Giving orders**: click a token, and only the positions it can reach this round light up. Then click its next position. A dashed arrow shows the move. With no order, a laner standing in its home lane follows its wave; any other token stays where it is.
 
 The clickable mockup [`docs/game-screen-mockup.html`](docs/game-screen-mockup.html) is the reference for this layout. It also holds the first draft of the position coordinates and the movement graph.
 
@@ -243,7 +245,7 @@ The clickable mockup [`docs/game-screen-mockup.html`](docs/game-screen-mockup.ht
 
 There are **10 difficulty levels**, named after League ranks: Iron, Bronze, Silver, Gold, Platinum, Emerald, Diamond, Master, Grandmaster, Challenger.
 
-The AI always plays by the fog-of-war rules: it only knows what its own wards and champions see. Lower levels don't play at random. They make the **macro mistakes typical of their rank**, and higher levels make them less and less often. Challenger almost always plays the best tempo move, but even Master+ makes a small mistake now and then.
+The AI always plays by the fog-of-war rules: it only knows what its own wards and champions see, plus the public scoreboard. For an enemy, it assumes the XP of the enemy's seen level, or else of its own champion of the same role, and that champion's items scaled by the scoreboard gold ratio (enemy gold earned over its own), plus the enemy's Dragon buffs. Your pressure arrows and strength bars use the same estimate. Lower levels don't play at random. They make the **macro mistakes typical of their rank**, and higher levels make them less and less often. Challenger almost always plays the best tempo move, but even Master+ makes a small mistake now and then.
 
 Each level is a data profile with a frequency per mistake (for example, Iron greeds 60% of the time and Challenger 1%). Mistakes are random rolls, but fights and waves stay deterministic.
 
@@ -259,7 +261,9 @@ Each level is a data profile with a frequency per mistake (for example, Iron gre
 | **No conversion** | Wins a fight, then walks away without taking a tower or objective | often | sometimes | sometimes | rarely | very rarely |
 | **Ignoring the enemy jungler** | Plays the same way whether or not the jungler was last seen nearby | very often | often | sometimes | rarely | very rarely |
 
-**Laning phase.** Until 14:00 (plates), AI laners stay in their lane and follow their wave. Only the jungler roams, plus rotations to an objective (Emerald+ wave sacrifice) and recalls.
+**Laning phase.** Until 14:00 (plates), AI laners stay in their lane and follow their wave: the normal role and priority rotations to objectives are off for laners. Only the jungler roams. The exceptions are recalls and the Emerald+ wave sacrifice, limited to the pit on the laner's half of the map (top to the Baron pit, bot to the Dragon). The mid laner, as far from both pits, never sacrifices its wave in this phase: it only rotates with priority (its wave even or pushed). Mistakes (rotating without priority, pointless plays) can still break the rule.
+
+At any time, the AI skips an objective when the enemies it knows near the pit would win the fight against the group it could bring there, instead of walking in only to flee.
 
 Master, Grandmaster and Challenger keep a small mistake rate that goes down with each rank, and they also differ in how many rounds ahead they plan.
 
