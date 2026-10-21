@@ -1,9 +1,9 @@
-import { useState } from 'preact/hooks';
 import type { ChampionState, Order, Stance } from '@lml/engine/contracts';
 import type { Store } from '../store';
+import { confirmError, confirmRound } from './confirm-round';
 import { EventLog } from './EventLog';
 import { shownRound } from './RoundBanner';
-import { championName, clock, errorText, OBJECTIVE_LABEL, objectiveTimers, positionLabel } from './format';
+import { championName, clock, OBJECTIVE_LABEL, objectiveTimers, positionLabel } from './format';
 
 /** Rounds until the objective spawning at `at` is up (it spawns during the round whose window ends at or after it). */
 function roundsUntil(store: Store, round: number, at: number): number | null {
@@ -60,17 +60,9 @@ function orderText(store: Store, c: ChampionState, o: Order | undefined): string
 }
 
 function Orders({ store }: { store: Store }) {
-  const [error, setError] = useState<string | null>(null);
   const view = store.view.value!;
   const pending = store.pending.value;
-  const confirm = () => {
-    try {
-      store.confirmRound();
-      setError(null);
-    } catch (err) {
-      setError(errorText(err));
-    }
-  };
+  const error = confirmError.value;
   return (
     <>
       <div>
@@ -82,7 +74,7 @@ function Orders({ store }: { store: Store }) {
           ))}
         </ul>
       </div>
-      <button class="go" onClick={confirm}>Valider le round</button>
+      <button class="go" onClick={() => confirmRound(store)}>Valider le round</button>
       {error && <div class="error">{error}</div>}
       {store.settings.value.teaching && (
         <div class="note">Mode didactique : les explications s'affichent ici après la résolution du round.</div>

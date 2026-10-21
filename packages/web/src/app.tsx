@@ -1,4 +1,6 @@
+import { useEffect } from 'preact/hooks';
 import type { Store } from './store';
+import { confirmRound, isConfirmKey } from './components/confirm-round';
 import { GameOver } from './components/GameOver';
 import { MapView } from './components/MapView';
 import { RoundBanner } from './components/RoundBanner';
@@ -13,6 +15,19 @@ const LEGAL =
 
 /** Teams on the sides like League: your column, the map with the round panel below it, the enemy column. */
 function Game({ store }: { store: Store }) {
+  // Enter validates the round while giving orders, unless a field or a control has the focus.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (store.screen.value !== 'orders') return;
+      const t = e.target instanceof HTMLElement ? e.target : null;
+      const { key, ctrlKey, metaKey, altKey, shiftKey, repeat } = e;
+      if (!isConfirmKey({ key, ctrlKey, metaKey, altKey, shiftKey, repeat, target: t })) return;
+      e.preventDefault();
+      confirmRound(store);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [store]);
   if (store.screen.value === 'over') {
     return (
       <>
