@@ -79,14 +79,14 @@ describe('resolveRound', () => {
     expect(() => resolveRound(s, d, ordersWith(s), {})).toThrow(/over/);
   });
 
-  test('a full game of default orders ends after round 37 with a winner', () => {
+  test('a full game of default orders ends after round 71 with a winner', () => {
     let s = newGame(d, 42);
-    for (let i = 0; i < 37; i++) {
+    for (let i = 0; i < 71; i++) {
       const o: Orders = { blue: defaultOrders(s, d, 'blue'), red: defaultOrders(s, d, 'red') };
       s = resolveRound(s, d, o, {}).state;
     }
     expect(s.over).toBe(true);
-    expect(s.round).toBe(38);
+    expect(s.round).toBe(72);
     expect(s.winner).not.toBeNull();
   });
 
@@ -282,18 +282,13 @@ describe('resolveRound', () => {
     expect([after.position, after.status]).toEqual(['base-blue', 'alive']);
   });
 
-  test('a spawn on the T1 arrives without acting in a 2-step round and acts with 4 steps (base bonus)', () => {
-    const roundWith = (steps: number): number => {
-      for (let r = 1; ; r++) if (d.rules.moves.budgetBySeconds[String(roundWindow(d.rules, r).seconds)] === steps) return r;
-    };
-    for (const [steps, acted] of [[2, false], [4, true]] as const) {
-      const s = setup(roundWith(steps), []);
-      const bt = get(s, 'blue', 'top');
-      bt.status = 'respawning';
-      bt.respawnRound = s.round;
-      const { events } = resolveRound(s, d, ordersWith(s, [{ kind: 'spawn', champion: bt.id, to: 'top-t1-blue' }]), {});
-      expect(events).toContainEqual({ type: 'moved', champion: bt.id, from: 'base-blue', to: 'top-t1-blue', acted });
-    }
+  test('a spawn on the T1 arrives without acting: 2 steps plus the base bonus do not leave one to act', () => {
+    const s = setup(10, []);
+    const bt = get(s, 'blue', 'top');
+    bt.status = 'respawning';
+    bt.respawnRound = s.round;
+    const { events } = resolveRound(s, d, ordersWith(s, [{ kind: 'spawn', champion: bt.id, to: 'top-t1-blue' }]), {});
+    expect(events).toContainEqual({ type: 'moved', champion: bt.id, from: 'base-blue', to: 'top-t1-blue', acted: false });
   });
 
   test('a gank in lane where one side flees is won by the side that stayed: wave and trade lead', () => {

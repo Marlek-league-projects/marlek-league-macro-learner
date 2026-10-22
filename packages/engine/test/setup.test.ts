@@ -15,10 +15,10 @@ test('rng is deterministic per seed', () => {
 test('round windows follow the phases', () => {
   expect(roundWindow(d.rules, 1)).toMatchObject({ start: 90, end: 110, stage: 0 });
   expect(roundWindow(d.rules, 6).end).toBe(210);
-  expect(roundWindow(d.rules, 15)).toMatchObject({ start: 370, end: 410, stage: 2 });
-  expect(roundWindow(d.rules, 37).end).toBe(1510);
-  expect(totalRounds(d.rules)).toBe(37);
-  expect(() => roundWindow(d.rules, 38)).toThrow();
+  expect(roundWindow(d.rules, 15)).toMatchObject({ start: 370, end: 390, stage: 2 });
+  expect(roundWindow(d.rules, 71).end).toBe(1510);
+  expect(totalRounds(d.rules)).toBe(71);
+  expect(() => roundWindow(d.rules, 72)).toThrow();
 });
 
 test('randomDraft gives 10 distinct champions in their roles', () => {

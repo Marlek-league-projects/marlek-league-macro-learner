@@ -2,15 +2,15 @@
   "phases": [
     { "name": "Niveau 1 & premier clear", "start": 90, "end": 210, "roundSeconds": 20, "stage": 0 },
     { "name": "Carapateurs & 1er dragon", "start": 210, "end": 370, "roundSeconds": 20, "stage": 1 },
-    { "name": "Larves & plaques", "start": 370, "end": 850, "roundSeconds": 40, "stage": 2 },
-    { "name": "Herald & mid game", "start": 850, "end": 1210, "roundSeconds": 60, "stage": 3 },
-    { "name": "Baron", "start": 1210, "end": 1510, "roundSeconds": 60, "stage": 4 }
+    { "name": "Larves & plaques", "start": 370, "end": 850, "roundSeconds": 20, "stage": 2 },
+    { "name": "Herald & mid game", "start": 850, "end": 1210, "roundSeconds": 20, "stage": 3 },
+    { "name": "Baron", "start": 1210, "end": 1510, "roundSeconds": 20, "stage": 4 }
   ],
-  "moves": { "budgetBySeconds": { "20": 2, "40": 3, "60": 4 }, "baseBonus": 1 },
+  "moves": { "budgetBySeconds": { "20": 2 }, "baseBonus": 1 },
   "wards": { "perRound": 3, "duration": 2, "unwardPerRound": 1, "unwardRoles": ["jungle", "support"] },
   "towers": { "hp": 5, "pushDamage": [1, 1, 2, 3, 4], "heraldDamage": 3, "platesGoldUntil": 840, "plateGold": 160, "towerGold": 250, "absentLanerChip": 0.5 },
   "lanes": { "pushBonus": 0.5 },
-  "buffs": { "grubsMult": 1.5, "baronMult": 2, "baronRounds": 3, "dragonLead": 250 },
+  "buffs": { "grubsMult": 1.5, "baronMult": 2, "baronRounds": 9, "dragonLead": 250 },
   "objectives": {
     "scuttle": { "firstSpawn": 210, "respawn": 150, "despawnAt": null, "minChampions": 1, "extraRound": false, "instantAt": null, "gold": 100, "xp": 100, "value": 450 },
     "dragon": { "firstSpawn": 300, "respawn": 300, "despawnAt": null, "minChampions": 1, "extraRound": true, "instantAt": 4, "gold": 100, "xp": 150, "value": 4500 },
@@ -25,6 +25,6 @@
   },
   "fight": { "numbers": [10, 8, 6, 5, 5], "towerNumbersFactor": 0.5, "lead": 1, "matchup": 0.5, "strength": 2, "towerStrength": 3, "teamfightMinTotal": 7, "deathGap": 3, "survivorLoss": 15, "gankExposed": 1.5, "gankHpLoss": 15, "pressureHpLoss": 10, "objectiveFocus": 0.8 },
   "health": { "max": 100, "tradeLoss": 20, "tradeWinnerLoss": 5, "regenPerRound": 8, "fightWeight": 0.5 },
-  "death": { "lateExtraRoundsFromStage": 4, "lateExtraRounds": 1 },
+  "death": { "roundsByStage": [1, 1, 2, 3, 6] },
   "verdict": { "plateValue": 150, "towerValue": 500 }
 }

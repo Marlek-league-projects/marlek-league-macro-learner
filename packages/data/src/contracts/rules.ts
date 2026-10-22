@@ -109,7 +109,8 @@ export interface Rules {
     /** A champion's fight-score contributions are scaled by `1 - fightWeight * (1 - hp / max)`. */
     fightWeight: number;
   };
-  death: { lateExtraRoundsFromStage: Stage; lateExtraRounds: number };
+  /** Rounds from the death to the respawn round, per stage: the death timer keeps its real duration. */
+  death: { roundsByStage: PerStage };
   verdict: { plateValue: number; towerValue: number };
 }
 

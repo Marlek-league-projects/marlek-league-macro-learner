@@ -121,10 +121,10 @@ describe('towers', () => {
     expect(get(s, 'blue', 'top').gold).toBeCloseTo(get(s, 'blue', 'top').goldEarned, 6);
   });
   test('plates give no gold after 14:00', () => {
-    const s = push3(30);
+    const s = push3(39);
     run(s);
     expect(s.platesTaken.blue).toBe(2);
-    expect(get(s, 'blue', 'top').goldEarned).toBeCloseTo(base(30), 6);
+    expect(get(s, 'blue', 'top').goldEarned).toBeCloseTo(base(39), 6);
   });
   test('defender on the tower blocks damage', () => {
     const s = push3();
@@ -178,7 +178,7 @@ describe('farming', () => {
     expect(ganked.gold).toBeCloseTo(solo.gold, 6);
     expect(ganked.xp).toBeCloseTo(solo.xp, 6);
   });
-  test('a solo laner who only farms hits level 6 by round 15, 11 by round 26 and 15 by the end', () => {
+  test('a solo laner who only farms hits level 6 by 6:50 (round 16), 11 by 14:10 (round 38) and 15 by the end', () => {
     const s = fresh();
     const top = get(s, 'blue', 'top');
     top.position = 'top-lane';
@@ -189,8 +189,8 @@ describe('farming', () => {
       run(s);
       levels[r] = level(top.xp, d.rules);
     }
-    expect(levels[15]).toBeGreaterThanOrEqual(6);
-    expect(levels[26]).toBeGreaterThanOrEqual(11);
+    expect(levels[16]).toBeGreaterThanOrEqual(6);
+    expect(levels[38]).toBeGreaterThanOrEqual(11);
     expect(levels[totalRounds(d.rules)]).toBeGreaterThanOrEqual(15);
   });
 });

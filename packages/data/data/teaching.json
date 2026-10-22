@@ -6,7 +6,7 @@
     {"id": "outnumbered-death", "roundsLost": 1, "text": "{champion} est mort à {position} en {n}v{m} : l'adversaire est arrivé en surnombre."},
     {"id": "enemy-rotated-with-priority", "roundsLost": 0, "text": "L'adversaire avait la priorité en lane et a décalé à {position} en premier."},
     {"id": "objective-uncontested", "roundsLost": 0, "text": "L'adversaire a pris {objective} sans opposition."},
-    {"id": "late-death", "roundsLost": 1, "text": "Mort en late game : {champion} rate un round de plus."}
+    {"id": "late-death", "roundsLost": 5, "text": "Mort en late game : {champion} reste mort 6 rounds (2 minutes), contre 1 round en début de partie."}
   ],
   "objectiveNames": {
     "dragon": "le Dragon",

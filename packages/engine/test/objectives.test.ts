@@ -160,21 +160,21 @@ describe('pit objectives', () => {
   });
 
   test('5 champions on Baron still need the extra round', () => {
-    const s = fresh(33);
+    const s = fresh(57);
     expect(s.pits['baron-pit'].objective).toBe('baron');
     for (const c of team(s, 'blue')) c.position = 'baron-pit';
     capture(s);
     expect(s.objectivesTaken.blue.baron).toBeUndefined();
-    expect(s.pits['baron-pit'].capture).toEqual({ side: 'blue', startedRound: 33 });
+    expect(s.pits['baron-pit'].capture).toEqual({ side: 'blue', startedRound: 57 });
     nextRound(s);
     capture(s);
     expect(s.objectivesTaken.blue.baron).toBe(1);
-    expect(s.baronUntilRound.blue).toBe(34 + d.rules.buffs.baronRounds - 1);
-    expect(s.pits['baron-pit'].nextSpawn).toBe(roundWindow(d.rules, 34).end + d.rules.objectives.baron.respawn!);
+    expect(s.baronUntilRound.blue).toBe(58 + d.rules.buffs.baronRounds - 1);
+    expect(s.pits['baron-pit'].nextSpawn).toBe(roundWindow(d.rules, 58).end + d.rules.objectives.baron.respawn!);
   });
 
   test('Baron needs 3 champions: 2 never start a capture', () => {
-    const s = fresh(33);
+    const s = fresh(57);
     get(s, 'blue', 'jungle').position = 'baron-pit';
     get(s, 'blue', 'mid').position = 'baron-pit';
     capture(s);
@@ -186,7 +186,7 @@ describe('pit objectives', () => {
   });
 
   test('voidgrubs give the grubs buff', () => {
-    const s = fresh(16);
+    const s = fresh(17);
     expect(s.pits['baron-pit'].objective).toBe('voidgrubs');
     for (const r of ['top', 'jungle', 'mid', 'support']) get(s, 'red', r).position = 'baron-pit';
     capture(s);
@@ -198,27 +198,27 @@ describe('pit objectives', () => {
     const objectives = { ...d.rules.objectives, baron: { ...d.rules.objectives.baron, despawnAt: 1300 } };
     const bad: GameData = { ...d, rules: { ...d.rules, objectives } };
     const s = newGame(bad, 7);
-    s.round = 37;
+    s.round = 71;
     expect(() => spawnObjectives(s, bad)).toThrow(/baron-pit/);
   });
 
   test('at 840 s the voidgrubs are replaced by the Herald', () => {
-    const s = fresh(25);
-    expect(roundWindow(d.rules, 25).end).toBeLessThan(840);
+    const s = fresh(37);
+    expect(roundWindow(d.rules, 37).end).toBeLessThan(840);
     expect(s.pits['baron-pit'].objective).toBe('voidgrubs');
     get(s, 'blue', 'jungle').position = 'baron-pit';
     capture(s);
-    nextRound(s); // round 26 ends at 850
+    nextRound(s); // round 38 ends at 850
     expect(s.pits['baron-pit'].objective).toBe('herald');
     expect(s.pits['baron-pit'].capture).toBeNull();
   });
 
   test('voidgrubs taken earlier do not respawn; the Herald comes at 840 s', () => {
-    const s = fresh(16);
+    const s = fresh(17);
     for (const r of ['top', 'jungle', 'mid', 'support']) get(s, 'blue', r).position = 'baron-pit';
     capture(s);
     for (const c of s.champions) c.position = `base-${c.side}`;
-    for (let r = 17; r <= 25; r++) {
+    for (let r = 18; r <= 37; r++) {
       nextRound(s);
       expect(s.pits['baron-pit'].objective).toBeNull();
     }
@@ -227,7 +227,7 @@ describe('pit objectives', () => {
   });
 
   test('Herald goes to the taker with the highest lead', () => {
-    const s = fresh(27);
+    const s = fresh(39);
     expect(s.pits['baron-pit'].objective).toBe('herald');
     const takers = ['top', 'jungle', 'mid', 'adc'].map((r) => get(s, 'blue', r));
     for (const c of takers) c.position = 'baron-pit';

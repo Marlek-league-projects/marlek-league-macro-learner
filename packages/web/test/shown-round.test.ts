@@ -9,6 +9,6 @@ describe('shownRound', () => {
 
   test('is the round just played in review and once the game is over', () => {
     expect(shownRound('review', 6)).toBe(5);
-    expect(shownRound('over', 38)).toBe(37);
+    expect(shownRound('over', 72)).toBe(71);
   });
 });

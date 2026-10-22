@@ -76,6 +76,10 @@ export function validateRules(rules: Rules): void {
   }
   checkPerStage('rules.towers.pushDamage', rules.towers.pushDamage);
   checkPerStage('rules.fight.numbers', rules.fight.numbers);
+  checkPerStage('rules.death.roundsByStage', rules.death?.roundsByStage ?? []);
+  rules.death.roundsByStage.forEach((n, i) => {
+    if (!Number.isInteger(n) || n < 1) fail('rules.death.roundsByStage', `stage ${i} = ${String(n)} is not a positive integer`);
+  });
   const f = rules.fight;
   const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
   if (!finite(f.deathGap) || f.deathGap <= 0) fail('rules.fight', `deathGap = ${String(f.deathGap)} is not a positive number`);

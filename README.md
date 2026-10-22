@@ -47,21 +47,21 @@ Teaching mode calls out tempo directly, for example: *"You lost 2 rounds: your m
 - **Matchups matter.** Each lane matchup gives an advantage that changes across five stages of the game: *really early, early, mid, mid-late, late*. That advantage drives lane priority.
 - **Map positions.** The map has 39 positions: each lane tower (T1, T2, T3) and lane middle, every jungle camp, the Baron and Dragon pits, both Scuttle Crabs, and the two bases. They are placed from real Summoner's Rift coordinates, on top of the official minimap from CommunityDragon.
 - **Rounds.** A round is resolved once you have given and confirmed an order for each of your five champions.
-- **Phases.** Neutral objectives (Scuttle Crab, Dragons, Voidgrubs, Herald, Baron) set the rhythm. The game is split into phases, and rounds cover less game time early and more game time later. Most of the advantage is decided before 25 minutes, so a game stops at 25:10, after 37 rounds.
+- **Phases.** Neutral objectives (Scuttle Crab, Dragons, Voidgrubs, Herald, Baron) set the rhythm. The game is split into phases, and every round lasts 20 s, so the phases only differ in what is on the map. Most of the advantage is decided before 25 minutes, so a game stops at 25:10, after 71 rounds.
 
 | Phase | Game time | Round length | Rounds | Key events |
 |---|---|---|---|---|
 | 1. Level 1 & first clear | 1:30 → 3:30 | 20 s | 6 | lane priority, invades, end of first clear |
 | 2. Scuttles & first Dragon | 3:30 → 6:10 | 20 s | 8 | Scuttle Crabs, first Dragon, Voidgrubs spawn |
-| 3. Voidgrubs & plates | 6:10 → 14:10 | 40 s | 12 | Voidgrubs, Dragons, tower plates |
-| 4. Herald & mid game | 14:10 → 20:10 | 1 min | 6 | plates drop, Herald, T1/T2 towers |
-| 5. Baron | 20:10 → 25:10 | 1 min | 5 | Baron, Dragon Soul, T2/inhibitor towers |
+| 3. Voidgrubs & plates | 6:10 → 14:10 | 20 s | 24 | Voidgrubs, Dragons, tower plates |
+| 4. Herald & mid game | 14:10 → 20:10 | 20 s | 18 | plates drop, Herald, T1/T2 towers |
+| 5. Baron | 20:10 → 25:10 | 20 s | 15 | Baron, Dragon Soul, T2/inhibitor towers |
 
-The longer a round, the farther a token can move during it. Objective timers change between patches, so they live in data files.
+Every round is 20 s, so a token moves the same distance all game. Values that only make sense in real time keep their duration (the death timer and the Baron buff, below); the others count in rounds. Objective timers change between patches, so they live in data files.
 
 - **Verdict.** There is no nexus to destroy for now. At the end of the game, the winner is the team with the bigger accumulated advantage: gold, objectives and towers.
 - **Starting state.** Every laner starts in lane. Each jungler has already done its first buff when round 1 starts: it stands on that buff camp, the camp is cleared, and it has the buff's gold and XP. You know which camp the enemy jungler started on.
-- **Death and recall.** A token that dies or recalls comes back next turn at a base position on its own half of the map. On that turn it can't invade or take an objective. In late game, a death also costs one extra turn.
+- **Death and recall.** A token that dies or recalls comes back next turn at a base position on its own half of the map. On that turn it can't invade or take an objective. A death keeps the champion out for a time that grows with the game stage (`death.roundsByStage`): 1, 1, 2, 3 and 6 rounds, which is 20 s, 20 s, 40 s, 1 min and 2 min. A recall always costs 1 round.
 
 ## Fights
 
@@ -158,6 +158,7 @@ Game stages for matchups, skirmish and teamfight: *really early, early, mid, mid
 - *(design call)* There are no inhibitors or nexus as targets in this version, since the game stops at 25:10.
 - **Voidgrubs** and **Baron** multiply tower damage (see [Neutral objectives](#neutral-objectives)).
 - Plates give gold until 14:00.
+- *(design call)* Tower damage, pushing bonuses and plate chips are per round, tuned for 20 s rounds, and rounds are now 20 s all game: late-game towers fall faster in minutes than with longer rounds.
 
 ## Neutral objectives
 
@@ -167,7 +168,7 @@ Game stages for matchups, skirmish and teamfight: *really early, early, mid, mid
 | **Dragon** | Lead for the whole team |
 | **Voidgrubs** | Tower damage ×1.5 for the team, for the rest of the game |
 | **Herald** | Picked up by the champion who takes it, then launched on a tower in a later round to remove 3 HP |
-| **Baron** | Tower damage ×2 for the team for 3 rounds |
+| **Baron** | Tower damage ×2 for the team for 9 rounds (3 min) |
 
 Tower damage bonuses stack: Voidgrubs plus Baron gives ×3. The Herald launch is an action the carrier picks at its tower position.
 
@@ -206,8 +207,8 @@ Recalling is how you **cash in** your advantage. A champion sitting on a lot of 
 
 The map positions form a graph, and a move is a walk of a few steps on it. [`docs/movement-map.html`](docs/movement-map.html) shows it: click a position to see where a champion can go in one round, for each budget and side. After changing the map or the movement rules, regenerate it with `bun run movement-map`. Starting values:
 
-- **Step budget**: every champion, laner or jungler, has the same number of steps per round, set by the round's length: 2 steps in 20 s rounds, 3 in 40 s rounds, 4 in 1 min rounds (`rules.moves.budgetBySeconds`).
-- **Speed boost from the base**: a move that starts on your own base gets 1 more step (`rules.moves.baseBonus`), respawns included. From the base, the T1s are 3 steps away (base → T3 → T2 → T1): in 20 s rounds a champion reaches its T1 without an action, in 40 s rounds it acts there.
+- **Step budget**: every champion, laner or jungler, has the same number of steps per round, 2 steps in a 20 s round (`rules.moves.budgetBySeconds`), all game long.
+- **Speed boost from the base**: a move that starts on your own base gets 1 more step (`rules.moves.baseBonus`), respawns included. From the base, the T1s are 3 steps away (base → T3 → T2 → T1): a champion reaches its T1 without an action (2 steps plus the bonus leave none to act).
 - **An action costs a step**: clearing a camp, taking a Scuttle, starting or continuing a pit objective, farming your lane's wave, and recalling all need a step left once you arrive. Staying where you are always leaves one.
 - **Arrival only**: a position reached on the last step of the budget is reached, but nothing is done there that round. The champion still fights or flees there, and acts the next round by staying. For example, with 2 steps, a jungler going Wolves → Krugs (through the mid T1) arrives without clearing Krugs, and a laner arriving in its lane on its last step gets no farm that round.
 - **Changing lane ends the move**: going from one lane to another is 1 step between the T1s (mid T1 → top or bot T1), the T2s (mid T2 → top or bot T2) or the T3s (any T3 → another T3 of its side), and the champion stops there for the round.

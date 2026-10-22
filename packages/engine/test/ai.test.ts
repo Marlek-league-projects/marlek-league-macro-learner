@@ -211,9 +211,9 @@ describe('aiOrders', () => {
     const laning = midOrder(sacrificeScenario());
     expect(laning.kind === 'move' && d.graph.positions[laning.to]!.lane).toBe('mid');
     const late = sacrificeScenario();
-    late.round = 28; // 910–970 s
-    late.pits['dragon-pit'].nextSpawn = 1000; // spawns next round
-    for (const role of ['adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 27;
+    late.round = 42; // 910–930 s
+    late.pits['dragon-pit'].nextSpawn = 940; // spawns next round
+    for (const role of ['adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 41;
     const o = midOrder(late);
     expect(o.kind).toBe('move');
     const to = (o as Extract<Order, { kind: 'move' }>).to;
@@ -435,9 +435,9 @@ describe('laning phase', () => {
     }
 
     const late = dragonWithPriority();
-    late.round = 28; // 910–970 s
-    late.pits['dragon-pit'].nextSpawn = 1000; // spawns next round
-    for (const role of ['jungle', 'adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 27;
+    late.round = 42; // 910–930 s
+    late.pits['dragon-pit'].nextSpawn = 940; // spawns next round
+    for (const role of ['jungle', 'adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 41;
     // The red group just seen at the pit would win the fight there: no rotation into it.
     expect(adcRotates(late, 'diamond', onlyMistake())).toBe(false);
     for (const role of ['jungle', 'adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 20;

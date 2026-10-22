@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData, mirrorId } from '@lml/data';
-import { canAct, defaultOrders, newGame, reachable, reachableFrom, roundWindow, route, spawnPoints, stepBudget, stepBudgetFor, validateOrders } from '@lml/engine';
+import { canAct, defaultOrders, newGame, reachable, reachableFrom, route, spawnPoints, stepBudget, stepBudgetFor, totalRounds, validateOrders } from '@lml/engine';
 import { retreatStep } from '../src/movement';
 import type { ChampionState, GameState, Order } from '@lml/engine/contracts';
 
@@ -16,14 +16,8 @@ function orders(s: GameState, over: Order[] = []): Order[] {
 }
 
 describe('step budget', () => {
-  /** First round of the 1-based `phase`. */
-  const firstRoundOf = (phase: number): number => {
-    for (let r = 1; ; r++) if (roundWindow(d.rules, r).phase === phase - 1) return r;
-  };
-  test('2 steps in round 1, 3 in phase 3 and 4 in phase 5', () => {
-    expect(stepBudget(d.rules, 1)).toBe(2);
-    expect(stepBudget(d.rules, firstRoundOf(3))).toBe(3);
-    expect(stepBudget(d.rules, firstRoundOf(5))).toBe(4);
+  test('2 steps in every round of the game', () => {
+    for (let r = 1; r <= totalRounds(d.rules); r++) expect(stepBudget(d.rules, r)).toBe(2);
   });
   test('an action needs a step left: staying acts, arriving on the last step does not', () => {
     expect(canAct(0, 2)).toBe(true);

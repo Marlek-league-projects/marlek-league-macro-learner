@@ -130,7 +130,7 @@ describe('store', () => {
     // a recall makes the top respawn next round, whatever the AI does
     store.setRecall(blue(store, 'top').id);
     // play until a blue champion respawns
-    for (let i = 0; i < 37 && store.screen.value !== 'over'; i++) {
+    for (let i = 0; i < 71 && store.screen.value !== 'over'; i++) {
       const dead = store.view.value!.allies.find((c) => c.status === 'respawning');
       if (dead) {
         expect(() => store.setMove(dead.id, dead.position)).toThrow(/spawn/);
@@ -152,9 +152,9 @@ describe('store', () => {
     throw new Error('no blue champion ever respawned for this seed');
   });
 
-  test('37 rounds reach over with a winner', () => {
+  test('71 rounds reach over with a winner', () => {
     const store = started(7);
-    for (let i = 0; i < 37; i++) {
+    for (let i = 0; i < 71; i++) {
       store.confirmRound();
       store.confirmContacts();
       store.next();
@@ -165,7 +165,7 @@ describe('store', () => {
 
   test('the last round replays on the game over screen', () => {
     const store = started(7);
-    for (let i = 0; i < 36; i++) {
+    for (let i = 0; i < 70; i++) {
       store.confirmRound();
       store.confirmContacts();
       store.next();
@@ -187,7 +187,7 @@ describe('store', () => {
   test('finalScores is null during the game, and matches engine.teamScore at the end', () => {
     const store = started(7);
     expect(store.finalScores()).toBeNull();
-    for (let i = 0; i < 37; i++) {
+    for (let i = 0; i < 71; i++) {
       store.confirmRound();
       store.confirmContacts();
       store.next();
@@ -205,7 +205,7 @@ describe('store', () => {
   test('roundWindow and level follow the engine', () => {
     const store = started();
     expect(store.roundWindow()).toEqual(engine.roundWindow(data.rules, 1));
-    expect(store.totalRounds()).toBe(37);
+    expect(store.totalRounds()).toBe(71);
     expect(store.level(data.rules.economy.levelXp[2]!)).toBe(3);
   });
 

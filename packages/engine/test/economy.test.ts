@@ -33,11 +33,14 @@ describe('death', () => {
     expect(v.respawnRound).toBe(11);
     expect(ev[0]).toMatchObject({ type: 'death', champion: v.id, respawnRound: 11 });
   });
-  test('round 33 (stage 4) death respawns round 35', () => {
-    const s = fresh(33);
-    const v = id(s, 'red', 'top');
-    applyKill(s, d, [v.id], [id(s, 'blue', 'top').id], []);
-    expect(v.respawnRound).toBe(35);
+  test('the death timer follows the stage: 20, 20, 40, 60 and 120 s (death.roundsByStage)', () => {
+    // First round of each stage: 1, 7, 15, 39 and 57 (rounds are 20 s everywhere).
+    for (const [round, stage] of [[1, 0], [7, 1], [15, 2], [39, 3], [57, 4]] as const) {
+      const s = fresh(round);
+      const v = id(s, 'red', 'top');
+      applyKill(s, d, [v.id], [id(s, 'blue', 'top').id], []);
+      expect(v.respawnRound).toBe(round + [1, 1, 2, 3, 6][stage]!);
+    }
   });
   test('winners split gold and xp per victim; herald is lost', () => {
     const s = fresh(10);

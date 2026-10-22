@@ -3,10 +3,11 @@ import { loadGameData, validateAiProfiles, validateAiTuning, validateRules, vali
 
 const data = loadGameData();
 
-test('phases give 37 rounds: 6, 8, 12, 6, 5', () => {
+test('phases give 71 rounds of 20 s: 6, 8, 24, 18, 15', () => {
   const rounds = data.rules.phases.map((p) => (p.end - p.start) / p.roundSeconds);
-  expect(rounds).toEqual([6, 8, 12, 6, 5]);
-  expect(rounds.reduce((a, b) => a + b, 0)).toBe(37);
+  expect(rounds).toEqual([6, 8, 24, 18, 15]);
+  expect(rounds.reduce((a, b) => a + b, 0)).toBe(71);
+  expect(data.rules.phases.every((p) => p.roundSeconds === 20)).toBe(true);
 });
 
 test('ai profiles: 10 ranks with scaled rates', () => {
@@ -44,10 +45,21 @@ test('validateRules rejects non-divisible phase and bad PerStage', () => {
 
 test('validateRules rejects a round length with no step budget', () => {
   const r = structuredClone(data.rules);
-  delete r.moves.budgetBySeconds['40'];
-  expect(() => validateRules(r)).toThrow(/rules\.moves.*40s/);
-  r.moves.budgetBySeconds['40'] = 0;
-  expect(() => validateRules(r)).toThrow(/rules\.moves.*40s/);
+  delete r.moves.budgetBySeconds['20'];
+  expect(() => validateRules(r)).toThrow(/rules\.moves.*20s/);
+  r.moves.budgetBySeconds['20'] = 0;
+  expect(() => validateRules(r)).toThrow(/rules\.moves.*20s/);
+});
+
+test('validateRules rejects a death timer that is not one positive integer per stage', () => {
+  const r = structuredClone(data.rules);
+  expect(r.death.roundsByStage).toEqual([1, 1, 2, 3, 6]);
+  r.death.roundsByStage = [1, 1, 2] as unknown as typeof r.death.roundsByStage;
+  expect(() => validateRules(r)).toThrow(/death\.roundsByStage/);
+  r.death.roundsByStage = [1, 0, 2, 3, 6];
+  expect(() => validateRules(r)).toThrow(/death\.roundsByStage/);
+  r.death.roundsByStage = [1, 1.5, 2, 3, 6];
+  expect(() => validateRules(r)).toThrow(/death\.roundsByStage/);
 });
 
 test('validateRules rejects a ward duration that is not a positive integer', () => {

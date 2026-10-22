@@ -22,7 +22,7 @@ export function applyKill(
 ): void {
   const { economy, death } = data.rules;
   const stage = roundWindow(data.rules, state.round).stage;
-  const extra = stage >= death.lateExtraRoundsFromStage ? death.lateExtraRounds : 0;
+  const deadRounds = death.roundsByStage[stage]!;
   const takers = state.champions.filter((c) => winners.includes(c.id) && c.status === 'alive');
   for (const id of victims) {
     const v = state.champions.find((c) => c.id === id);
@@ -31,7 +31,7 @@ export function applyKill(
     v.items += v.gold;
     v.gold = 0;
     v.status = 'dead';
-    v.respawnRound = state.round + 1 + extra;
+    v.respawnRound = state.round + deadRounds;
     v.hasHerald = false;
     state.kills[v.side === 'blue' ? 'red' : 'blue'] += 1;
     for (const w of takers) grant(w, economy.killGold / takers.length, economy.killXp / takers.length);
