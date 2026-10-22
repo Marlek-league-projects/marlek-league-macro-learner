@@ -273,3 +273,9 @@ export function objectiveScore(view: PlayerView, data: GameData, side: Side): nu
   }
   return score + view.platesTaken[side] * verdict.plateValue + view.towersDestroyed[side] * verdict.towerValue;
 }
+
+/** The round summary's line for champions with no order: "Sans ordre : Vi, Galio". */
+export const noOrderText = (names: string[]): string => `Sans ordre : ${names.join(', ')}`;
+
+/** An alive champion with no move order: a laner in its home lane follows its wave, anyone else stays put. */
+export const idleText = (followsWave: boolean): string => (followsWave ? 'suit sa wave' : 'reste en place');

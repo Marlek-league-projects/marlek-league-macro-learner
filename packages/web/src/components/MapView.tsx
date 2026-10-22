@@ -374,6 +374,7 @@ export function MapView({ store }: { store: Store }) {
   const selectedPawn = pawns.find((pawn) => pawn.ally && pawn.id === selected?.id);
   const anchor = selectedPawn ? pawnPoint(selectedPawn) : null;
 
+  const idleIds = ordering ? store.championsWithoutOrder() : [];
   const pawnNodes = [...pawns].sort((a, b) => Number(a.ally) - Number(b.ally)).map((pawn) => {
     const at = pawnPoint(pawn);
     if (!at) return null;
@@ -403,6 +404,13 @@ export function MapView({ store }: { store: Store }) {
         <circle class="body" cx={x} cy={y} r={13} fill={pawn.side === 'blue' ? '#1d4ed8' : '#b91c1c'} stroke={pawn.side === 'blue' ? '#93c5fd' : '#fca5a5'} stroke-width={2} />
         <image href={championImage(data, pawn.id)} x={x - 12} y={y - 12} width={24} height={24} clip-path={`url(#${clip})`} />
         <image href={roleIcon(pawn.role)} x={x - 9} y={y - 33} width={18} height={18} pointer-events={passThrough ? 'none' : undefined} />
+        {pawn.ally && idleIds.includes(pawn.id) && (
+          <g class="noorder-badge" pointer-events="none">
+            <title>Sans ordre</title>
+            <circle cx={x + 12} cy={y - 9} r={7} />
+            <text x={x + 12} y={y - 6} text-anchor="middle">?</text>
+          </g>
+        )}
         {values && <PawnHud x={x} y={y} hud={values} />}
         <text x={x} y={y + 25} text-anchor="middle" class="pname">{name}</text>
       </g>

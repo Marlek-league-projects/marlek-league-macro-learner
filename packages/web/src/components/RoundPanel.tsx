@@ -3,7 +3,7 @@ import type { Store } from '../store';
 import { confirmError, confirmRound } from './confirm-round';
 import { EventLog } from './EventLog';
 import { shownRound } from './RoundBanner';
-import { championName, clock, OBJECTIVE_LABEL, objectiveTimers, positionLabel } from './format';
+import { championName, clock, idleText, noOrderText, OBJECTIVE_LABEL, objectiveTimers, positionLabel } from './format';
 
 /** Rounds until the objective spawning at `at` is up (it spawns during the round whose window ends at or after it). */
 function roundsUntil(store: Store, round: number, at: number): number | null {
@@ -46,7 +46,8 @@ function orderText(store: Store, c: ChampionState, o: Order | undefined): string
     return [o.to ? `→ ${at(o.to)} puis recall` : 'recall', ...(o.ward ? ['ward au départ'] : []), ...stanceText(o.stance)].join(' · ');
   }
   const parts: string[] = [];
-  parts.push(o?.kind === 'move' && o.to !== c.position ? `→ ${at(o.to)}` : 'reste en place');
+  const idle = idleText(store.followsWave(c.id));
+  parts.push(o?.kind === 'move' && o.to !== c.position ? `→ ${at(o.to)}` : idle);
   if (o?.kind === 'move') {
     if (o.ward === 'from') parts.push('ward au départ');
     else if (o.ward === 'to') parts.push("ward à l'arrivée");
@@ -63,6 +64,7 @@ function Orders({ store }: { store: Store }) {
   const view = store.view.value!;
   const pending = store.pending.value;
   const error = confirmError.value;
+  const idle = store.championsWithoutOrder();
   return (
     <>
       <div>
@@ -73,6 +75,9 @@ function Orders({ store }: { store: Store }) {
             <li key={c.id}>{championName(store.data, c.id)} : {orderText(store, c, pending[c.id])}</li>
           ))}
         </ul>
+        {idle.length > 0 && (
+          <div class="note noorder">{noOrderText(idle.map((id) => championName(store.data, id)))}</div>
+        )}
       </div>
       <button class="go" onClick={() => confirmRound(store)}>Valider le round</button>
       {error && <div class="error">{error}</div>}

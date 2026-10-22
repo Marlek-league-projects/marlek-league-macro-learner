@@ -134,6 +134,10 @@ export interface Store {
   spawnPointsFor(champion: string): string[];
   /** Where a respawning own champion re-enters with no spawn order: the engine's default spawn. */
   defaultSpawn(champion: string): string;
+  /** Own alive champions that will do nothing this round: no pending order and a default of staying put (not wave followers). */
+  championsWithoutOrder(): string[];
+  /** True when the own champion, with no pending order, follows its lane wave by default. */
+  followsWave(champion: string): boolean;
   setLaunchHerald(champion: string, on: boolean): void;
   /** Both sides' scores once the game is over, otherwise null. */
   finalScores(): Record<Side, ScoreBreakdown> | null;
@@ -152,6 +156,9 @@ const PLAYER: Side = 'blue';
 export const junglerStartCamps = (data: GameData): string[] =>
   Object.values(data.graph.positions).filter((p) => p.kind === 'camp' && p.side === PLAYER).map((p) => p.id);
 const ENEMY: Side = 'red';
+
+/** A laner's home lane, as the engine's default orders see it (the jungler has none). */
+const HOME_LANE: Record<string, string> = { top: 'top', mid: 'mid', adc: 'bot', support: 'bot' };
 
 export function createStore(data: GameData, engine: GameEngine): Store {
   const screen = signal<Screen>('start');
@@ -594,6 +601,23 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       const def = engine.defaultOrders(current(), data, PLAYER).find((o) => o.champion === id);
       if (def?.kind !== 'spawn') throw new Error(`${id}: not respawning`);
       return def.to;
+    },
+
+    followsWave(id) {
+      const c = champion(id);
+      const lane = HOME_LANE[c.role];
+      return c.status === 'alive' && lane !== undefined && data.graph.positions[c.position]?.lane === lane;
+    },
+
+    championsWithoutOrder() {
+      const pend = pending.value;
+      return current().champions.flatMap((c) => {
+        if (c.side !== PLAYER || c.status !== 'alive' || pend[c.id]) return [];
+        const lane = HOME_LANE[c.role];
+        if (lane !== undefined && data.graph.positions[c.position]?.lane === lane) return [];
+        const def = engine.defaultOrders(current(), data, PLAYER).find((o) => o.champion === c.id);
+        return def?.kind === 'move' && def.to === c.position ? [c.id] : [];
+      });
     },
 
     setLaunchHerald(id, on) {

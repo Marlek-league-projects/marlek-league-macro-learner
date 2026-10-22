@@ -51,6 +51,7 @@ function AllyTeam({ store, view }: { store: Store; view: PlayerView }) {
   const canSelect = store.screen.value === 'orders';
   const recalled = store.recalled.value;
   const hud = hudValues(view, data, store.level, store.estimateEnemy);
+  const idle = canSelect ? store.championsWithoutOrder() : [];
   return (
     <div class="team ally">
       <div class="teamhead">
@@ -89,6 +90,7 @@ function AllyTeam({ store, view }: { store: Store; view: PlayerView }) {
                 <span class="muted">Or en poche {num(c.gold)}{c.hasHerald ? ' · Héraut' : ''}</span>
               )}
               <Power hud={h} />
+              {idle.includes(c.id) && <div class="noorder-tag" title="Aucun ordre : ce pion ne fera rien ce round">? Sans ordre</div>}
             </div>
           );
         })}
