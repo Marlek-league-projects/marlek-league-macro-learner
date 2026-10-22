@@ -73,10 +73,10 @@ test('laner reach from a lane T1 includes the nearby scuttle', () => {
   ] as const)
     expect(g.adj[t1]).toContain(scuttle);
 });
-test('128 undirected edges, every one mirrored', () => {
+test('136 undirected edges, every one mirrored', () => {
   const edges = new Set<string>();
   for (const [a, ns] of Object.entries(g.adj)) for (const b of ns) edges.add([a, b].sort().join('|'));
-  expect(edges.size).toBe(128);
+  expect(edges.size).toBe(136);
   for (const e of edges) {
     const [a, b] = e.split('|') as [string, string];
     expect(g.adj[mirrorId(a)]).toContain(mirrorId(b));

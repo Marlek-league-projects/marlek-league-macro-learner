@@ -165,7 +165,11 @@ describe('fog of war on own camps', () => {
     s.round = 7;
     place(s, 'red', 'jungle', 'scuttle-bot');
     place(s, 'blue', 'jungle', 'gromp-blue');
-    if (watch === 'champion') place(s, 'blue', 'jungle', 'raptors-blue');
+    if (watch === 'champion') {
+      place(s, 'blue', 'jungle', 'raptors-blue');
+      // Ahead, so it wins the fight (a tie would leave both on the spot with no action).
+      get(s, 'blue', 'jungle').bonusLead += 100_000;
+    }
     if (watch === 'ward') s.wards.push({ side: 'blue', position: 'raptors-blue', placedRound: 6 });
     const rj = get(s, 'red', 'jungle').id;
     const bj = get(s, 'blue', 'jungle').id;

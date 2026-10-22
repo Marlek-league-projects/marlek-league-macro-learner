@@ -92,16 +92,18 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   const gankWins: Partial<Record<Lane, Side>> = {};
   /** In a contested river without choosing the objective: no pit objective this round (the Scuttle is unaffected). */
   const offPit = new Set<string>();
-  const loseHp = (id: string, amount: number): void => {
+  /** A loss of HP; reaching 0 kills, with the kill credited to `credit` (the opponents in the contact causing it). */
+  const loseHp = (id: string, amount: number, credit: string[]): void => {
     const c = byId(id);
     const before = c.hp;
     changeHp(c, data.rules, -amount);
     hurt.add(id);
     if (before > c.hp) events.push({ type: 'hpLost', champion: id, amount: before - c.hp });
+    if (c.hp === 0 && c.status === 'alive') applyKill(s, data, [id], credit, events);
   };
-  /** A tied fight: everyone goes back to where it stood (and acts there only if it had a step left on arrival). */
-  const goBack = (ids: string[]): void => {
-    for (const id of ids) byId(id).position = byId(id).previous;
+  /** A tied fight: everyone stays where the fight happened, with no action this round. */
+  const stay = (ids: string[]): void => {
+    for (const id of ids) forfeited.add(id);
   };
   /**
    * A decided fight: graded deaths among the `eligible` losers, then every losing survivor loses `fight.survivorLoss`
@@ -110,11 +112,12 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   const settle = (winner: Side, losers: string[], eligible: string[], gap: number, winners: string[], ganked: Side | null, lane: Lane | null): void => {
     const victims = fightVictims(s, data, eligible, gap);
     for (const id of losers) {
-      if (!victims.includes(id) && other(winner) !== ganked) loseHp(id, F.survivorLoss);
+      if (!victims.includes(id) && other(winner) !== ganked) loseHp(id, F.survivorLoss, winners);
     }
     if (ganked) {
-      for (const id of ganked === winner ? winners : losers) {
-        if (!victims.includes(id)) loseHp(id, F.gankHpLoss);
+      const gankedIds = ganked === winner ? winners : losers;
+      for (const id of gankedIds) {
+        if (!victims.includes(id)) loseHp(id, F.gankHpLoss, gankedIds === winners ? losers : winners);
       }
     }
     if (ganked && lane && winner !== ganked && victims.length === 0) gankWins[lane] = winner;
@@ -123,16 +126,15 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     retreat(losers);
   };
   /**
-   * Flee movement: back to the previous position (the base for a champion who just spawned), or one step toward the
-   * base for a champion who did not move and has nowhere to go back to. Dead champions stay where they are. Either
-   * way, no action.
+   * Flee movement: one step toward the own base from where the contact happened (`retreatStep`). Dead champions
+   * stay where they are. No action.
    */
   const retreat = (ids: string[]): void => {
     for (const id of ids) {
       const c = byId(id);
       if (c.status !== 'alive') continue;
       forfeited.add(id);
-      c.position = c.previous === c.position ? retreatStep(data, c.side, c.position) : c.previous;
+      c.position = retreatStep(data, c.side, c.position);
       events.push({ type: 'fled', champion: id, to: c.position });
     }
   };
@@ -162,7 +164,6 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
       if (!(smaller && choice[smaller] === 'farm' && choice[other(smaller)] !== 'flee')) noPressure.add(lane);
     }
     if (fleeing.length > 0) {
-      for (const side of fleeing) retreat(ids[side]);
       if (fleeing.length === 1) {
         const fled = fleeing[0]!;
         const stayed = other(fled);
@@ -171,7 +172,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
         const gankFled = fled === defender;
         if (gankFled && lane) gankWins[lane] = stayed;
         if (n[fled] < n[stayed] && choice[stayed] === 'fight') {
-          for (const id of ids[fled]) loseHp(id, gankFled ? F.gankHpLoss : F.fleeHpLoss);
+          for (const id of ids[fled]) loseHp(id, gankFled ? F.gankHpLoss : F.fleeHpLoss, ids[stayed]);
         }
         // In lane, the side that stayed wins the trade.
         if (lane) {
@@ -179,6 +180,8 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
           events.push({ type: 'trade', position: contact.position, lane, winner: stayed });
         }
       }
+      // Losses (and a death at 0 HP) happen at the contact; the survivors then leave it.
+      for (const side of fleeing) retreat(ids[side]);
       continue;
     }
     if (!contact.auto && smaller && choice[smaller] === 'farm') {
@@ -193,10 +196,10 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
         settle(winner, ids[smaller], ids[smaller], gap, ids[bigger], defender, lane);
       } else if (defender === smaller && winner === bigger && lane) {
         // A ganked laner farming under its tower still pays the failed-gank price: the gankers won without a kill.
-        for (const id of ids[smaller]) loseHp(id, F.gankHpLoss);
+        for (const id of ids[smaller]) loseHp(id, F.gankHpLoss, ids[bigger]);
         gankWins[lane] = bigger;
       } else {
-        for (const id of ids[smaller]) loseHp(id, F.pressureHpLoss);
+        for (const id of ids[smaller]) loseHp(id, F.pressureHpLoss, ids[bigger]);
       }
       continue;
     }
@@ -220,15 +223,15 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
       tradeWinners[lane!] = winner;
       events.push({ type: 'trade', position: contact.position, lane: lane!, winner });
       if (winner !== null) {
-        for (const id of ids[winner]) loseHp(id, data.rules.health.tradeWinnerLoss);
-        for (const id of ids[other(winner)]) loseHp(id, data.rules.health.tradeLoss);
+        for (const id of ids[winner]) loseHp(id, data.rules.health.tradeWinnerLoss, ids[other(winner)]);
+        for (const id of ids[other(winner)]) loseHp(id, data.rules.health.tradeLoss, ids[winner]);
       }
       continue;
     }
     events.push({ type: 'fight', position: contact.position, blue: contact.blue, red: contact.red, winner, scores });
     for (const id of [...contact.blue, ...contact.red]) fighters.add(id);
     if (winner === null) {
-      goBack([...contact.blue, ...contact.red]);
+      stay([...contact.blue, ...contact.red]);
     } else {
       // Farm and Push are per champion: in an even lane, a loser playing safe is never a victim (it only loses HP as
       // a survivor).

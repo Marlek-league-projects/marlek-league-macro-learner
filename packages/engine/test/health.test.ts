@@ -71,13 +71,33 @@ describe('health', () => {
     }
   });
 
+  test('fleeing a committed gank down to 0 HP dies, the kill goes to the side that stayed', () => {
+    const s = newGame(d, 7);
+    s.round = 10;
+    place(s, 'blue', 'top', 'top-t1-blue');
+    place(s, 'red', 'top', 'top-t1-red');
+    place(s, 'red', 'jungle', 'scuttle-top');
+    get(s, 'blue', 'top').hp = d.rules.fight.gankHpLoss;
+    const bt = get(s, 'blue', 'top').id;
+    const o = ordersWith(s, [
+      { kind: 'move', champion: bt, to: 'top-lane' },
+      { kind: 'move', champion: get(s, 'red', 'top').id, to: 'top-lane' },
+      { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'top-lane' },
+    ]);
+    const { state, events } = resolveRound(s, d, o, {});
+    expect(get(state, 'blue', 'top').status).not.toBe('alive');
+    expect(events.filter((e) => e.type === 'death').map((e) => e.champion)).toEqual([bt]);
+    expect(events).toContainEqual(expect.objectContaining({ type: 'death', champion: bt, position: 'top-lane' }));
+    expect(state.kills.red).toBe(1);
+  });
+
   test('a trade won because the other side fled costs no trade HP; fleeing a committed gank costs gankHpLoss', () => {
     const s = newGame(d, 7);
     s.round = 10;
     place(s, 'blue', 'top', 'top-t1-blue');
     place(s, 'red', 'top', 'top-t1-red');
     place(s, 'red', 'jungle', 'scuttle-top');
-    for (const c of s.champions) c.hp = 50;
+    for (const c of s.champions) c.hp = 50 + d.rules.fight.gankHpLoss;
     const bt = get(s, 'blue', 'top').id;
     const o = ordersWith(s, [
       { kind: 'move', champion: bt, to: 'top-lane' },
@@ -87,20 +107,26 @@ describe('health', () => {
     const { state, events } = resolveRound(s, d, o, {});
     expect(events).toContainEqual({ type: 'fled', champion: bt, to: 'top-t1-blue' });
     expect(events.some((e) => e.type === 'trade' && e.winner === 'red')).toBe(true);
-    for (const role of ['top', 'jungle']) expect(get(state, 'red', role).hp).toBe(50 + H.regenPerRound);
-    expect(get(state, 'blue', 'top').hp).toBe(50 - d.rules.fight.gankHpLoss);
+    for (const role of ['top', 'jungle']) expect(get(state, 'red', role).hp).toBe(Math.min(H.max, 50 + d.rules.fight.gankHpLoss + H.regenPerRound));
+    expect(get(state, 'blue', 'top').hp).toBe(50);
     expect(events).toContainEqual({ type: 'hpLost', champion: bt, amount: d.rules.fight.gankHpLoss });
   });
 
-  test('health is clamped to 0..max and never kills by itself', () => {
+  test('health is clamped to 0..max; reaching 0 kills, credited to the contact opponents, with a respawn timer', () => {
     const s = lane();
     get(s, 'red', 'top').hp = 5;
     const rt = get(s, 'red', 'top').id;
+    const bt = get(s, 'blue', 'top');
+    const goldBefore = bt.gold;
     const { state, events } = resolveRound(s, d, ordersWith(s, [{ kind: 'move', champion: rt, to: 'top-lane', stance: 'trade' }]), {});
     const red = get(state, 'red', 'top');
-    expect(red.status).toBe('alive');
-    expect(red.hp).toBe(0);
+    expect(red.status).not.toBe('alive');
+    expect(red.respawnRound).toBeGreaterThan(s.round);
     expect(events).toContainEqual({ type: 'hpLost', champion: rt, amount: 5 });
+    expect(events.filter((e) => e.type === 'death').map((e) => e.champion)).toEqual([rt]);
+    expect(state.kills.blue).toBe(1);
+    expect(get(state, 'blue', 'top').goldEarned).toBeGreaterThan(bt.goldEarned);
+    expect(get(state, 'blue', 'top').gold).toBeGreaterThan(goldBefore);
     get(s, 'blue', 'mid').hp = H.max - 1;
     const r2 = resolveRound(s, d, ordersWith(s), {});
     expect(get(r2.state, 'blue', 'mid').hp).toBe(H.max);

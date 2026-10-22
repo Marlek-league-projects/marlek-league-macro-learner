@@ -366,10 +366,11 @@ describe('laning phase', () => {
           blue: aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99)),
           red: aiOrders(viewFor(s, d, 'red'), d, profile('challenger'), red),
         };
-        const o = orderOf(orders.blue, top);
+        // A laner killed (a fight, or its HP reaching 0) has no order while dead.
+        const o: Order | undefined = orders.blue.find((x) => x.champion === top);
         const from = get(s, 'blue', 'top').position;
-        trail.push(`${s.round}:${o.kind === 'move' ? `${from}->${o.to}` : o.kind}`);
-        if (o.kind === 'move') {
+        trail.push(`${s.round}:${o === undefined ? 'dead' : o.kind === 'move' ? `${from}->${o.to}` : o.kind}`);
+        if (o?.kind === 'move') {
           const pos = d.graph.positions[o.to]!;
           const inLane = pos.lane === 'top' || pos.kind === 'base';
           const ok = inLane || offLaneReason(s, from, o.to) !== null;

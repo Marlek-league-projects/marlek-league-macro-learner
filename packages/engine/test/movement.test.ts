@@ -86,7 +86,7 @@ describe('route', () => {
     }
   });
   test('changing lane ends the move: the route only changes lane on its last step', () => {
-    expect(route(d, 'top-t1-blue', 'bot-t1-blue', 'blue')).toEqual(['top-t1-blue', 'scuttle-top', 'mid-t1-blue', 'bot-t1-blue']);
+    expect(route(d, 'top-t1-blue', 'bot-t1-blue', 'blue')).toEqual(['top-t1-blue', 'bluebuff-blue', 'mid-t1-blue', 'bot-t1-blue']);
   });
   test('never through the enemy base', () => {
     expect(() => route(d, 'top-t3-red', 'base-red', 'blue')).toThrow(/no route/);
@@ -190,7 +190,9 @@ describe('spawnPoints', () => {
     for (const t of ['top-t1-blue', 'mid-t1-blue', 'bot-t1-blue']) expect(reachable(s, d, top.id)[t]).toBe(3);
     expect(points).not.toContain('top-lane');
     for (const camp of ['gromp-blue', 'wolves-blue', 'raptors-blue', 'krugs-blue']) expect(points).toContain(camp);
-    expect(points).not.toContain('bluebuff-blue');
+    // The mid T2 is 1 step from both own buffs (3 steps from the base).
+    for (const buff of ['bluebuff-blue', 'redbuff-blue']) expect(points).toContain(buff);
+    expect(points).not.toContain('bluebuff-red');
   });
   test('the default spawn: a laner its front standing home tower, the jungler its nearest own camp', () => {
     const s = fresh();

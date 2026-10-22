@@ -42,8 +42,8 @@ describe('resolveRound', () => {
     const { s, o } = scuttleScenario();
     const bj = get(s, 'blue', 'jungle').id;
     const { state, events } = resolveRound(s, d, o, {});
-    expect(events).toContainEqual({ type: 'fled', champion: bj, to: 'raptors-blue' });
-    expect(state.champions.find((c) => c.id === bj)!.position).toBe('raptors-blue');
+    expect(events).toContainEqual({ type: 'fled', champion: bj, to: 'bot-t1-blue' });
+    expect(state.champions.find((c) => c.id === bj)!.position).toBe('bot-t1-blue');
     expect(state.champions.find((c) => c.id === bj)!.status).toBe('alive');
     expect(events.some((e) => e.type === 'fight')).toBe(false);
   });
@@ -154,7 +154,7 @@ describe('resolveRound', () => {
     expect(defaultOrders(r1.state, d, 'blue').find((x) => x.champion === bj)!.kind).toBe('spawn');
   });
 
-  test('a tied fight sends both sides back, kills nobody and cancels a recall', () => {
+  test('a tied fight leaves both sides on the spot, kills nobody and cancels a recall', () => {
     const s = setup(7, [
       ['blue', 'jungle', 'raptors-blue'],
       ['red', 'jungle', 'scuttle-bot'],
@@ -175,11 +175,11 @@ describe('resolveRound', () => {
     expect(events.find((e) => e.type === 'fight')).toMatchObject({ position: 'scuttle-bot', winner: null });
     expect(events.some((e) => e.type === 'death' || e.type === 'recall')).toBe(false);
     const after = (id: string): ChampionState => state.champions.find((c) => c.id === id)!;
-    expect([after(bj.id).position, after(bj.id).status]).toEqual(['raptors-blue', 'alive']);
+    expect([after(bj.id).position, after(bj.id).status]).toEqual(['scuttle-bot', 'alive']);
     expect([after(rj.id).position, after(rj.id).status]).toEqual(['scuttle-bot', 'alive']);
   });
 
-  test('a tied fight sends an arrival-only champion back without an action; a champion who stayed still acts', () => {
+  test('a tied fight leaves both on the spot without an action, even one who stood on the camp', () => {
     const s = setup(7, [
       ['blue', 'jungle', 'gromp-blue'],
       ['red', 'jungle', 'raptors-red'],
@@ -199,9 +199,11 @@ describe('resolveRound', () => {
     ]);
     const { state, events } = resolveRound(s, d, o, {});
     expect(events.find((e) => e.type === 'fight')).toMatchObject({ position: 'raptors-red', winner: null });
-    expect(state.champions.find((c) => c.id === bj.id)!.position).toBe('gromp-blue');
-    expect(events.some((e) => e.type === 'campCleared' && e.champion === bj.id)).toBe(false);
-    expect(events).toContainEqual(expect.objectContaining({ type: 'campCleared', camp: 'raptors-red', champion: rj.id }));
+    for (const id of [bj.id, rj.id]) {
+      expect(state.champions.find((c) => c.id === id)!.position).toBe('raptors-red');
+      expect(events.some((e) => e.type === 'campCleared' && e.champion === id)).toBe(false);
+    }
+    expect(events.some((e) => e.type === 'fled')).toBe(false);
     expect(events).toContainEqual(expect.objectContaining({ type: 'moved', champion: bj.id, acted: false }));
   });
 
@@ -265,7 +267,7 @@ describe('resolveRound', () => {
     expect(get(state, 'blue', 'jungle').position).toBe('mid-t2-blue');
   });
 
-  test('a spawning champion who flees goes back to its base, where its move started', () => {
+  test('a spawning champion who flees takes one step toward its base from the contact', () => {
     const s = setup(10, [
       ['red', 'top', 'top-lane'],
       ['red', 'mid', 'scuttle-top'],
@@ -280,7 +282,29 @@ describe('resolveRound', () => {
     ]);
     const { state } = resolveRound(s, d, o, { 'lane-top': { blue: 'flee' } });
     const after = state.champions.find((c) => c.id === bt.id)!;
-    expect([after.position, after.status]).toEqual(['base-blue', 'alive']);
+    expect([after.position, after.status]).toEqual(['top-t2-blue', 'alive']);
+  });
+
+  test('a flee in the mid lane goes to the own T1, and from the T1 to the own T2', () => {
+    for (const [at, from, to] of [
+      ['mid-lane', 'mid-t1-blue', 'mid-t1-blue'],
+      ['mid-t1-blue', 'mid-lane', 'mid-t2-blue'],
+    ] as const) {
+      const s = setup(10, [
+        ['blue', 'mid', from],
+        ['red', 'mid', 'mid-lane'],
+        ['red', 'jungle', 'scuttle-top'],
+      ]);
+      const bm = get(s, 'blue', 'mid').id;
+      const o = ordersWith(s, [
+        { kind: 'move', champion: bm, to: at },
+        { kind: 'move', champion: get(s, 'red', 'mid').id, to: at },
+        { kind: 'move', champion: get(s, 'red', 'jungle').id, to: at },
+      ]);
+      const { state, events } = resolveRound(s, d, o, { 'lane-mid': { blue: 'flee' } });
+      expect(events).toContainEqual({ type: 'fled', champion: bm, to });
+      expect(get(state, 'blue', 'mid').position).toBe(to);
+    }
   });
 
   test('a spawn on the T1 arrives without acting: 2 steps plus the base bonus do not leave one to act', () => {
@@ -443,7 +467,7 @@ describe('fleeing, retreating or an interrupted recall forfeits the action', () 
       { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'scuttle-bot' },
     ]);
     const { state, events } = resolveRound(s, d, o, {});
-    expect(get(state, 'blue', 'jungle').position).toBe('raptors-blue');
+    expect(get(state, 'blue', 'jungle').position).toBe('bot-t1-blue');
     expect(events.some((e) => e.type === 'campCleared' && e.champion === bj)).toBe(false);
     expect(events).toContainEqual({ type: 'moved', champion: bj, from: 'raptors-blue', to: 'scuttle-bot', acted: false });
   });

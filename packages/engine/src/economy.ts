@@ -39,7 +39,7 @@ export function applyKill(
   }
 }
 
-/** Clamps `c.hp` to 0..`health.max` after adding `delta`. Health never kills by itself. */
+/** Clamps `c.hp` to 0..`health.max` after adding `delta`. Killing at 0 HP is the caller's job (`loseHp` in `resolveRound`). */
 export function changeHp(c: ChampionState, rules: Rules, delta: number): void {
   c.hp = Math.max(0, Math.min(rules.health.max, c.hp + delta));
 }

@@ -103,6 +103,10 @@
     ["raptors-blue","krugs-blue"],
     ["mid-lane","wolves-blue"],
     ["mid-lane","raptors-blue"],
-    ["raptors-blue","mid-t2-blue"]
+    ["raptors-blue","mid-t2-blue"],
+    ["mid-t1-blue","bluebuff-blue"],
+    ["mid-t1-blue","redbuff-blue"],
+    ["mid-t2-blue","bluebuff-blue"],
+    ["mid-t2-blue","redbuff-blue"]
   ]
 }
