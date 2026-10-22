@@ -1,6 +1,7 @@
 // Map geometry and timers, from the player's view only (fog of war holds).
 import type { GameData, Lane, ObjectiveId, Position, Side } from '@lml/data/contracts';
 import type { PlayerView } from '@lml/engine/contracts';
+import { clock, OBJECTIVE_LABEL, pitObjectiveAt } from './format';
 
 export interface Point {
   x: number;
@@ -23,6 +24,37 @@ export function spawnCountdown(view: PlayerView, data: GameData, id: string, now
     return at === undefined ? null : left(at);
   }
   return null;
+}
+
+export interface PitTimer {
+  /** "Larves 6:00" (what spawns next and when), or the objective's name while it is up. */
+  text: string;
+  /** The objective is up. */
+  live: boolean;
+  /** While up: "jusqu'à 14:00" when the objective leaves the pit at a set time (Larves, Héraut); otherwise null. */
+  until: string | null;
+  /** Longer text (SVG title): the same, with the time left before the spawn. */
+  title: string;
+}
+
+/**
+ * A pit's map label, named after its objective: before the spawn, the next objective and its spawn time ("Larves
+ * 6:00", then "Héraut 14:00", then "Nashor 20:00" on the Baron pit); while up, its name, and when it despawns if it
+ * does. Null when the view shows no spawn to come.
+ */
+export function pitTimer(view: PlayerView, data: GameData, pit: 'baron-pit' | 'dragon-pit', now: number): PitTimer | null {
+  const state = view.pits[pit];
+  if (state.objective) {
+    const name = OBJECTIVE_LABEL[state.objective];
+    const despawn = data.rules.objectives[state.objective].despawnAt;
+    const until = despawn === null ? null : `jusqu'à ${clock(despawn)}`;
+    return { text: name, live: true, until, title: until ? `${name} en jeu ${until}` : `${name} en jeu` };
+  }
+  if (state.nextSpawn === null) return null;
+  const at = state.nextSpawn;
+  const name = OBJECTIVE_LABEL[pitObjectiveAt(data, pit, at)];
+  const left = Math.max(0, at - now);
+  return { text: `${name} ${clock(at)}`, live: false, until: null, title: `${name} à ${clock(at)} (dans ${clock(left)})` };
 }
 
 /** Gap between the centres of tokens standing side by side on one position (room for their HUDs). */

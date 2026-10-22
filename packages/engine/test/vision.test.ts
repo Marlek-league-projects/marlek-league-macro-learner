@@ -402,11 +402,12 @@ describe('eventsFor', () => {
 });
 
 describe('scoreboard', () => {
-  test('shows kills, towers, dragons, barons and the true gold earned per team', () => {
+  test('shows kills, towers, dragons, barons, heralds, voidgrubs, plates and the true gold earned per team', () => {
     const s = newGame(d, 5);
     s.kills = { blue: 3, red: 1 };
     s.towersDestroyed = { blue: 2, red: 0 };
-    s.objectivesTaken = { blue: { dragon: 2 }, red: { baron: 1, dragon: 1 } };
+    s.objectivesTaken = { blue: { dragon: 2, voidgrubs: 1 }, red: { baron: 1, dragon: 1, herald: 1 } };
+    s.platesTaken = { blue: 3, red: 1 };
     get(s, 'red', 'mid').goldEarned = 1234;
     const sum = (side: string): number =>
       s.champions.filter((c) => c.side === side).reduce((t, c) => t + c.goldEarned, 0);
@@ -416,6 +417,9 @@ describe('scoreboard', () => {
         towersDestroyed: { blue: 2, red: 0 },
         dragons: { blue: 2, red: 1 },
         barons: { blue: 0, red: 1 },
+        heralds: { blue: 0, red: 1 },
+        voidgrubs: { blue: 1, red: 0 },
+        plates: { blue: 3, red: 1 },
         goldEarned: { blue: sum('blue'), red: sum('red') },
       });
     }

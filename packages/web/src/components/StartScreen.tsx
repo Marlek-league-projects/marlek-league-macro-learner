@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import type { Rank } from '@lml/data/contracts';
-import type { Store } from '../store';
+import { junglerStartCamps, type Store } from '../store';
+import { positionLabel } from './format';
 
 const randomSeed = (): number => Math.floor(Math.random() * 1_000_000_000);
 
@@ -9,6 +10,8 @@ export function StartScreen({ store }: { store: Store }) {
   const [rank, setRank] = useState<Rank>(initial.rank);
   const [teaching, setTeaching] = useState(initial.teaching);
   const [seed, setSeed] = useState(randomSeed);
+  // '' : the seed picks Blue or Red Buff.
+  const [jungle, setJungle] = useState(initial.junglerStart ?? '');
 
   return (
     <div class="start">
@@ -33,6 +36,15 @@ export function StartScreen({ store }: { store: Store }) {
         </div>
       </div>
       <label class="field">
+        <span>Départ du jungler</span>
+        <select value={jungle} onChange={(e) => setJungle((e.currentTarget as HTMLSelectElement).value)}>
+          <option value="">Selon la graine (buff bleu ou rouge)</option>
+          {junglerStartCamps(store.data).map((id) => (
+            <option key={id} value={id}>{positionLabel(store.data, id).replace(/ \(bleu\)$/, '')}</option>
+          ))}
+        </select>
+      </label>
+      <label class="field">
         <span>Graine</span>
         <div class="seedrow">
           <input
@@ -44,7 +56,7 @@ export function StartScreen({ store }: { store: Store }) {
           <button type="button" title="Nouvelle graine" onClick={() => setSeed(randomSeed())}>↻</button>
         </div>
       </label>
-      <button class="go" onClick={() => store.start({ rank, teaching, seed })}>Lancer la partie</button>
+      <button class="go" onClick={() => store.start({ rank, teaching, seed, ...(jungle ? { junglerStart: jungle } : {}) })}>Lancer la partie</button>
     </div>
   );
 }

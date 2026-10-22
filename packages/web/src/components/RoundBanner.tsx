@@ -1,7 +1,7 @@
 import type { Store } from '../store';
 import { confirmRound } from './confirm-round';
 import { bannerHasReplay, bannerPrimary } from './banner-action';
-import { clock, shownRound as roundOn } from './format';
+import { shownRound as roundOn } from './format';
 
 /** The round on screen (see format.shownRound). */
 export function runBannerAction(store: Store, action: 'confirm' | 'next' | 'new'): void {
@@ -15,19 +15,14 @@ export function shownRound(store: Store): number {
 }
 
 /**
- * "Round N/71 · m:ss → m:ss · phase", large, at the top of the page; while giving orders, a "Valider le round"
- * button next to it (Enter does the same), so validating never needs a scroll.
+ * The round's buttons, in the middle of the score bar: "Valider le round" while giving orders (Enter does the same),
+ * "Round suivant" / "Nouvelle partie" after it, and "Revoir le tour" once a round has resolved.
  */
-export function RoundBanner({ store }: { store: Store }) {
+export function RoundActions({ store }: { store: Store }) {
   if (!store.view.value) return null;
-  const round = shownRound(store);
-  const win = store.roundWindow(round);
-  const phase = store.data.rules.phases[win.phase];
   const primary = bannerPrimary(store.screen.value);
   return (
-    <div class="banner">
-      Round {round}/{store.totalRounds()} · {clock(win.start)} → {clock(win.end)}
-      {phase && <> · <span class="phase">{phase.name}</span></>}
+    <div class="round-actions">
       {primary && (
         <button class="go banner-go" onClick={() => runBannerAction(store, primary.action)} title={primary.enter ? 'Raccourci : Entrée' : undefined}>
           {primary.label}

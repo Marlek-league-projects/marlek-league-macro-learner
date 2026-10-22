@@ -267,7 +267,7 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
             class={`wide${move?.launchHerald ? ' on' : ''}`}
             onClick={() => run(() => store.setLaunchHerald(c.id, !move?.launchHerald))}
           >
-            Lancer le Herald
+            Lancer le Héraut
           </button>
         )}
         <button class="wide" onClick={() => run(() => store.clearOrder(c.id))}>Annuler l'ordre</button>

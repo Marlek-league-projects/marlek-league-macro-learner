@@ -15,6 +15,7 @@ import {
   PAWN_SPREAD,
   pressureDirection,
   rangeRing,
+  pitTimer,
   spawnCountdown,
   wavePoint,
 } from './map-marks';
@@ -28,7 +29,6 @@ import {
   dec,
   errorText,
   kindLabel,
-  OBJECTIVE_LABEL,
   plural,
   recallIcon,
   roleIcon,
@@ -276,12 +276,24 @@ export function MapView({ store }: { store: Store }) {
 
   // Countdown before each pit, scuttle and own camp spawns, or that it is up (drawn right of any pawns there).
   const timers = Object.values(positions).map((p) => {
-    const left = countdown(p.id);
-    if (left === null) return null;
     const n = byPosition.get(p.id)?.length ?? 0;
     const reachX = Math.max(dotRadius(p), n > 0 ? ((n - 1) / 2) * PAWN_SPREAD + 14 : 0);
-    const pit = p.kind === 'pit' ? view.pits[p.id as 'baron-pit' | 'dragon-pit'] : null;
-    const text = left !== 'up' ? clock(left) : pit?.objective ? OBJECTIVE_LABEL[pit.objective] : 'en vie';
+    if (p.kind === 'pit') {
+      // Pits name what they count down to ("Larves 6:00"), and when an up objective leaves ("jusqu'à 14:00").
+      const pt = pitTimer(view, data, p.id as 'baron-pit' | 'dragon-pit', now);
+      if (!pt) return null;
+      const x = p.x + reachX + 4;
+      return (
+        <text key={p.id} class={`timer${pt.live ? ' live' : ''}`} x={x} y={pt.until ? p.y - 1 : p.y + 4} text-anchor="start">
+          <title>{pt.title}</title>
+          {pt.text}
+          {pt.until && <tspan class="timer-until" x={x} dy={11}>{pt.until}</tspan>}
+        </text>
+      );
+    }
+    const left = countdown(p.id);
+    if (left === null) return null;
+    const text = left !== 'up' ? clock(left) : 'en vie';
     return (
       <text key={p.id} class={`timer${left === 'up' ? ' live' : ''}`} x={p.x + reachX + 4} y={p.y + 4} text-anchor="start">
         {text}

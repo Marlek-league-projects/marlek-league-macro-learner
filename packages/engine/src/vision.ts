@@ -224,6 +224,9 @@ function scoreboard(s: GameState): Scoreboard {
     towersDestroyed: { ...s.towersDestroyed },
     dragons: perSide((side) => s.objectivesTaken[side].dragon ?? 0),
     barons: perSide((side) => s.objectivesTaken[side].baron ?? 0),
+    heralds: perSide((side) => s.objectivesTaken[side].herald ?? 0),
+    voidgrubs: perSide((side) => s.objectivesTaken[side].voidgrubs ?? 0),
+    plates: { ...s.platesTaken },
     goldEarned: perSide((side) => s.champions.reduce((t, c) => (c.side === side ? t + c.goldEarned : t), 0)),
   };
 }

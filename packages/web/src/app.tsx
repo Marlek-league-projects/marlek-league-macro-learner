@@ -4,9 +4,9 @@ import { bannerPrimary } from './components/banner-action';
 import { isConfirmKey } from './components/confirm-round';
 import { GameOver } from './components/GameOver';
 import { MapView } from './components/MapView';
-import { RoundBanner, runBannerAction } from './components/RoundBanner';
+import { runBannerAction } from './components/RoundBanner';
 import { RoundPanel } from './components/RoundPanel';
-import { Scoreboard } from './components/Scoreboard';
+import { ScoreBar } from './components/ScoreBar';
 import { StartScreen } from './components/StartScreen';
 import { TeamPanel } from './components/TeamPanel';
 
@@ -60,12 +60,11 @@ export function App({ store }: { store: Store }) {
   return (
     <div class="wrap">
       <header class="head">
-        {playing && <RoundBanner store={store} />}
-        {playing && <Scoreboard store={store} />}
-        <h1>
-          League Macro Learner
-          {playing && <span class="muted"> · IA {profile?.label ?? rank} · graine {seed}</span>}
-        </h1>
+        {playing ? (
+          <ScoreBar store={store} subtitle={`League Macro Learner · IA ${profile?.label ?? rank} · graine ${seed}`} />
+        ) : (
+          <h1>League Macro Learner</h1>
+        )}
       </header>
       {playing ? <Game store={store} /> : <StartScreen store={store} />}
       <footer class="legal">{LEGAL}</footer>

@@ -104,3 +104,14 @@ export function hudTop(y: number): number {
 export function hudText(hud: Hud, hpMax: number): string {
   return `PV ${Math.round(hud.hp * hpMax)} · niv ${hud.level} · ⚔ puissance ${hud.power}`;
 }
+
+/**
+ * What an enemy met in a contact showed then, while it has not been seen since (`met`): its level and HP at the
+ * meeting, and the power this side would estimate from them. Null without a meeting record.
+ */
+export function metHud(enemy: EnemyInfo, data: GameData, estimate: (enemy: EnemyInfo) => EnemyEstimate): Hud | null {
+  const met = enemy.met;
+  if (!met) return null;
+  const est = estimate({ ...enemy, level: met.level, hp: met.hp });
+  return { hp: hpShare(met.hp, data.rules.health.max), power: powerOf(est.xp + est.items + est.bonusLead), level: met.level, xp: null };
+}

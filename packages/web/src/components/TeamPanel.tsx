@@ -1,7 +1,7 @@
-import type { ChampionState, EnemyInfo, PlayerView } from '@lml/engine/contracts';
+import type { ChampionState, PlayerView } from '@lml/engine/contracts';
 import type { Store } from '../store';
-import { type Hud, hpColor, hudValues } from './hud';
-import { championImage, championName, num, objectiveScore, positionLabel, roleIcon } from './format';
+import { type Hud, hpColor, hudValues, metHud } from './hud';
+import { championImage, championName, enemySeenText, num, objectiveScore, roleIcon } from './format';
 
 interface Props {
   store: Store;
@@ -24,17 +24,6 @@ export function TeamPanel({ store, team }: Props) {
   const view = store.view.value;
   if (!view) return null;
   return team === 'ally' ? <AllyTeam store={store} view={view} /> : <EnemyTeam store={store} view={view} />;
-}
-
-/** What the scoreboard does not show: Voidgrubs and plates. */
-function Kpis({ view, side }: { view: PlayerView; side: 'blue' | 'red' }) {
-  const taken = view.objectivesTaken[side];
-  return (
-    <>
-      <span class="kpi">Larves <strong>{taken.voidgrubs ?? 0}</strong></span>
-      <span class="kpi">Plaques <strong>{view.platesTaken[side]}</strong></span>
-    </>
-  );
 }
 
 function CardTitle({ store, id, role, level }: { store: Store; id: string; role: ChampionState['role']; level: number | null }) {
@@ -68,7 +57,6 @@ function AllyTeam({ store, view }: { store: Store; view: PlayerView }) {
         <b style="color:var(--blue)">Ton équipe (bleu)</b>
         <span class="kpi">Or gagné <strong>{num(gold)}</strong></span>
         <span class="kpi">XP <strong>{num(xp)}</strong></span>
-        <Kpis view={view} side={view.side} />
         <span class="kpi">Wards <strong>{wardsUsed} / {data.rules.wards.perRound}</strong></span>
         <span class="kpi" title="Objectifs, plaques et tours pris, toi contre l'adversaire">
           Objectifs <strong class={tone(ours - theirs)}>{num(ours)} – {num(theirs)}</strong>
@@ -98,7 +86,7 @@ function AllyTeam({ store, view }: { store: Store; view: PlayerView }) {
                   {recalled.includes(c.id) ? 'À la base' : 'Mort'} (retour round {c.respawnRound ?? view.round})
                 </span>
               ) : (
-                <span class="muted">Or en poche {num(c.gold)}{c.hasHerald ? ' · Herald' : ''}</span>
+                <span class="muted">Or en poche {num(c.gold)}{c.hasHerald ? ' · Héraut' : ''}</span>
               )}
               <Power hud={h} />
             </div>
@@ -118,34 +106,23 @@ function Power({ hud }: { hud: Hud | undefined }) {
   );
 }
 
-function seenText(store: Store, e: EnemyInfo): string {
-  if (e.visible && e.position) return `Vue : ${positionLabel(store.data, e.position)} (ce round)`;
-  if (e.position && e.lastSeenRound !== null) {
-    const when = e.lastSeenRound === 0 ? 'début de partie' : `round ${e.lastSeenRound}`;
-    return `Dernière vue : ${positionLabel(store.data, e.position)} (${when})`;
-  }
-  return 'Jamais vu';
-}
-
 function EnemyTeam({ store, view }: { store: Store; view: PlayerView }) {
-  const enemySide = view.side === 'blue' ? 'red' : 'blue';
   const hud = hudValues(view, store.data, store.level, store.estimateEnemy);
   return (
     <div class="team enemy">
       <div class="teamhead">
         <b style="color:var(--red)">Équipe adverse (rouge)</b>
-        <Kpis view={view} side={enemySide} />
       </div>
       <div class="cards">
         {view.enemies.map((e) => {
-          // Fog of war: HP, level and power only while the enemy is visible.
-          const h = hud[e.id];
+          // Fog of war: HP, level and power only while the enemy is visible, or as they were when last met.
+          const h = hud[e.id] ?? metHud(e, store.data, store.estimateEnemy) ?? undefined;
           return (
             <div key={e.id} class="card">
               <CardTitle store={store} id={e.id} role={e.role} level={h?.level ?? null} />
               {h ? <HpBar hp={h.hp} max={store.data.rules.health.max} /> : <div class="muted">PV —</div>}
               <Power hud={h} />
-              <div class="muted">{seenText(store, e)}</div>
+              <div class="muted">{enemySeenText(store.data, e)}</div>
             </div>
           );
         })}

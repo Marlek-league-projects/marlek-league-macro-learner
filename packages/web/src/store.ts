@@ -26,6 +26,8 @@ export interface Settings {
   rank: Rank;
   teaching: boolean;
   seed: number;
+  /** The blue jungler's start camp (a `-blue` camp id); undefined: Blue or Red Buff, picked by the seed. */
+  junglerStart?: string;
 }
 
 /** A side's final score, split as engine.teamScore adds it up. */
@@ -122,6 +124,10 @@ export const playerDefault = (contact: Contact): Choice =>
   contact.options.blue.includes('objective') ? 'objective' : contact.defaults.blue;
 
 const PLAYER: Side = 'blue';
+
+/** Camps the player's jungler may start on: the own (blue) jungle camps, in map order. */
+export const junglerStartCamps = (data: GameData): string[] =>
+  Object.values(data.graph.positions).filter((p) => p.kind === 'camp' && p.side === PLAYER).map((p) => p.id);
 const ENEMY: Side = 'red';
 
 export function createStore(data: GameData, engine: GameEngine): Store {
@@ -262,7 +268,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       settings.value = s;
       profile = data.aiProfiles.find((p) => p.rank === s.rank) ?? null;
       if (!profile) throw new Error(`no AI profile for rank ${s.rank}`);
-      state = engine.newGame(data, s.seed);
+      state = engine.newGame(data, s.seed, undefined, s.junglerStart !== undefined ? { blueJunglerStart: s.junglerStart } : undefined);
       aiRng = engine.createRng(s.seed + 1);
       roundOrders = null;
       redChoices = {};

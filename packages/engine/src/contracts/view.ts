@@ -21,12 +21,17 @@ export interface EnemyInfo {
 /** What a side assumes an enemy has (fog of war: never its true lead), as the AI and lane pressure estimate it. */
 export type EnemyEstimate = Pick<ChampionState, 'xp' | 'items' | 'bonusLead' | 'hp'>;
 
-/** League-style scoreboard: all public, except `goldEarned`, the README-declared exception to the fog. */
+/** League-style (broadcast) scoreboard: all public, except `goldEarned`, the README-declared exception to the fog. */
 export interface Scoreboard {
   kills: Record<Side, number>;
   towersDestroyed: Record<Side, number>;
   dragons: Record<Side, number>;
   barons: Record<Side, number>;
+  heralds: Record<Side, number>;
+  /** Voidgrubs camps taken (one per game at most). */
+  voidgrubs: Record<Side, number>;
+  /** Tower plates taken. */
+  plates: Record<Side, number>;
   /** True team sum of gold earned, for the gold advantage. */
   goldEarned: Record<Side, number>;
 }

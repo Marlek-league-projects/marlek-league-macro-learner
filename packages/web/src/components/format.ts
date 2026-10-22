@@ -1,6 +1,6 @@
 // French display helpers shared by the components.
 import type { GameData, Lane, ObjectiveId, Position, Role, Side } from '@lml/data/contracts';
-import type { Choice, Contact, ContactKind, GameEvent, PlayerView, WavePos } from '@lml/engine/contracts';
+import type { Choice, Contact, ContactKind, EnemyInfo, GameEvent, PlayerView, WavePos } from '@lml/engine/contracts';
 import type { Screen } from '../store';
 
 const ASSETS = './assets/';
@@ -16,6 +16,17 @@ export const championImage = (data: GameData, id: string): string =>
 export const championName = (data: GameData, id: string): string => data.champions[id]?.name ?? id;
 
 export const positionLabel = (data: GameData, id: string): string => data.graph.positions[id]?.label ?? id;
+
+/** Where an enemy card says the enemy is: seen this round, met in a contact (until seen again), last seen, or never. */
+export function enemySeenText(data: GameData, e: EnemyInfo): string {
+  if (e.visible && e.position) return `Vue : ${positionLabel(data, e.position)} (ce round)`;
+  if (e.met) return `Croisé : ${positionLabel(data, e.met.position)} (round ${e.met.round})`;
+  if (e.position && e.lastSeenRound !== null) {
+    const when = e.lastSeenRound === 0 ? 'début de partie' : `round ${e.lastSeenRound}`;
+    return `Dernière vue : ${positionLabel(data, e.position)} (${when})`;
+  }
+  return 'Jamais vu';
+}
 
 /**
  * The round on screen for a view at `viewRound`: in review and once the game is over the view has
@@ -56,7 +67,7 @@ export const OBJECTIVE_LABEL: Record<ObjectiveId, string> = {
   scuttle: 'Carapateur',
   dragon: 'Dragon',
   voidgrubs: 'Larves',
-  herald: 'Herald',
+  herald: 'Héraut',
   baron: 'Nashor',
 };
 
@@ -126,9 +137,12 @@ const OBJECTIVE_ARTICLE: Record<ObjectiveId, string> = {
   baron: 'le',
 };
 
+/** "le Dragon", "les Larves". */
+export const objectiveWithArticle = (objective: ObjectiveId): string => `${OBJECTIVE_ARTICLE[objective]} ${OBJECTIVE_LABEL[objective]}`;
+
 /** The objective prompt's main button: "Faire le Dragon", plus " + Carapateur" when the river's Scuttle is up too. */
 export function objectiveActionLabel(objective: ObjectiveId, withScuttle: boolean): string {
-  const main = `Faire ${OBJECTIVE_ARTICLE[objective]} ${OBJECTIVE_LABEL[objective]}`;
+  const main = `Faire ${objectiveWithArticle(objective)}`;
   return withScuttle ? `${main} + ${OBJECTIVE_LABEL.scuttle}` : main;
 }
 
@@ -167,9 +181,9 @@ export function eventText(e: GameEvent, data: GameData): string {
         ? `${at(e.tower)} détruite`
         : `${at(e.tower)} : −${dec(e.damage)} PV (reste ${dec(e.hp)})`;
     case 'objectiveStarted':
-      return `${SIDE_LABEL[e.side]} commence ${OBJECTIVE_LABEL[e.objective]} (${names(e.champions)})`;
+      return `${SIDE_LABEL[e.side]} commence ${objectiveWithArticle(e.objective)} (${names(e.champions)})`;
     case 'objectiveTaken':
-      return `${SIDE_LABEL[e.side]} prend ${OBJECTIVE_LABEL[e.objective]} à ${at(e.position)}`;
+      return `${SIDE_LABEL[e.side]} prend ${objectiveWithArticle(e.objective)} à ${at(e.position)}`;
     case 'campCleared':
       return `Camp nettoyé : ${at(e.camp)} par ${name(e.champion)}`;
     case 'wardPlaced':
@@ -179,7 +193,7 @@ export function eventText(e: GameEvent, data: GameData): string {
     case 'wardSpotted':
       return `Ward à ${at(e.position)} : ${name(e.champion)} repéré${e.to ? ` → ${at(e.to)}` : ''}`;
     case 'heraldLaunched':
-      return `Herald lancé sur ${at(e.tower)}`;
+      return `Héraut lancé sur ${at(e.tower)}`;
     case 'hpLost':
       return `${name(e.champion)} −${num(e.amount)} PV`;
   }
@@ -209,7 +223,7 @@ export function errorText(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   if (/wards/.test(msg)) return 'Limite de wards atteinte pour ce round.';
   if (/unward/.test(msg)) return 'Un seul unward par round.';
-  if (/herald/.test(msg)) return 'Le Herald se lance sur une tour adverse.';
+  if (/herald/.test(msg)) return 'Le Héraut se lance sur une tour adverse.';
   if (/reach/.test(msg)) return 'Position hors de portée ce round.';
   if (/spawn/.test(msg)) return 'Point de réapparition invalide.';
   return `Ordre refusé : ${msg}`;
