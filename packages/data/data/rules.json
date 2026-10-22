@@ -3,7 +3,7 @@
     { "name": "Niveau 1 & premier clear", "start": 90, "end": 210, "roundSeconds": 20, "stage": 0 },
     { "name": "Carapateurs & 1er dragon", "start": 210, "end": 370, "roundSeconds": 20, "stage": 1 },
     { "name": "Larves & plaques", "start": 370, "end": 850, "roundSeconds": 20, "stage": 2 },
-    { "name": "Herald & mid game", "start": 850, "end": 1210, "roundSeconds": 20, "stage": 3 },
+    { "name": "Héraut & mid game", "start": 850, "end": 1210, "roundSeconds": 20, "stage": 3 },
     { "name": "Baron", "start": 1210, "end": 1510, "roundSeconds": 20, "stage": 4 }
   ],
   "moves": { "budgetBySeconds": { "20": 2 }, "baseBonus": 1 },
