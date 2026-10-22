@@ -842,7 +842,7 @@ describe('AI range-aware targets', () => {
 
   test('a camp 2 steps away at budget 2 is not a clear: it scores as a walk (walkPenalty), and a camp in action range wins', () => {
     expect(stepBudget(d.rules, 10)).toBe(2);
-    const from = 'gromp-blue';
+    const from = 'wolves-blue';
     const r = reachableFrom(d, from, 2, 'blue');
     const far = Object.keys(r).find((p) => r[p] === 2 && d.graph.positions[p]!.kind === 'camp' && d.graph.positions[p]!.side === 'blue')!;
     const near = Object.keys(r).find((p) => r[p] === 1 && d.graph.positions[p]!.kind === 'camp' && d.graph.positions[p]!.side === 'blue')!;

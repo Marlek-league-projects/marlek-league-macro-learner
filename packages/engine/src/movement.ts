@@ -74,16 +74,16 @@ export function reachableFrom(data: GameData, position: string, budget: number, 
   return walk(data, position, budget, side).arrival;
 }
 
-/** Route preference between shortest paths: a lane position, then a camp, then the river (and anything else). */
+/** Route preference between shortest paths: a lane position, then a camp, then a Scuttle (and anything else), then a pit. */
 const rank = (data: GameData, id: string): number => {
   const kind = data.graph.positions[id]?.kind;
-  return kind === 'tower' || kind === 'laneMid' ? 0 : kind === 'camp' ? 1 : 2;
+  return kind === 'tower' || kind === 'laneMid' ? 0 : kind === 'camp' ? 1 : kind === 'pit' ? 3 : 2;
 };
 
 /**
  * The deterministic shortest path a `side` champion walks from `from` to `to`, both ends included, under the
  * movement rules (enemy base off limits, changing lane ends the move). Between shortest paths each step prefers a
- * lane position, then a camp, then the river, then the lower id (seen from blue: red takes the mirror of blue's
+ * lane position, then a camp, then a Scuttle, then a pit, then the lower id (seen from blue: red takes the mirror of blue's
  * route). Throws when `to` cannot be reached.
  */
 export function route(data: GameData, from: string, to: string, side: Side): string[] {

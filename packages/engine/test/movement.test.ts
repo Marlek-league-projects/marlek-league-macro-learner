@@ -43,9 +43,11 @@ describe('reach with budget 2', () => {
     );
     expect(reach('top-t1-blue')['top-t1-red']).toBe(2);
   });
-  test('krugs-blue acts on scuttle-bot; dragon-pit is arrival-only', () => {
+  test('krugs-blue acts on scuttle-bot and on dragon-pit next to it; from bot-t2-blue both are arrival-only', () => {
     expect(reach('krugs-blue')['scuttle-bot']).toBe(1);
-    expect(reach('krugs-blue')['dragon-pit']).toBe(2);
+    expect(reach('krugs-blue')['dragon-pit']).toBe(1);
+    expect(reach('bot-t2-blue')['scuttle-bot']).toBe(2);
+    expect(reach('bot-t2-blue')['dragon-pit']).toBe(2);
   });
   test('mid-lane acts on both pits and both scuttles', () => {
     for (const p of ['baron-pit', 'dragon-pit', 'scuttle-top', 'scuttle-bot']) expect(reach('mid-lane')[p]).toBe(1);
@@ -76,9 +78,9 @@ describe('reach with budget 2', () => {
 
 describe('route', () => {
   test('a shortest path, both ends included, preferring a lane position over a camp or the river', () => {
-    // krugs-blue to dragon-pit is 2 steps through bot-t1-blue, mid-t1-blue, redbuff-blue or scuttle-bot.
-    expect(route(d, 'krugs-blue', 'dragon-pit', 'blue')).toEqual(['krugs-blue', 'bot-t1-blue', 'dragon-pit']);
-    expect(route(d, 'krugs-red', 'baron-pit', 'red')).toEqual(['krugs-red', 'top-t1-red', 'baron-pit']);
+    // bot-t2-blue to dragon-pit is 2 steps through bot-t1-blue or krugs-blue.
+    expect(route(d, 'bot-t2-blue', 'dragon-pit', 'blue')).toEqual(['bot-t2-blue', 'bot-t1-blue', 'dragon-pit']);
+    expect(route(d, 'top-t2-red', 'baron-pit', 'red')).toEqual(['top-t2-red', 'top-t1-red', 'baron-pit']);
     expect(route(d, 'wolves-blue', 'wolves-blue', 'blue')).toEqual(['wolves-blue']);
   });
   test('red walks the mirror of the blue route', () => {
@@ -90,7 +92,7 @@ describe('route', () => {
     }
   });
   test('changing lane ends the move: the route only changes lane on its last step', () => {
-    expect(route(d, 'top-t1-blue', 'bot-t1-blue', 'blue')).toEqual(['top-t1-blue', 'baron-pit', 'mid-t1-blue', 'bot-t1-blue']);
+    expect(route(d, 'top-t1-blue', 'bot-t1-blue', 'blue')).toEqual(['top-t1-blue', 'scuttle-top', 'mid-t1-blue', 'bot-t1-blue']);
   });
   test('never through the enemy base', () => {
     expect(() => route(d, 'top-t3-red', 'base-red', 'blue')).toThrow(/no route/);
@@ -104,7 +106,7 @@ describe('validateOrders', () => {
     j.position = 'raptors-blue';
     const mv = (to: string): Order => ({ kind: 'move', champion: j.id, to });
     expect(() => validateOrders(s, d, 'blue', orders(s, [mv('krugs-blue')]))).not.toThrow();
-    expect(() => validateOrders(s, d, 'blue', orders(s, [mv('top-t2-blue')]))).toThrow(/reach/);
+    expect(() => validateOrders(s, d, 'blue', orders(s, [mv('gromp-blue')]))).toThrow(/reach/);
   });
   test('a recall step leaves a step for the recall: 2 steps with budget 2 is rejected', () => {
     const s = fresh();

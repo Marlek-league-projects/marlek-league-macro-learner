@@ -21,8 +21,19 @@ test('laner reach: mid T1 reaches top, bot and both scuttles in 1', () => {
   for (const p of ['top-t1-blue', 'bot-t1-blue', 'scuttle-top', 'scuttle-bot']) expect(g.distance('mid-t1-blue', p)).toBe(1);
 });
 test('jungler examples in 2', () => {
-  expect(g.distance('raptors-blue', 'krugs-blue')).toBe(2);
   expect(g.distance('raptors-blue', 'bluebuff-red')).toBe(2);
+  expect(g.distance('gromp-blue', 'raptors-blue')).toBe(3);
+});
+test('one step: the T3s of a side, the mid T2 to the top and bot T2, Wolves and Gromp, Raptors and Krugs', () => {
+  for (const side of ['blue', 'red']) {
+    const one = [
+      [`top-t3-${side}`, `mid-t3-${side}`], [`mid-t3-${side}`, `bot-t3-${side}`], [`top-t3-${side}`, `bot-t3-${side}`],
+      [`mid-t2-${side}`, `top-t2-${side}`], [`mid-t2-${side}`, `bot-t2-${side}`],
+      [`wolves-${side}`, `gromp-${side}`], [`raptors-${side}`, `krugs-${side}`],
+      ['mid-lane', `wolves-${side}`], ['mid-lane', `raptors-${side}`], [`raptors-${side}`, `mid-t2-${side}`],
+    ];
+    for (const [a, b] of one) expect(`${a} ${b} ${g.distance(a!, b!)}`).toBe(`${a} ${b} 1`);
+  }
 });
 test('crossing the own jungle goes through the mid T1, on both sides', () => {
   for (const [a, b, m] of [['wolves-blue', 'krugs-blue', 'mid-t1-blue'], ['wolves-red', 'krugs-red', 'mid-t1-red']] as const) {
@@ -59,10 +70,10 @@ test('laner reach from a lane T1 includes the nearby scuttle', () => {
   ] as const)
     expect(g.adj[t1]).toContain(scuttle);
 });
-test('98 undirected edges, every one mirrored', () => {
+test('126 undirected edges, every one mirrored', () => {
   const edges = new Set<string>();
   for (const [a, ns] of Object.entries(g.adj)) for (const b of ns) edges.add([a, b].sort().join('|'));
-  expect(edges.size).toBe(98);
+  expect(edges.size).toBe(126);
   for (const e of edges) {
     const [a, b] = e.split('|') as [string, string];
     expect(g.adj[mirrorId(a)]).toContain(mirrorId(b));
@@ -79,10 +90,8 @@ test('each river position links the lanes and camps of the brief, on both sides'
     ['baron-pit', 'bluebuff-blue', 'gromp-blue', 'krugs-red', 'mid-lane', 'mid-t1-blue', 'mid-t1-red', 'raptors-red',
       'redbuff-red', 'top-lane', 'top-t1-blue', 'top-t1-red', 'wolves-blue'].sort(),
   );
-  expect(sorted('baron-pit')).toEqual(
-    ['bluebuff-blue', 'mid-lane', 'mid-t1-blue', 'mid-t1-red', 'redbuff-red', 'scuttle-top', 'top-lane', 'top-t1-blue',
-      'top-t1-red'].sort(),
-  );
+  // Whatever is 1 step from a Scuttle is 1 step from the pit next to it.
+  expect(sorted('baron-pit')).toEqual(sorted('scuttle-top').filter((p) => p !== 'baron-pit').concat('scuttle-top').sort());
   expect(sorted('scuttle-bot')).toEqual(sorted('scuttle-top').map(mirrorId).sort());
   expect(sorted('dragon-pit')).toEqual(sorted('baron-pit').map(mirrorId).sort());
 });

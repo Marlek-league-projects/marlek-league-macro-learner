@@ -92,6 +92,16 @@
     ["scuttle-top","redbuff-red"],
     ["scuttle-top","krugs-red"],
     ["baron-pit","bluebuff-blue"],
-    ["baron-pit","redbuff-red"]
+    ["baron-pit","redbuff-red"],
+    ["top-t3-blue","mid-t3-blue"],
+    ["mid-t3-blue","bot-t3-blue"],
+    ["top-t3-blue","bot-t3-blue"],
+    ["mid-t2-blue","top-t2-blue"],
+    ["mid-t2-blue","bot-t2-blue"],
+    ["wolves-blue","gromp-blue"],
+    ["raptors-blue","krugs-blue"],
+    ["mid-lane","wolves-blue"],
+    ["mid-lane","raptors-blue"],
+    ["raptors-blue","mid-t2-blue"]
   ]
 }

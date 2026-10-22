@@ -175,7 +175,7 @@ describe('zone contacts', () => {
   });
 
   test('an arrival-only champion on the pit cannot choose objective, and still fights', () => {
-    const s = setup([['blue', 'jungle', 'krugs-blue'], ['red', 'jungle', 'scuttle-bot']]);
+    const s = setup([['blue', 'jungle', 'bot-t2-blue'], ['red', 'jungle', 'scuttle-bot']]);
     scuttleBotUp(s);
     const bj = get(s, 'blue', 'jungle').id;
     const o = stay(s, [{ kind: 'move', champion: bj, to: 'dragon-pit' }]);

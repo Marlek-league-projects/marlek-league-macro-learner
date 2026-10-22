@@ -14,6 +14,7 @@ export function mirrorId(id: string): string {
 }
 
 const CAMPS = ['bluebuff', 'gromp', 'wolves', 'raptors', 'redbuff', 'krugs'];
+const RIVER_PAIRS = [['scuttle-top', 'baron-pit'], ['scuttle-bot', 'dragon-pit']] as const;
 
 function derive(p: MapData['positions'][number]): Position {
   const { id } = p;
@@ -48,6 +49,8 @@ export function buildGraph(map: MapData): MapGraph {
     link(a, b);
     link(mirrorId(a), mirrorId(b));
   }
+  // Whatever is 1 step from a Scuttle is 1 step from the pit next to it.
+  for (const [scuttle, pit] of RIVER_PAIRS) for (const n of [...adj[scuttle]!]) if (n !== pit) link(n, pit);
 
   const distance = (a: string, b: string): number => {
     if (!adj[a] || !adj[b]) throw new Error(`Unknown position: ${a} / ${b}`);

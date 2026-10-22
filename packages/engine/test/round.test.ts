@@ -260,8 +260,8 @@ describe('resolveRound', () => {
     ]);
     const { state } = resolveRound(s, d, o, {});
     expect(get(state, 'blue', 'top').position).toBe('base-blue');
-    // raptors-blue neighbours: mid-t1-blue (3 from base), redbuff-blue, scuttle-bot, ...; mid-t1-blue is closest.
-    expect(get(state, 'blue', 'jungle').position).toBe('mid-t1-blue');
+    // raptors-blue neighbours: mid-t2-blue (2 from base), mid-t1-blue, krugs-blue, scuttle-bot, ...; mid-t2-blue is closest.
+    expect(get(state, 'blue', 'jungle').position).toBe('mid-t2-blue');
   });
 
   test('a spawning champion who flees retreats one tower back', () => {
@@ -388,16 +388,16 @@ describe('resolveRound', () => {
 
 describe('an action needs a step left on arrival', () => {
   test('a jungler arriving on a camp 2 steps away (budget 2) does not clear it, and clears it next round by staying', () => {
-    const s = setup(2, [['blue', 'jungle', 'gromp-blue']]);
+    const s = setup(2, [['blue', 'jungle', 'wolves-blue']]);
     const bj = get(s, 'blue', 'jungle').id;
-    const first = resolveRound(s, d, ordersWith(s, [{ kind: 'move', champion: bj, to: 'wolves-blue' }]), {});
-    expect(first.events).toContainEqual({ type: 'moved', champion: bj, from: 'gromp-blue', to: 'wolves-blue', acted: false });
-    expect(get(first.state, 'blue', 'jungle').position).toBe('wolves-blue');
-    expect(first.events.some((e) => e.type === 'campCleared' && e.camp === 'wolves-blue')).toBe(false);
-    expect(first.state.camps['wolves-blue']).toBe(d.rules.camps.firstSpawn);
+    const first = resolveRound(s, d, ordersWith(s, [{ kind: 'move', champion: bj, to: 'krugs-blue' }]), {});
+    expect(first.events).toContainEqual({ type: 'moved', champion: bj, from: 'wolves-blue', to: 'krugs-blue', acted: false });
+    expect(get(first.state, 'blue', 'jungle').position).toBe('krugs-blue');
+    expect(first.events.some((e) => e.type === 'campCleared' && e.camp === 'krugs-blue')).toBe(false);
+    expect(first.state.camps['krugs-blue']).toBe(d.rules.camps.firstSpawn);
 
     const second = resolveRound(first.state, d, ordersWith(first.state), {});
-    expect(second.events).toContainEqual({ type: 'campCleared', camp: 'wolves-blue', champion: bj });
+    expect(second.events).toContainEqual({ type: 'campCleared', camp: 'krugs-blue', champion: bj });
   });
 
   test('a laner arriving in its lane on its last step gets no farm; one step less farms', () => {
