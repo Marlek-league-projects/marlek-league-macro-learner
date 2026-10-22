@@ -22,7 +22,10 @@ test('laner reach: mid T1 reaches top, bot and both scuttles in 1', () => {
 });
 test('jungler examples in 2', () => {
   expect(g.distance('raptors-blue', 'bluebuff-red')).toBe(2);
-  expect(g.distance('gromp-blue', 'raptors-blue')).toBe(3);
+  expect(g.distance('gromp-blue', 'raptors-blue')).toBe(2);
+  expect(g.distance('wolves-blue', 'raptors-blue')).toBe(1);
+  expect(g.distance('wolves-red', 'raptors-red')).toBe(1);
+  expect(g.distance('gromp-blue', 'krugs-blue')).toBe(3);
 });
 test('one step: the T3s of a side, the mid T2 to the top and bot T2, Wolves and Gromp, Raptors and Krugs', () => {
   for (const side of ['blue', 'red']) {
@@ -70,10 +73,10 @@ test('laner reach from a lane T1 includes the nearby scuttle', () => {
   ] as const)
     expect(g.adj[t1]).toContain(scuttle);
 });
-test('126 undirected edges, every one mirrored', () => {
+test('128 undirected edges, every one mirrored', () => {
   const edges = new Set<string>();
   for (const [a, ns] of Object.entries(g.adj)) for (const b of ns) edges.add([a, b].sort().join('|'));
-  expect(edges.size).toBe(126);
+  expect(edges.size).toBe(128);
   for (const e of edges) {
     const [a, b] = e.split('|') as [string, string];
     expect(g.adj[mirrorId(a)]).toContain(mirrorId(b));

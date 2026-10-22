@@ -205,7 +205,7 @@ Recalling is how you **cash in** your advantage. A champion sitting on a lot of 
 
 ## Movement
 
-The map positions form a graph, and a move is a walk of a few steps on it. [`docs/movement-map.html`](docs/movement-map.html) shows it: click a position to see where a champion can go in one round, for each budget and side. After changing the map or the movement rules, regenerate it with `bun run movement-map`. Starting values:
+The map positions form a graph, and a move is a walk of a few steps on it. [`docs/movement-map.html`](docs/movement-map.html) shows it: click a position to see where a champion can go in one round, for each side. After changing the map or the movement rules, regenerate it with `bun run movement-map`. Starting values:
 
 - **Step budget**: every champion, laner or jungler, has the same number of steps per round, 2 steps in a 20 s round (`rules.moves.budgetBySeconds`), all game long.
 - **Speed boost from the base**: a move that starts on your own base gets 1 more step (`rules.moves.baseBonus`), respawns included. From the base, the T1s are 3 steps away (base → T3 → T2 → T1): a champion reaches its T1 without an action (2 steps plus the bonus leave none to act).
@@ -216,7 +216,7 @@ The map positions form a graph, and a move is a walk of a few steps on it. [`doc
 - **Lane to river**: the top Scuttle and the Baron pit are 1 step from the top T1s, the top lane middle, the mid lane middle and the blue mid T1 (and the red mid T1, by symmetry); the Scuttle and the pit are 1 step from each other. The bottom side mirrors it. So the mid lane middle reaches both Scuttles and both pits, and so does each mid T1.
 - **A Scuttle's pit is as close as the Scuttle**: whatever is 1 step from a Scuttle is also 1 step from the pit next to it (Baron pit for the top Scuttle, Dragon pit for the bottom one). This is a rule of the map loader, so a new Scuttle link brings its pit link with it.
 - **River to jungle**: the top Scuttle and the Baron pit are 1 step from blue Gromp, Blue Buff and Wolves, and from red Raptors, Red Buff and Krugs. The bottom side mirrors it.
-- **Your own jungle**: Gromp, Blue Buff and Wolves are each 1 step from the other two, and so are Raptors, Red Buff and Krugs. Crossing from one side to the other goes through the mid lane: Wolves → Krugs through the mid T1, Wolves → Raptors through the mid T1, T2 or lane middle.
+- **Your own jungle**: Gromp, Blue Buff and Wolves are each 1 step from the other two, and so are Raptors, Red Buff and Krugs. Wolves and Raptors are also 1 step from each other, a direct crossing over the mid lane that is not a lane change. Crossing to the other camps goes through the mid lane: Wolves → Krugs through the mid T1 or through Raptors.
 - **Jungle to lanes**: Gromp → top T2 and T1, Blue Buff → top T1, Wolves → mid T2, T1 and lane middle, Raptors → mid T2, T1 and lane middle, Krugs → mid T1, bot T2 and T1, Red Buff → bot T1 (the red side mirrors it), so a jungler ganks its nearby lane from an outer camp.
 - **Route**: a move is drawn and resolved along a shortest path. Among equal ones, each step prefers a lane position, then a camp, then a Scuttle, then a pit (a champion only walks through a pit when no other shortest path exists).
 
@@ -257,7 +257,7 @@ Vision is revealed when the round resolves, so you use what you saw this round t
 
 ## Game screen
 
-- **Round banner** (very top, large): round N/37, game time window of the round and phase. While you give orders it also holds a **Valider le round** button, so confirming never needs a scroll. **Enter** does the same when no field or button has the focus.
+- **Round banner** (very top, large): round N/71, game time window of the round and phase. While you give orders it also holds a **Valider le round** button, so confirming never needs a scroll. **Enter** does the same when no field or button has the focus.
 - **Scoreboard** (top centre, like League): kills blue – red, towers, Dragons and Barons per team, and the team **gold advantage** ("+1.2k" or "−800"). Kills, towers and objectives are public, as in the real game. The gold advantage is a learning aid and uses the enemy's real gold. It also feeds the estimates of enemies you can't fully see: the AI, the pressure arrows and the strength bars size an enemy on your own champion of the same role, with its items scaled by the gold ratio (see *AI opponent*).
 - **Teams on the sides, like League**: your team in a column left of the map, the enemy team in a column right of the map. One card per champion with role icon, name, level, XP bar, lead bar and unspent gold (own team), or last seen position (enemy).
 - **Above every visible token**: its HP bar, its power score (level and lead), its level and its XP bar, so you can compare yourself with a visible enemy. The team cards show the same, plus unspent gold for your own champions.

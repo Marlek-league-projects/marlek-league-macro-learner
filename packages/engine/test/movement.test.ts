@@ -100,7 +100,7 @@ describe('validateOrders', () => {
     j.position = 'raptors-blue';
     const mv = (to: string): Order => ({ kind: 'move', champion: j.id, to });
     expect(() => validateOrders(s, d, 'blue', orders(s, [mv('krugs-blue')]))).not.toThrow();
-    expect(() => validateOrders(s, d, 'blue', orders(s, [mv('gromp-blue')]))).toThrow(/reach/);
+    expect(() => validateOrders(s, d, 'blue', orders(s, [mv('redbuff-red')]))).toThrow(/reach/);
   });
   test('a recall step leaves a step for the recall: 2 steps with budget 2 is rejected', () => {
     const s = fresh();

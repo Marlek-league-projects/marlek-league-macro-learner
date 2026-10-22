@@ -6,12 +6,13 @@ import type { Side } from '@lml/data/contracts';
 import { reachableFrom } from '../src/movement';
 
 const PAGE = join(import.meta.dir, '..', '..', '..', 'docs', 'movement-map.html');
-const BUDGETS = [2, 3, 4];
 const SIDES: Side[] = ['blue', 'red'];
 
 const d = loadGameData();
 const ids = Object.keys(d.graph.positions);
 const bonus = d.rules.moves.baseBonus;
+// One step budget per round length in the rules (today only 20 s rounds).
+const BUDGETS = [...new Set(Object.values(d.rules.moves.budgetBySeconds))].sort((a, b) => a - b);
 
 const pos = Object.fromEntries(
   ids.map((id) => {
@@ -38,7 +39,10 @@ const html = await Bun.file(PAGE).text();
 const start = html.indexOf('const D=');
 const end = html.indexOf(';let B=', start);
 if (start < 0 || end < 0) throw new Error(`no "const D=...;let B=" data block in ${PAGE}`);
-const next = html.slice(0, start) + 'const D=' + JSON.stringify({ pos, edges, reach, baseBonus: bonus }) + html.slice(end);
-const updated = next.replace(/\d+ liens, \d+ positions/, `${edges.length} liens, ${ids.length} positions`);
+const label = Object.entries(d.rules.moves.budgetBySeconds).map(([s, b]) => `${b} pas (rounds de ${s} s)`).join(', ');
+const next = html.slice(0, start) + 'const D=' + JSON.stringify({ pos, edges, reach, baseBonus: bonus, budgets: BUDGETS }) + html.slice(end);
+const updated = next
+  .replace(/\d+ liens, \d+ positions/, `${edges.length} liens, ${ids.length} positions`)
+  .replace(/Budget : [^.]*\./, `Budget : ${label}.`);
 await Bun.write(PAGE, updated);
 console.log(`movement-map: ${ids.length} positions, ${edges.length} links${updated === html ? ' (unchanged)' : ' (updated)'}`);
