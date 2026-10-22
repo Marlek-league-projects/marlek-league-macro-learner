@@ -78,6 +78,27 @@ describe('nearby champions (join a fight 1 step away)', () => {
     expect(c.nearby.blue).not.toContain(ba.id);
   });
 
+  test('no lane-to-lane join: a mid laner on its T1 cannot join a top lane fight; a jungler on Gromp can', () => {
+    const s = setup(7, [
+      ['blue', 'top', 'top-lane'], ['red', 'top', 'top-lane'], ['red', 'jungle', 'top-t1-blue'],
+      ['blue', 'mid', 'mid-t1-blue'], ['blue', 'jungle', 'gromp-blue'],
+    ]);
+    const o = ordersWith(s, s.champions.map(stayOn));
+    expect(d.graph.adj['mid-t1-blue']).toContain('top-t1-blue');
+    const c = detectContacts(s, d, o).find((x) => x.id === 'lane-top')!;
+    expect(c.auto).toBe(false);
+    expect(c.nearby.blue).not.toContain(get(s, 'blue', 'mid').id);
+    expect(c.nearby.blue).toContain(get(s, 'blue', 'jungle').id);
+    expect(() => resolveRound(s, d, o, { 'lane-top': { joins: { blue: [get(s, 'blue', 'mid').id] } } })).toThrow();
+  });
+
+  test('a river contact is joinable from a lane tower', () => {
+    const { s, o, bm } = river();
+    const c = detectContacts(s, d, o).find((x) => x.id === 'river-bot')!;
+    expect(c.nearby.red).toContain(get(s, 'red', 'mid').id);
+    expect(c.nearby.blue).toContain(bm.id);
+  });
+
   test('automatic standard-laning contacts offer no join', () => {
     const s = setup(7, [['blue', 'top', 'top-lane'], ['red', 'top', 'top-lane'], ['blue', 'jungle', 'scuttle-top']]);
     const bj = get(s, 'blue', 'jungle');

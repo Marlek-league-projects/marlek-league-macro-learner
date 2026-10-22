@@ -208,13 +208,17 @@ export function detectContacts(state: GameState, data: GameData, orders: Orders)
   const hp = (c: Omit<Contact, 'hp' | 'nearby'>): Record<string, number> =>
     Object.fromEntries([...c.blue, ...c.red].map((id) => [id, state.champions.find((x) => x.id === id)!.hp]));
   const inContact = new Set(out.flatMap((c) => [...c.blue, ...c.red]));
-  /** Alive, in no contact, not recalling (a spawn is not alive yet), arrived 1 step from one of `c.positions`. */
+  /** Alive, in no contact, not recalling (a spawn is not alive yet), arrived 1 step from one of `c.positions`, not from another lane. */
   const nearby = (c: Omit<Contact, 'hp' | 'nearby'>): Record<Side, string[]> => {
     const near: Record<Side, string[]> = { blue: [], red: [] };
     if (c.auto) return near;
+    const contactLane = c.id.startsWith('lane-') ? data.graph.positions[c.position]?.lane : undefined;
     for (const champ of state.champions) {
       if (champ.status !== 'alive' || inContact.has(champ.id)) continue;
       if (orders[champ.side].find((o) => o.champion === champ.id)?.kind === 'recall') continue;
+      // A lane contact cannot be joined from another lane (from the jungle or the river it can).
+      const from = data.graph.positions[arrival[champ.id]!]?.lane;
+      if (contactLane !== undefined && from !== undefined && from !== contactLane) continue;
       const adj = data.graph.adj[arrival[champ.id]!] ?? [];
       if (c.positions.some((p) => adj.includes(p))) near[champ.side].push(champ.id);
     }
