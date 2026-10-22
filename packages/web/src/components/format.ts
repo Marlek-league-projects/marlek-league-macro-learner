@@ -146,7 +146,7 @@ export function objectiveActionLabel(objective: ObjectiveId, withScuttle: boolea
   return withScuttle ? `${main} + ${OBJECTIVE_LABEL.scuttle}` : main;
 }
 
-const SIDE_LABEL: Record<Side, string> = { blue: 'Bleu', red: 'Rouge' };
+export const SIDE_LABEL: Record<Side, string> = { blue: 'Bleu', red: 'Rouge' };
 
 const LANE_LABEL: Record<Lane, string> = { top: 'top', mid: 'mid', bot: 'bot' };
 

@@ -4,8 +4,8 @@ import type { ObjectivePromptEntry } from './map-marks';
 import { championImage, championName, errorText, objectiveActionLabel, positionLabel } from './format';
 
 /**
- * At the start of the order phase, one entry per own champion standing on a pit whose objective is up or being
- * taken: do the objective (a stay order) or give another order (selects the token). Docked over the map edge
+ * At the start of the order phase, one entry per own champion standing on (or moving onto) a pit whose objective is up, being
+ * taken or spawning this round: do the objective (a stay order) or give another order (selects the token). Docked over the map edge
  * that `dock` names, like the contacts overlay.
  */
 export function ObjectivePrompt({ store, entries, dock }: { store: Store; entries: ObjectivePromptEntry[]; dock: 'top' | 'bottom' }) {
@@ -22,7 +22,7 @@ export function ObjectivePrompt({ store, entries, dock }: { store: Store; entrie
     <div class={`contacts-overlay objective-overlay ${dock}`}>
       <div>
         <strong>Objectif</strong>
-        <span class="note"> · Ton champion est sur le pit.</span>
+        <span class="note"> · Ton champion est sur le pit ou s'y rend.</span>
       </div>
       <div class="contacts">
         {entries.map((e) => (

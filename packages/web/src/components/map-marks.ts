@@ -1,7 +1,7 @@
 // Map geometry and timers, from the player's view only (fog of war holds).
 import type { GameData, Lane, ObjectiveId, Position, Side } from '@lml/data/contracts';
 import type { PlayerView } from '@lml/engine/contracts';
-import { clock, OBJECTIVE_LABEL, pitObjectiveAt } from './format';
+import { clock, OBJECTIVE_LABEL, pitObjectiveAt, SIDE_LABEL } from './format';
 
 export interface Point {
   x: number;
@@ -38,17 +38,41 @@ export interface PitTimer {
 }
 
 /**
+ * The objective on `pit` during the round ending at `end`: the one up in the view, or the one spawning by the round's
+ * end (objectives spawn at the start of the resolve, but the order phase already counts them up, as contacts do).
+ */
+export function pitObjectiveBy(view: PlayerView, data: GameData, pit: 'baron-pit' | 'dragon-pit', end: number): ObjectiveId | null {
+  const state = view.pits[pit];
+  if (state.objective) return state.objective;
+  return state.nextSpawn !== null && state.nextSpawn <= end ? pitObjectiveAt(data, pit, state.nextSpawn) : null;
+}
+
+/** Rounds left before the capture in progress completes: it ends the round after it started. */
+export function captureRoundsLeft(view: PlayerView, startedRound: number): number {
+  return Math.max(1, startedRound + 2 - view.round);
+}
+
+/**
  * A pit's map label, named after its objective and counting the time left like every other map timer: before the
  * spawn, the next objective and the time left ("Larves 4:30", then "Héraut 12:30", then "Nashor 18:30" on the Baron
  * pit); while up, "<name> en vie" and, when it despawns, the time left before it does ("part dans 7:30"). Null when
- * the view shows no spawn to come.
+ * the view shows no spawn to come. `end` is the round's end: an objective spawning by then is already "en vie". A
+ * capture in progress (own, or the enemy's when seen) names who takes it and the rounds left ("Dragon — Bleu, 1 round
+ * restant").
  */
-export function pitTimer(view: PlayerView, data: GameData, pit: 'baron-pit' | 'dragon-pit', now: number): PitTimer | null {
+export function pitTimer(view: PlayerView, data: GameData, pit: 'baron-pit' | 'dragon-pit', now: number, end: number = now): PitTimer | null {
   const state = view.pits[pit];
-  if (state.objective) {
-    const name = OBJECTIVE_LABEL[state.objective];
-    const despawn = data.rules.objectives[state.objective].despawnAt;
+  const up = pitObjectiveBy(view, data, pit, end);
+  if (up) {
+    const name = OBJECTIVE_LABEL[up];
+    const despawn = data.rules.objectives[up].despawnAt;
     const until = despawn === null ? null : `part dans ${clock(Math.max(0, despawn - now))}`;
+    const capture = state.objective ? state.capture : null;
+    if (capture) {
+      const n = captureRoundsLeft(view, capture.startedRound);
+      const text = `${name} — ${SIDE_LABEL[capture.side]}, ${n} round${n > 1 ? 's' : ''} restant${n > 1 ? 's' : ''}`;
+      return { text, live: true, until, title: until ? `${text}, ${until}` : text };
+    }
     return { text: `${name} en vie`, live: true, until, title: until ? `${name} en vie, ${until}` : `${name} en vie` };
   }
   if (state.nextSpawn === null) return null;
@@ -131,18 +155,35 @@ export interface ObjectivePromptEntry {
   withScuttle: boolean;
 }
 
+/** An own champion's pending move: where it goes and whether it has a step left there to act (`canAct`). */
+export interface PendingMove {
+  to: string;
+  acts: boolean;
+}
+
 /**
- * The objective prompt at the start of the order phase: each own alive champion standing on a pit whose objective
- * is up or being taken, minus the ones already answered (`closed`). Never for a champion on a Scuttle.
+ * The objective prompt in the order phase: each own alive champion standing on a pit, or whose pending move ends on
+ * one with a step left, when that pit's objective is up, being taken or spawning by the round's end (`end`), minus the
+ * ones already answered (`closed`). A champion whose pending move leaves the pit is not offered it. Never for a
+ * champion on a Scuttle.
  */
-export function objectivePromptEntries(view: PlayerView, now: number, closed: readonly string[]): ObjectivePromptEntry[] {
+export function objectivePromptEntries(
+  view: PlayerView,
+  data: GameData,
+  window: { start: number; end: number },
+  closed: readonly string[],
+  moves: Readonly<Record<string, PendingMove>> = {},
+): ObjectivePromptEntry[] {
   const out: ObjectivePromptEntry[] = [];
   for (const c of view.allies) {
     if (c.status !== 'alive' || closed.includes(c.id)) continue;
-    if (c.position !== 'baron-pit' && c.position !== 'dragon-pit') continue;
-    const objective = view.pits[c.position].objective;
+    const move = moves[c.id];
+    if (move && !move.acts) continue;
+    const at = move ? move.to : c.position;
+    if (at !== 'baron-pit' && at !== 'dragon-pit') continue;
+    const objective = pitObjectiveBy(view, data, at, window.end);
     if (!objective) continue;
-    out.push({ champion: c.id, pit: c.position, objective, withScuttle: view.scuttles[PIT_SCUTTLE[c.position]] <= now });
+    out.push({ champion: c.id, pit: at, objective, withScuttle: view.scuttles[PIT_SCUTTLE[at]] <= window.end });
   }
   return out;
 }

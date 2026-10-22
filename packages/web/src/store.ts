@@ -74,6 +74,8 @@ export interface Store {
   stepBudget(champion: string): number;
   /** A position `distance` steps away lets `champion` act on arrival this round. */
   canAct(distance: number, champion: string): boolean;
+  /** For an own champion with a pending move: whether it has a step left on arrival to act there; null without a move. */
+  pendingMoveActs(champion: string): boolean | null;
   /** The path the engine walks for an own champion's move to `to`, both ends included. */
   routeOf(champion: string, to: string): string[];
   /** A move to `to` can come before a recall: it leaves a step of the budget for the recall. */
@@ -321,12 +323,20 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       return engine.canAct(distance, budget(id));
     },
 
+    pendingMoveActs(id) {
+      const o = pending.value[id];
+      if (o?.kind !== 'move' || !state) return null;
+      const d = engine.reachable(state, data, id)[o.to];
+      return d !== undefined && engine.canAct(d, budget(id));
+    },
+
     wardRoundsLeft(ward) {
       return engine.wardRoundsLeft(ward, view.value?.round ?? current().round, data.rules);
     },
 
     doObjective(id) {
-      setMove(id, champion(id).position);
+      // Keeps a pending move onto the pit (the prompt is also offered for one); otherwise stays where it stands.
+      setMove(id, existingMove(id)?.to ?? champion(id).position);
       objectivePromptsClosed.value = [...objectivePromptsClosed.value, id];
     },
 

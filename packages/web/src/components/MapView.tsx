@@ -12,6 +12,7 @@ import {
   dotRadius,
   hitRadius,
   objectivePromptEntries,
+  type PendingMove,
   PAWN_SPREAD,
   pressureDirection,
   rangeRing,
@@ -185,7 +186,8 @@ export function MapView({ store }: { store: Store }) {
   // Positions the selected pawn can be ordered to, with the number of moves (a respawning one walks from its base).
   const reach: Record<string, number> | null = selected && selected.status !== 'dead' ? store.reachableForSelected() : null;
 
-  const now = store.roundWindow().start;
+  const roundWin = store.roundWindow();
+  const now = roundWin.start;
   const pending = store.pending.value;
   const replayable = store.screen.value === 'review' || store.screen.value === 'over';
   const replaying = replayable && store.replaying.value && store.previousView.value !== null;
@@ -193,7 +195,12 @@ export function MapView({ store }: { store: Store }) {
   const contactAt = new Set(
     store.screen.value === 'contacts' ? store.contacts.value.flatMap((c) => c.positions) : [],
   );
-  const objectiveEntries = ordering ? objectivePromptEntries(view, now, store.objectivePromptsClosed.value) : [];
+  const pendingMoves: Record<string, PendingMove> = {};
+  for (const [id, o] of Object.entries(pending)) {
+    const acts = store.pendingMoveActs(id);
+    if (o.kind === 'move' && acts !== null) pendingMoves[id] = { to: o.to, acts };
+  }
+  const objectiveEntries = ordering ? objectivePromptEntries(view, data, roundWin, store.objectivePromptsClosed.value, pendingMoves) : [];
   /** Act or arrival-only ring of a position for the selected token. */
   const ring = (id: string) => (reach && selected ? rangeRing(reach[id], (d) => store.canAct(d, selected.id)) : null);
 
@@ -280,7 +287,7 @@ export function MapView({ store }: { store: Store }) {
     const reachX = Math.max(dotRadius(p), n > 0 ? ((n - 1) / 2) * PAWN_SPREAD + 14 : 0);
     if (p.kind === 'pit') {
       // Pits name what they count down to with the time left ("Larves 4:30"), and when an up objective leaves ("part dans 7:20").
-      const pt = pitTimer(view, data, p.id as 'baron-pit' | 'dragon-pit', now);
+      const pt = pitTimer(view, data, p.id as 'baron-pit' | 'dragon-pit', now, roundWin.end);
       if (!pt) return null;
       const x = p.x + reachX + 4;
       return (

@@ -147,6 +147,8 @@ describe('enemy camp timers', () => {
   });
 });
 
+const win = (start: number) => ({ start, end: start + 20 });
+
 describe('objective prompt entries', () => {
   /** Opening view with the blue jungler on `position` and the pits' objectives set. */
   function onPit(position: string, dragon: 'dragon' | null, scuttleBotAt = 0) {
@@ -160,23 +162,23 @@ describe('objective prompt entries', () => {
 
   test('an own champion on a pit whose objective is up, with the Scuttle up too', () => {
     const { v, j } = onPit('dragon-pit', 'dragon', 100);
-    expect(objectivePromptEntries(v, 300, [])).toEqual([{ champion: j.id, pit: 'dragon-pit', objective: 'dragon', withScuttle: true }]);
-    expect(objectivePromptEntries(v, 50, [])[0]!.withScuttle).toBe(false);
+    expect(objectivePromptEntries(v, data, win(300), [])).toEqual([{ champion: j.id, pit: 'dragon-pit', objective: 'dragon', withScuttle: true }]);
+    expect(objectivePromptEntries(v, data, win(50), [])[0]!.withScuttle).toBe(false);
   });
 
   test('an objective being taken still prompts', () => {
     const { v, j } = onPit('dragon-pit', 'dragon');
     v.pits['dragon-pit'].capture = { side: 'blue', startedRound: 3 };
-    expect(objectivePromptEntries(v, 300, []).map((e) => e.champion)).toEqual([j.id]);
+    expect(objectivePromptEntries(v, data, win(300), []).map((e) => e.champion)).toEqual([j.id]);
   });
 
   test('none once answered, on an empty pit, on the Scuttle, or when dead', () => {
     const answered = onPit('dragon-pit', 'dragon');
-    expect(objectivePromptEntries(answered.v, 300, [answered.j.id])).toEqual([]);
-    expect(objectivePromptEntries(onPit('dragon-pit', null).v, 300, [])).toEqual([]);
-    expect(objectivePromptEntries(onPit('scuttle-bot', 'dragon').v, 300, [])).toEqual([]);
+    expect(objectivePromptEntries(answered.v, data, win(300), [answered.j.id])).toEqual([]);
+    expect(objectivePromptEntries(onPit('dragon-pit', null).v, data, win(300), [])).toEqual([]);
+    expect(objectivePromptEntries(onPit('scuttle-bot', 'dragon').v, data, win(300), [])).toEqual([]);
     const dead = onPit('dragon-pit', 'dragon');
     dead.j.status = 'dead';
-    expect(objectivePromptEntries(dead.v, 300, [])).toEqual([]);
+    expect(objectivePromptEntries(dead.v, data, win(300), [])).toEqual([]);
   });
 });
