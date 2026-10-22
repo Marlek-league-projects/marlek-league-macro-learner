@@ -147,7 +147,9 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
       const c = byId(id);
       if (c.status !== 'alive') continue;
       forfeited.add(id);
-      c.position = here;
+      // Step from the spot nearer the own base: a champion standing behind the contact never walks toward it.
+      const base = `base-${c.side}`;
+      if (data.graph.distance(here, base) <= data.graph.distance(c.position, base)) c.position = here;
       c.position = retreatStep(data, c.side, c.position);
       events.push({ type: 'fled', champion: id, to: c.position });
     }
@@ -269,6 +271,13 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     }
   }
 
+  // A gank that kills (a ganked champion died in the contact) is neither a failed gank nor a won one.
+  for (const contact of contacts) {
+    const lane = data.graph.positions[contact.position]!.lane;
+    const defender = gankedSide(contact);
+    if (lane && defender && contact[defender].some((id) => byId(id).status !== 'alive')) delete gankWins[lane];
+  }
+
   // Each side witnessed the fight: it remembers the enemies it met with the HP and level they have after it.
   for (const contact of contacts) {
     for (const side of SIDES) {
@@ -291,7 +300,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   }
 
   // 7-9. herald, camps, objectives, lanes
-  launchHeralds(s, data, orders, events);
+  launchHeralds(s, data, orders, events, forfeited);
   // Only a champion with a step left on arrival (one who stayed always has it) who did not flee, retreat or have its
   // recall interrupted acts: clears its camp, takes its objective, farms its wave. A lane fight's pull-in or a tied
   // fight's way back neither gives nor takes that step.

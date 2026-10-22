@@ -473,6 +473,19 @@ describe('herald launch', () => {
     return ev;
   };
 
+  test('a forfeited carrier (fled, retreated or joined) does not launch', () => {
+    const s = fresh(28);
+    const c = get(s, 'blue', 'top');
+    c.hasHerald = true;
+    c.position = 'top-t1-red';
+    const orders: Orders = { blue: [{ kind: 'move', champion: c.id, to: c.position, launchHerald: true }], red: [] };
+    const ev: GameEvent[] = [];
+    launchHeralds(s, d, orders, ev, new Set([c.id]));
+    expect(ev).toEqual([]);
+    expect(c.hasHerald).toBe(true);
+    expect(s.towers['top-t1-red']).toBe(d.rules.towers.hp);
+  });
+
   test('an alive carrier on an enemy tower deals heraldDamage', () => {
     const s = fresh(28);
     const c = get(s, 'blue', 'top');

@@ -361,3 +361,38 @@ describe('move then recall', () => {
     expect(() => validateOrders(s, d, 'blue', recall(get(s, 'blue', 'mid').id, 'base-red'))).toThrow(/recall/);
   });
 });
+
+describe('flee direction and gank outcome', () => {
+  test('a flee never ends farther from the own base than where the champion stood', () => {
+    // 2v2 top skirmish: blue top on its T2 (behind the fight), blue jungler in the lane, both reds on the blue-side T1.
+    const s = setup(7, [
+      ['blue', 'top', 'top-t2-blue'], ['blue', 'jungle', 'top-lane'],
+      ['red', 'top', 'top-t1-red'], ['red', 'mid', 'top-t1-red'],
+    ]);
+    const o = ordersWith(s, s.champions.map((c) => ({ kind: 'move', champion: c.id, to: c.position }) as Order));
+    const c = detectContacts(s, d, o).find((x) => x.id === 'lane-top')!;
+    const before = new Map(s.champions.map((x) => [x.id, d.graph.distance(x.position, `base-${x.side}`)]));
+    const { events, state } = resolveRound(s, d, o, { [c.id]: { blue: 'flee', red: 'fight' } });
+    const fled = events.filter((e) => e.type === 'fled');
+    expect(fled.length).toBeGreaterThan(0);
+    for (const e of fled) {
+      if (e.type !== 'fled') continue;
+      const ch = state.champions.find((x) => x.id === e.champion)!;
+      expect(d.graph.distance(e.to, `base-${ch.side}`)).toBeLessThanOrEqual(before.get(ch.id)!);
+    }
+  });
+
+  test('a gank that kills (the ganked laner fleeing to 0 HP) does not trigger the failed-gank wave rule', () => {
+    const s = setup(10, [['blue', 'top', 'top-lane'], ['red', 'top', 'top-lane'], ['blue', 'jungle', 'scuttle-top']]);
+    get(s, 'red', 'top').hp = d.rules.fight.gankHpLoss;
+    s.waves.top = -1;
+    const stay = s.champions.filter((c) => c.role !== 'jungle' || c.side !== 'blue').map((c) => ({ kind: 'move', champion: c.id, to: c.position }) as Order);
+    const o = ordersWith(s, [{ kind: 'move', champion: get(s, 'blue', 'jungle').id, to: 'top-lane' }, ...stay]);
+    const c = detectContacts(s, d, o).find((x) => x.id === 'lane-top')!;
+    expect(c.kind).toBe('gank');
+    const r = resolveRound(s, d, o, { [c.id]: { blue: 'fight', red: 'flee' } });
+    expect(r.events.some((e) => e.type === 'death' && e.champion === get(s, 'red', 'top').id)).toBe(true);
+    // A failed gank would jump the wave to the ganked side's tower (+1); a kill leaves the normal one-step move.
+    expect(r.state.waves.top).toBe(0);
+  });
+});

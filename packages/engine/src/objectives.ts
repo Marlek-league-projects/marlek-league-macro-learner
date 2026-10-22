@@ -219,14 +219,14 @@ export function clearCamps(state: GameState, data: GameData, acting: ReadonlySet
  * deals `heraldDamage` like any tower damage (plates, kill, gold) but without multiplier. Dead carriers lose the Herald;
  * a recalling (respawning) carrier keeps it.
  */
-export function launchHeralds(state: GameState, data: GameData, orders: Orders, events: GameEvent[]): void {
+export function launchHeralds(state: GameState, data: GameData, orders: Orders, events: GameEvent[], forfeited: ReadonlySet<string> = new Set()): void {
   for (const c of state.champions) if (c.status === 'dead') c.hasHerald = false;
 
   for (const side of SIDES) {
     for (const order of orders[side]) {
       if (order.kind !== 'move' || !order.launchHerald) continue;
       const c = state.champions.find((x) => x.id === order.champion && x.side === side);
-      if (!c || c.status !== 'alive' || !c.hasHerald) continue;
+      if (!c || c.status !== 'alive' || !c.hasHerald || forfeited.has(c.id)) continue;
       const tower = c.position;
       const p = data.graph.positions[tower];
       if (p?.kind !== 'tower' || !p.side || p.side === side || (state.towers[tower] ?? 0) <= 0) continue;

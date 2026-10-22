@@ -258,4 +258,20 @@ describe('where a joiner lands (fix round 1)', () => {
     expect(joined('red')).toMatchObject({ champion: rm.id, from: 'wolves-red' });
     expect(joined('blue')).toMatchObject({ champion: rm.id, from: null, position: 'scuttle-bot' });
   });
+
+  test('a joiner moving onto its origin this round: the other side does not see that move either', () => {
+    const { s, rm } = river();
+    rm.position = 'raptors-red';
+    rm.previous = 'raptors-red';
+    const orders = ordersWith(s, [{ kind: 'move', champion: rm.id, to: 'wolves-red' }, ...s.champions.filter((c) => c.id !== rm.id).map(stayOn)]);
+    const r = resolveRound(s, d, orders, { 'river-bot': { blue: 'fight', red: 'fight', joins: { red: [rm.id] } } });
+    // Blue sees the joiner in the contact at the end of the round.
+    r.state.lastSeen.blue[rm.id] = { position: 'scuttle-bot', round: r.state.round - 1 };
+    const mine = (side: 'blue' | 'red') => eventsFor(r.events, r.state, d, side);
+    const moveOnto = (side: 'blue' | 'red') => mine(side).some((e) => e.type === 'moved' && e.champion === rm.id && e.to === 'wolves-red');
+    expect(r.events.some((e) => e.type === 'moved' && e.champion === rm.id && e.to === 'wolves-red')).toBe(true);
+    expect(moveOnto('red')).toBe(true);
+    expect(moveOnto('blue')).toBe(false);
+    expect(mine('blue').find((e) => e.type === 'joined')).toMatchObject({ champion: rm.id, from: null });
+  });
 });

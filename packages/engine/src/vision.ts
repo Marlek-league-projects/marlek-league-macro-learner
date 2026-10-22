@@ -300,5 +300,11 @@ export function eventsFor(events: GameEvent[], after: GameState, data: GameData,
     }
   });
   // A joiner is seen in the contact, but where it came from only when the side sees that position.
-  return shown.map((e) => (e.type === 'joined' && e.from !== null && !own(e.champion) && !seen.has(e.from) ? { ...e, from: null } : e));
+  // Its own move onto that origin is hidden too: the side only learns that it joined.
+  const maskedJoin = new Map(
+    shown.flatMap((e) => (e.type === 'joined' && e.from !== null && !own(e.champion) && !seen.has(e.from) ? [[e.champion, e.from] as const] : [])),
+  );
+  return shown
+    .filter((e) => !(e.type === 'moved' && maskedJoin.get(e.champion) === e.to))
+    .map((e) => (e.type === 'joined' && e.from !== null && !own(e.champion) && !seen.has(e.from) ? { ...e, from: null } : e));
 }
