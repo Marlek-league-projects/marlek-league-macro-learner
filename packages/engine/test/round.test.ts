@@ -80,14 +80,14 @@ describe('resolveRound', () => {
     expect(() => resolveRound(s, d, ordersWith(s), {})).toThrow(/over/);
   });
 
-  test('a full game of default orders ends after round 71 with a winner', () => {
+  test('a full game of default orders ends after round 73 with a winner', () => {
     let s = newGame(d, 42);
-    for (let i = 0; i < 71; i++) {
+    for (let i = 0; i < 73; i++) {
       const o: Orders = { blue: defaultOrders(s, d, 'blue'), red: defaultOrders(s, d, 'red') };
       s = resolveRound(s, d, o, {}).state;
     }
     expect(s.over).toBe(true);
-    expect(s.round).toBe(72);
+    expect(s.round).toBe(74);
     expect(s.winner).not.toBeNull();
   });
 
@@ -474,7 +474,7 @@ describe('an action needs a step left on arrival', () => {
     expect(first.events).toContainEqual({ type: 'moved', champion: bj, from: 'wolves-blue', to: 'krugs-blue', acted: false });
     expect(get(first.state, 'blue', 'jungle').position).toBe('krugs-blue');
     expect(first.events.some((e) => e.type === 'campCleared' && e.camp === 'krugs-blue')).toBe(false);
-    expect(first.state.camps['krugs-blue']).toBe(d.rules.camps.firstSpawn);
+    expect(first.state.camps['krugs-blue']).toBe(d.rules.camps.firstSpawnByCamp.krugs);
 
     const second = resolveRound(first.state, d, ordersWith(first.state), {});
     expect(second.events).toContainEqual({ type: 'campCleared', camp: 'krugs-blue', champion: bj });

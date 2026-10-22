@@ -134,7 +134,7 @@ describe('aiOrders', () => {
 
   function dragonOrder(botWave: -1 | 0 | 1, rank: Rank = 'challenger'): Order {
     const s = newGame(d, 7);
-    s.round = 10; // dragon spawns at 300 s, in round 11
+    s.round = 12; // dragon spawns at 300 s, in round 13
     s.waves.bot = botWave;
     place(s, 'blue', 'jungle', 'raptors-blue');
     const orders = aiOrders(viewFor(s, d, 'blue'), d, profile(rank), stubRng(() => 0.99));
@@ -154,7 +154,7 @@ describe('aiOrders', () => {
 
   test('a live dragon without bot priority does not pull the challenger jungler', () => {
     const s = newGame(d, 7);
-    s.round = 12; // dragon spawned in round 11
+    s.round = 14; // dragon spawned in round 13
     s.waves.bot = -1;
     place(s, 'blue', 'jungle', 'raptors-blue');
     const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
@@ -164,7 +164,7 @@ describe('aiOrders', () => {
   test('a pit held by a known enemy group that beats ours is skipped; with no enemy seen there it is set up', () => {
     const jungleSetsUp = (enemiesAtPit: boolean): boolean => {
       const s = newGame(d, 7);
-      s.round = 10; // Dragon spawns next round
+      s.round = 12; // Dragon spawns next round
       s.waves.bot = 1;
       place(s, 'blue', 'jungle', 'raptors-blue');
       // Top and mid start within a jungler's move of the pit: away, the jungler would fight alone.
@@ -172,7 +172,7 @@ describe('aiOrders', () => {
       if (enemiesAtPit) {
         for (const role of ['jungle', 'adc', 'support']) {
           place(s, 'red', role, 'dragon-pit');
-          s.lastSeen.blue[get(s, 'red', role).id] = { position: 'dragon-pit', round: 9 };
+          s.lastSeen.blue[get(s, 'red', role).id] = { position: 'dragon-pit', round: 11 };
         }
       }
       const view = viewFor(s, d, 'blue');
@@ -186,13 +186,13 @@ describe('aiOrders', () => {
   });
 
   /**
-   * Round 10, Dragon spawning next round, blue mid on its T1 with its wave crashing in. Blue jungler and adc are
+   * Round 12, Dragon spawning next round, blue mid on its T1 with its wave crashing in. Blue jungler and adc are
    * near the pit (the support is dead): 2 against the red bot duo just seen in bot lane, 3 with the mid. The red
    * jungler was not seen for ages.
    */
   function sacrificeScenario(): GameState {
     const s = newGame(d, 7);
-    s.round = 10;
+    s.round = 12;
     s.waves.mid = -1;
     place(s, 'blue', 'mid', 'mid-t1-blue');
     place(s, 'blue', 'jungle', 'raptors-blue');
@@ -200,7 +200,7 @@ describe('aiOrders', () => {
     get(s, 'blue', 'support').status = 'dead';
     for (const role of ['adc', 'support']) {
       place(s, 'red', role, 'bot-t1-red');
-      s.lastSeen.blue[get(s, 'red', role).id] = { position: 'bot-t1-red', round: 9 };
+      s.lastSeen.blue[get(s, 'red', role).id] = { position: 'bot-t1-red', round: 11 };
     }
     return s;
   }
@@ -216,9 +216,9 @@ describe('aiOrders', () => {
     const laning = midOrder(sacrificeScenario());
     expect(laning.kind === 'move' && d.graph.positions[laning.to]!.lane).toBe('mid');
     const late = sacrificeScenario();
-    late.round = 42; // 910–930 s
+    late.round = 44; // 915–935 s
     late.pits['dragon-pit'].nextSpawn = 940; // spawns next round
-    for (const role of ['adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 41;
+    for (const role of ['adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 43;
     const o = midOrder(late);
     expect(o.kind).toBe('move');
     const to = (o as Extract<Order, { kind: 'move' }>).to;
@@ -333,12 +333,12 @@ describe('aiOrders', () => {
 });
 
 describe('laning phase', () => {
-  const lastLaningRound = 26; // 810–850 s; round 27 starts at 850 s, past laningPhaseUntil
+  const lastLaningRound = 40; // 835–855 s; round 41 starts at 855 s, past laningPhaseUntil
   /** No mistake rolled, and every random pick takes the first option. */
   const onlyMistake = (id?: (typeof MISTAKE_IDS)[number]): Rng =>
     stubRng((n) => (n < 5 * MISTAKE_IDS.length ? (id && n % MISTAKE_IDS.length === MISTAKE_IDS.indexOf(id) ? 0 : 0.99) : 0));
 
-  test('laningPhaseUntil is 14:00 and covers rounds 1 to 26', () => {
+  test('laningPhaseUntil is 14:00 and covers rounds 1 to 40', () => {
     expect(d.aiTuning.laningPhaseUntil).toBe(840);
   });
 
@@ -358,7 +358,7 @@ describe('laning phase', () => {
     return d.graph.positions[from]!.lane !== 'top' && back ? 'return' : null;
   }
 
-  test('a challenger top laner stays on top lane positions in rounds 1 to 26, except to recall, respawn or sacrifice its wave', () => {
+  test('a challenger top laner stays on top lane positions in rounds 1 to 40, except to recall, respawn or sacrifice its wave', () => {
     for (const seed of [1, 2, 3, 4, 5]) {
       let s = newGame(d, seed);
       const top = get(s, 'blue', 'top').id;
@@ -392,18 +392,18 @@ describe('laning phase', () => {
   }, 20_000);
 
   /**
-   * Round 10, Dragon spawning next round, blue bot lane on its pushed wave at the red T1 (priority). The other
+   * Round 12, Dragon spawning next round, blue bot lane on its pushed wave at the red T1 (priority). The other
    * blue champions are dead and the red jungler and bot duo were just seen at the pit: no rotation gives the numbers.
    */
   function dragonWithPriority(): GameState {
     const s = newGame(d, 7);
-    s.round = 10;
+    s.round = 12;
     s.waves.bot = 1;
     for (const role of ['jungle', 'top', 'mid']) get(s, 'blue', role).status = 'dead';
     for (const role of ['adc', 'support']) place(s, 'blue', role, 'bot-t1-red');
     for (const role of ['jungle', 'adc', 'support']) {
       place(s, 'red', role, 'dragon-pit');
-      s.lastSeen.blue[get(s, 'red', role).id] = { position: 'dragon-pit', round: 9 };
+      s.lastSeen.blue[get(s, 'red', role).id] = { position: 'dragon-pit', round: 11 };
     }
     return s;
   }
@@ -441,19 +441,19 @@ describe('laning phase', () => {
     }
 
     const late = dragonWithPriority();
-    late.round = 42; // 910–930 s
+    late.round = 44; // 915–935 s
     late.pits['dragon-pit'].nextSpawn = 940; // spawns next round
-    for (const role of ['jungle', 'adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 41;
+    for (const role of ['jungle', 'adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 43;
     // The red group just seen at the pit would win the fight there: no rotation into it.
     expect(adcRotates(late, 'diamond', onlyMistake())).toBe(false);
-    for (const role of ['jungle', 'adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 20;
+    for (const role of ['jungle', 'adc', 'support']) late.lastSeen.blue[get(late, 'red', role).id]!.round = 22;
     expect(adcOrder(late, 'diamond', onlyMistake())).toMatchObject({ kind: 'move', to: 'dragon-pit' });
     expect(adcRotates(late, 'diamond', onlyMistake())).toBe(true);
   });
 
   test('a paying wave sacrifice is kept to the laner\'s half of the map: top stays, mid (with priority) rotates to the Dragon', () => {
     const s = newGame(d, 7);
-    s.round = 10; // Dragon spawns next round; no enemy seen, the rotation gives the numbers
+    s.round = 12; // Dragon spawns next round; no enemy seen, the rotation gives the numbers
     s.waves.mid = 1; // blue mid has priority
     place(s, 'blue', 'jungle', 'raptors-blue');
     expect(d.graph.distance('top-t1-blue', 'dragon-pit')).toBeLessThanOrEqual(stepBudget(d.rules, s.round));
@@ -467,7 +467,7 @@ describe('laning phase', () => {
   test('in the laning phase the mid laner rotates only with priority: no wave sacrifice', () => {
     const midRotates = (wave: -1 | 0 | 1): boolean => {
       const s = newGame(d, 7);
-      s.round = 10; // Dragon spawns next round; no enemy seen, the rotation gives the numbers
+      s.round = 12; // Dragon spawns next round; no enemy seen, the rotation gives the numbers
       s.waves.mid = wave;
       place(s, 'blue', 'jungle', 'raptors-blue');
       const view = viewFor(s, d, 'blue');
@@ -483,7 +483,7 @@ describe('laning phase', () => {
 
   test('a laner rotating to a pit steps straight into it from its T1, like the Scuttle', () => {
     const s = newGame(d, 7);
-    s.round = 14; // Voidgrubs up; no enemy seen, so the top's wave sacrifice gives the numbers
+    s.round = 24; // Voidgrubs up; no enemy seen, so the top's wave sacrifice gives the numbers
     s.pits['baron-pit'] = { objective: 'voidgrubs', nextSpawn: null, capture: null };
     place(s, 'blue', 'top', 'top-t1-blue');
     place(s, 'blue', 'jungle', 'bluebuff-blue');

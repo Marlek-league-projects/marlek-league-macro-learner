@@ -73,11 +73,11 @@ describe('met enemy card', () => {
 describe('pit timer', () => {
   test('the Baron pit names what it counts down to, with the time left', () => {
     const v = view();
-    v.pits['baron-pit'] = { objective: null, nextSpawn: 360, capture: null };
-    expect(pitTimer(v, data, 'baron-pit', 90)).toMatchObject({ text: 'Larves 4:30', live: false, until: null });
-    expect(pitTimer(v, data, 'baron-pit', 90)!.title).toBe('Larves à 6:00 (dans 4:30)');
-    v.pits['baron-pit'] = { objective: null, nextSpawn: 840, capture: null };
-    expect(pitTimer(v, data, 'baron-pit', 600)!.text).toBe('Héraut 4:00');
+    v.pits['baron-pit'] = { objective: null, nextSpawn: 480, capture: null };
+    expect(pitTimer(v, data, 'baron-pit', 55)).toMatchObject({ text: 'Larves 7:05', live: false, until: null });
+    expect(pitTimer(v, data, 'baron-pit', 55)!.title).toBe('Larves à 8:00 (dans 7:05)');
+    v.pits['baron-pit'] = { objective: null, nextSpawn: 900, capture: null };
+    expect(pitTimer(v, data, 'baron-pit', 600)!.text).toBe('Héraut 5:00');
     v.pits['baron-pit'] = { objective: null, nextSpawn: 1200, capture: null };
     expect(pitTimer(v, data, 'baron-pit', 900)!.text).toBe('Nashor 5:00');
   });
@@ -85,13 +85,13 @@ describe('pit timer', () => {
   test('while the grubs are up it shows the time left before they despawn', () => {
     const v = view();
     v.pits['baron-pit'] = { objective: 'voidgrubs', nextSpawn: null, capture: null };
-    expect(pitTimer(v, data, 'baron-pit', 400)).toMatchObject({ text: 'Larves en vie', live: true, until: 'part dans 7:20' });
+    expect(pitTimer(v, data, 'baron-pit', 400)).toMatchObject({ text: 'Larves en vie', live: true, until: 'part dans 8:05' });
   });
 
   test('the dragon pit: "Dragon m:ss" (time left), and no despawn while up; nothing to come shows nothing', () => {
     const v = view();
     v.pits['dragon-pit'] = { objective: null, nextSpawn: 300, capture: null };
-    expect(pitTimer(v, data, 'dragon-pit', 90)!.text).toBe('Dragon 3:30');
+    expect(pitTimer(v, data, 'dragon-pit', 55)!.text).toBe('Dragon 4:05');
     v.pits['dragon-pit'] = { objective: 'dragon', nextSpawn: null, capture: null };
     expect(pitTimer(v, data, 'dragon-pit', 400)).toMatchObject({ text: 'Dragon en vie', live: true, until: null });
     v.pits['baron-pit'] = { objective: null, nextSpawn: null, capture: null };

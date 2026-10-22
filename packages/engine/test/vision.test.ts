@@ -115,25 +115,25 @@ describe('fog of war on objectives', () => {
   test('an enemy pit capture is hidden unless an enemy is seen on the pit', () => {
     const run = (ward: boolean): GameState => {
       const s = newGame(d, 5);
-      s.round = 12;
+      s.round = 14;
       place(s, 'red', 'jungle', 'dragon-pit');
-      if (ward) s.wards.push({ side: 'blue', position: 'dragon-pit', placedRound: 11 });
+      if (ward) s.wards.push({ side: 'blue', position: 'dragon-pit', placedRound: 13 });
       return resolveRound(s, d, ordersWith(s), {}).state;
     };
     const unseen = run(false);
-    expect(unseen.pits['dragon-pit'].capture).toEqual({ side: 'red', startedRound: 12 });
+    expect(unseen.pits['dragon-pit'].capture).toEqual({ side: 'red', startedRound: 14 });
     expect(viewFor(unseen, d, 'blue').pits['dragon-pit'].capture).toBeNull();
-    expect(viewFor(unseen, d, 'red').pits['dragon-pit'].capture).toEqual({ side: 'red', startedRound: 12 });
+    expect(viewFor(unseen, d, 'red').pits['dragon-pit'].capture).toEqual({ side: 'red', startedRound: 14 });
     expect(unseen.pits['dragon-pit'].capture).not.toBeNull(); // the view does not touch the state
-    expect(viewFor(run(true), d, 'blue').pits['dragon-pit'].capture).toEqual({ side: 'red', startedRound: 12 });
+    expect(viewFor(run(true), d, 'blue').pits['dragon-pit'].capture).toEqual({ side: 'red', startedRound: 14 });
   });
 
   test('an unseen enemy scuttle take leaves the scuttle shown as before', () => {
     const run = (ward: boolean): GameState => runScuttle(ward).state;
-    const taken = d.rules.objectives.scuttle.respawn! + 230;
+    const taken = d.rules.objectives.scuttle.respawn! + 195; // round 7 ends at 195 s
     const unseen = run(false);
     expect(unseen.scuttles['scuttle-top']).toBe(taken);
-    expect(viewFor(unseen, d, 'blue').scuttles['scuttle-top']).toBe(210);
+    expect(viewFor(unseen, d, 'blue').scuttles['scuttle-top']).toBe(d.rules.objectives.scuttle.firstSpawn);
     expect(viewFor(unseen, d, 'red').scuttles['scuttle-top']).toBe(taken);
     expect(viewFor(run(true), d, 'blue').scuttles['scuttle-top']).toBe(taken);
   });
@@ -149,9 +149,9 @@ describe('fog of war on objectives', () => {
     expect(scuttleTaken(true, 'blue')).toBe(true);
 
     const s = newGame(d, 5);
-    s.round = 13;
+    s.round = 15;
     place(s, 'red', 'jungle', 'dragon-pit');
-    s.pits['dragon-pit'] = { objective: 'dragon', nextSpawn: null, capture: { side: 'red', startedRound: 12 } };
+    s.pits['dragon-pit'] = { objective: 'dragon', nextSpawn: null, capture: { side: 'red', startedRound: 14 } };
     const { state, events } = resolveRound(s, d, ordersWith(s), {});
     expect(events.some((e) => e.type === 'objectiveTaken' && e.objective === 'dragon')).toBe(true);
     expect(eventsFor(events, state, d, 'blue').some((e) => e.type === 'objectiveTaken' && e.objective === 'dragon')).toBe(true);
@@ -179,15 +179,15 @@ describe('fog of war on own camps', () => {
 
   test('an unseen enemy invade leaves the own camp shown alive as before', () => {
     const s = invade('none');
-    expect(s.camps['raptors-blue']).toBeGreaterThan(d.rules.camps.firstSpawn);
-    expect(viewFor(s, d, 'blue').camps['raptors-blue']).toBe(d.rules.camps.firstSpawn);
+    expect(s.camps['raptors-blue']).toBeGreaterThan(d.rules.camps.firstSpawnByCamp.raptors);
+    expect(viewFor(s, d, 'blue').camps['raptors-blue']).toBe(d.rules.camps.firstSpawnByCamp.raptors);
   });
 
   test('an own champion or an own ward on the camp updates its timer', () => {
     for (const watch of ['champion', 'ward'] as const) {
       const s = invade(watch);
       expect(viewFor(s, d, 'blue').camps['raptors-blue']).toBe(s.camps['raptors-blue']!);
-      expect(viewFor(s, d, 'blue').camps['raptors-blue']).toBeGreaterThan(d.rules.camps.firstSpawn);
+      expect(viewFor(s, d, 'blue').camps['raptors-blue']).toBeGreaterThan(d.rules.camps.firstSpawnByCamp.raptors);
     }
   });
 
@@ -198,7 +198,7 @@ describe('fog of war on own camps', () => {
     const { state } = resolveRound(s, d, ordersWith(s), {});
     const view = viewFor(state, d, 'blue');
     expect(view.camps['redbuff-blue']).toBe(state.camps['redbuff-blue']!);
-    expect(view.camps['redbuff-blue']).toBeGreaterThan(d.rules.camps.firstSpawn);
+    expect(view.camps['redbuff-blue']).toBeGreaterThan(d.rules.camps.firstSpawnByCamp.redbuff);
   });
 });
 
@@ -210,9 +210,9 @@ describe('enemy camp timers', () => {
     place(s, 'red', 'jungle', 'gromp-red');
     const { state, events } = resolveRound(s, d, ordersWith(s), {});
     expect(events).toContainEqual({ type: 'campCleared', camp: 'raptors-red', champion: get(s, 'blue', 'jungle').id });
-    expect(state.camps['raptors-red']).toBeGreaterThan(d.rules.camps.firstSpawn);
+    expect(state.camps['raptors-red']).toBeGreaterThan(d.rules.camps.firstSpawnByCamp.raptors);
     expect(viewFor(state, d, 'blue').camps['raptors-red']).toBe(state.camps['raptors-red']!);
-    expect(viewFor(state, d, 'red').camps['raptors-red']).toBe(d.rules.camps.firstSpawn);
+    expect(viewFor(state, d, 'red').camps['raptors-red']).toBe(d.rules.camps.firstSpawnByCamp.raptors);
   });
 });
 

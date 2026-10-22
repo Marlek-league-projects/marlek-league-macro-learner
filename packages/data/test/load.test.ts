@@ -3,10 +3,11 @@ import { loadGameData, validateAiProfiles, validateAiTuning, validateRules, vali
 
 const data = loadGameData();
 
-test('phases give 71 rounds of 20 s: 6, 8, 24, 18, 15', () => {
+test('phases give 73 rounds of 20 s from 0:55 to 25:15: 6, 10, 24, 18, 15', () => {
   const rounds = data.rules.phases.map((p) => (p.end - p.start) / p.roundSeconds);
-  expect(rounds).toEqual([6, 8, 24, 18, 15]);
-  expect(rounds.reduce((a, b) => a + b, 0)).toBe(71);
+  expect(rounds).toEqual([6, 10, 24, 18, 15]);
+  expect(rounds.reduce((a, b) => a + b, 0)).toBe(73);
+  expect(data.rules.phases.map((p) => p.start).concat(data.rules.phases.at(-1)!.end)).toEqual([55, 175, 375, 855, 1215, 1515]);
   expect(data.rules.phases.every((p) => p.roundSeconds === 20)).toBe(true);
 });
 

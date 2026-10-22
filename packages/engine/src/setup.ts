@@ -54,13 +54,13 @@ export function newGame(data: GameData, seed: number, draft?: Draft, options?: N
   const camps: Record<string, number> = {};
   for (const p of Object.values(graph.positions)) {
     if (p.kind === 'tower') towers[p.id] = rules.towers.hp;
-    else if (p.kind === 'camp') camps[p.id] = rules.camps.firstSpawn;
+    else if (p.kind === 'camp') camps[p.id] = rules.camps.firstSpawnByCamp[p.camp!];
   }
 
   // Each jungler has already cleared its start buff camp.
   for (const j of champions.filter((c) => c.role === 'jungle')) {
     const buff = JUNGLE_START_CAMPS.includes(graph.positions[j.position]!.camp!);
-    camps[j.position] = rules.camps.firstSpawn + (buff ? rules.camps.buffRespawn : rules.camps.smallRespawn);
+    camps[j.position] = rules.camps.firstSpawnByCamp[graph.positions[j.position]!.camp!] + (buff ? rules.camps.buffRespawn : rules.camps.smallRespawn);
     grant(j, buff ? rules.camps.buffGold : rules.camps.smallGold, buff ? rules.camps.buffXp : rules.camps.smallXp);
   }
 

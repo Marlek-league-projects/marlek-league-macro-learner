@@ -1,3 +1,4 @@
+import type { CampType } from './map';
 export type Role = 'top' | 'jungle' | 'mid' | 'adc' | 'support';
 export type Stage = 0 | 1 | 2 | 3 | 4;
 export type PerStage = [number, number, number, number, number];
@@ -49,7 +50,8 @@ export interface Rules {
   buffs: { grubsMult: number; baronMult: number; baronRounds: number; dragonLead: number };
   objectives: Record<ObjectiveId, ObjectiveRule>;
   camps: {
-    firstSpawn: number;
+    /** First spawn (seconds) of each camp type: buffs, Wolves and Raptors at 0:55, Krugs and Gromp at 1:07. */
+    firstSpawnByCamp: Record<CampType, number>;
     buffRespawn: number;
     smallRespawn: number;
     buffGold: number;

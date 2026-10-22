@@ -1,10 +1,10 @@
 {
   "phases": [
-    { "name": "Niveau 1 & premier clear", "start": 90, "end": 210, "roundSeconds": 20, "stage": 0 },
-    { "name": "Carapateurs & 1er dragon", "start": 210, "end": 370, "roundSeconds": 20, "stage": 1 },
-    { "name": "Larves & plaques", "start": 370, "end": 850, "roundSeconds": 20, "stage": 2 },
-    { "name": "Héraut & mid game", "start": 850, "end": 1210, "roundSeconds": 20, "stage": 3 },
-    { "name": "Baron", "start": 1210, "end": 1510, "roundSeconds": 20, "stage": 4 }
+    { "name": "Niveau 1 & premier clear", "start": 55, "end": 175, "roundSeconds": 20, "stage": 0 },
+    { "name": "Carapateurs & 1er dragon", "start": 175, "end": 375, "roundSeconds": 20, "stage": 1 },
+    { "name": "Larves & plaques", "start": 375, "end": 855, "roundSeconds": 20, "stage": 2 },
+    { "name": "Héraut & mid game", "start": 855, "end": 1215, "roundSeconds": 20, "stage": 3 },
+    { "name": "Baron", "start": 1215, "end": 1515, "roundSeconds": 20, "stage": 4 }
   ],
   "moves": { "budgetBySeconds": { "20": 2 }, "baseBonus": 1 },
   "wards": { "perRound": 3, "duration": 2, "unwardPerRound": 1, "unwardRoles": ["jungle", "support"] },
@@ -12,13 +12,13 @@
   "lanes": { "pushBonus": 0.5 },
   "buffs": { "grubsMult": 1.5, "baronMult": 2, "baronRounds": 9, "dragonLead": 250 },
   "objectives": {
-    "scuttle": { "firstSpawn": 210, "respawn": 150, "despawnAt": null, "minChampions": 1, "extraRound": false, "instantAt": null, "gold": 100, "xp": 100, "value": 450 },
+    "scuttle": { "firstSpawn": 175, "respawn": 150, "despawnAt": null, "minChampions": 1, "extraRound": false, "instantAt": null, "gold": 100, "xp": 100, "value": 450 },
     "dragon": { "firstSpawn": 300, "respawn": 300, "despawnAt": null, "minChampions": 1, "extraRound": true, "instantAt": 4, "gold": 100, "xp": 150, "value": 4500 },
-    "voidgrubs": { "firstSpawn": 360, "respawn": null, "despawnAt": 840, "minChampions": 1, "extraRound": true, "instantAt": 4, "gold": 100, "xp": 100, "value": 3000 },
-    "herald": { "firstSpawn": 840, "respawn": null, "despawnAt": 1200, "minChampions": 1, "extraRound": true, "instantAt": 4, "gold": 100, "xp": 150, "value": 3000 },
+    "voidgrubs": { "firstSpawn": 480, "respawn": null, "despawnAt": 885, "minChampions": 1, "extraRound": true, "instantAt": 4, "gold": 100, "xp": 100, "value": 3000 },
+    "herald": { "firstSpawn": 900, "respawn": null, "despawnAt": 1185, "minChampions": 1, "extraRound": true, "instantAt": 4, "gold": 100, "xp": 150, "value": 3000 },
     "baron": { "firstSpawn": 1200, "respawn": 360, "despawnAt": null, "minChampions": 3, "extraRound": true, "instantAt": null, "gold": 300, "xp": 300, "value": 6000 }
   },
-  "camps": { "firstSpawn": 90, "buffRespawn": 300, "smallRespawn": 135, "buffGold": 90, "buffXp": 230, "smallGold": 60, "smallXp": 170, "fastClearAt": 7 },
+  "camps": { "firstSpawnByCamp": { "bluebuff": 55, "redbuff": 55, "wolves": 55, "raptors": 55, "krugs": 67, "gromp": 67 }, "buffRespawn": 300, "smallRespawn": 135, "buffGold": 90, "buffXp": 230, "smallGold": 60, "smallXp": 170, "fastClearAt": 7 },
   "economy": {
     "farmGoldPerMin": 330, "farmXpPerMin": 600, "duoXpShare": 0.7, "supportShare": 0.3, "pressureFarmShare": 0.5, "passiveGoldPerMin": 120, "killGold": 300, "killXp": 250, "tradeLead": 60,
     "levelXp": [0, 280, 660, 1140, 1720, 2400, 3180, 4060, 5040, 6120, 7300, 8580, 9960, 11440, 13020, 14700, 16480, 18360]

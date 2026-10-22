@@ -71,6 +71,12 @@ export function validateRules(rules: Rules): void {
   if (typeof baseBonus !== 'number' || !Number.isInteger(baseBonus) || baseBonus < 0) {
     fail('rules.moves', `baseBonus = ${String(baseBonus)} is not a non-negative integer`);
   }
+  for (const camp of ['bluebuff', 'redbuff', 'wolves', 'raptors', 'krugs', 'gromp'] as const) {
+    const t = rules.camps?.firstSpawnByCamp?.[camp];
+    if (typeof t !== 'number' || !Number.isFinite(t) || t < 0) {
+      fail('rules.camps.firstSpawnByCamp', `${camp} = ${String(t)} is not a non-negative number of seconds`);
+    }
+  }
   const duration = rules.wards?.duration;
   if (typeof duration !== 'number' || !Number.isInteger(duration) || duration < 1) {
     fail('rules.wards', `duration = ${String(duration)} is not a positive integer`);

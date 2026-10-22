@@ -121,10 +121,10 @@ describe('towers', () => {
     expect(get(s, 'blue', 'top').gold).toBeCloseTo(get(s, 'blue', 'top').goldEarned, 6);
   });
   test('plates give no gold after 14:00', () => {
-    const s = push3(39);
+    const s = push3(41);
     run(s);
     expect(s.platesTaken.blue).toBe(2);
-    expect(get(s, 'blue', 'top').goldEarned).toBeCloseTo(base(39), 6);
+    expect(get(s, 'blue', 'top').goldEarned).toBeCloseTo(base(41), 6);
   });
   test('defender on the tower blocks damage', () => {
     const s = push3();

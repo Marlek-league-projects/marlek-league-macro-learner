@@ -82,8 +82,8 @@ describe('teaching', () => {
   const ids = (out: Array<{ ruleId: string }>): string[] => out.map((x) => x.ruleId);
 
   test('leaving an unpushed lane toward a live Dragon is a wave sacrifice, not a mistake', () => {
-    // Dragon spawned in round 11; scuttle-bot is the mid's first step toward the pit.
-    const { s, state, events } = midLeaves(12, 'scuttle-bot');
+    // Dragon spawned in round 13; scuttle-bot is the mid's first step toward the pit.
+    const { s, state, events } = midLeaves(14, 'scuttle-bot');
     expect(state.pits['dragon-pit'].objective).toBe('dragon');
     const out = explainRound(s, state, events, d, 'blue');
     expect(ids(out)).toContain('wave-sacrifice-for-objective');
@@ -94,8 +94,8 @@ describe('teaching', () => {
   });
 
   test('stepping toward the Dragon the round before it spawns is the setup, not a mistake', () => {
-    // Round 10: the Dragon spawns at 300 s, in round 11.
-    const { s, state, events } = midLeaves(10, 'scuttle-bot');
+    // Round 12: the Dragon spawns at 300 s, in round 13.
+    const { s, state, events } = midLeaves(12, 'scuttle-bot');
     expect(state.pits['dragon-pit'].objective).toBeNull();
     const out = explainRound(s, state, events, d, 'blue');
     expect(ids(out)).toContain('wave-sacrifice-for-objective');
@@ -104,7 +104,7 @@ describe('teaching', () => {
   });
 
   test('leaving an unpushed lane for a camp is still a mistake', () => {
-    const { s, state, events } = midLeaves(12, 'raptors-blue');
+    const { s, state, events } = midLeaves(14, 'raptors-blue');
     const out = explainRound(s, state, events, d, 'blue');
     expect(ids(out)).toContain('left-lane-without-priority');
     expect(ids(out)).not.toContain('wave-sacrifice-for-objective');

@@ -28,6 +28,16 @@ export function objectiveAt(data: GameData, pit: PitId, t: number): ObjectiveId 
 }
 
 /**
+ * When the objective after `objective` in its pit's sequence spawns: when `objective` leaves (`despawn`), or at its own
+ * first spawn if that is later (the Herald comes 15 s after the Voidgrubs leave, Baron 15 s after the Herald).
+ */
+function nextSpawnAfter(data: GameData, pit: PitId, objective: ObjectiveId, despawn: number | null): number | null {
+  if (despawn === null) return null;
+  const next = PIT_SEQUENCE[pit][PIT_SEQUENCE[pit].indexOf(objective) + 1];
+  return next === undefined ? despawn : Math.max(despawn, data.rules.objectives[next].firstSpawn);
+}
+
+/**
  * Round start: activates pit objectives whose spawn time falls before the end of the round,
  * despawns timed-out ones (voidgrubs → herald → baron).
  */
@@ -48,8 +58,8 @@ export function spawnObjectives(state: GameState, data: GameData): void {
       }
       const despawn = pit.objective ? data.rules.objectives[pit.objective].despawnAt : null;
       if (despawn !== null && despawn <= end) {
+        pit.nextSpawn = nextSpawnAfter(data, id, pit.objective!, despawn);
         pit.objective = null;
-        pit.nextSpawn = despawn;
         pit.capture = null;
         continue;
       }
@@ -98,7 +108,7 @@ function takePit(state: GameState, data: GameData, id: PitId, pit: PitState, sid
   pit.objective = null;
   pit.capture = null;
   // Respawning objectives come back after `respawn`; the others leave the pit to the next one in line.
-  pit.nextSpawn = rule.respawn !== null ? roundWindow(data.rules, state.round).end + rule.respawn : rule.despawnAt;
+  pit.nextSpawn = rule.respawn !== null ? roundWindow(data.rules, state.round).end + rule.respawn : nextSpawnAfter(data, id, objective, rule.despawnAt);
 }
 
 /** The Scuttle of each pit's river. */

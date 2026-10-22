@@ -34,8 +34,8 @@ describe('death', () => {
     expect(ev[0]).toMatchObject({ type: 'death', champion: v.id, respawnRound: 11 });
   });
   test('the death timer follows the stage: 20, 20, 40, 60 and 120 s (death.roundsByStage)', () => {
-    // First round of each stage: 1, 7, 15, 39 and 57 (rounds are 20 s everywhere).
-    for (const [round, stage] of [[1, 0], [7, 1], [15, 2], [39, 3], [57, 4]] as const) {
+    // First round of each stage: 1, 7, 17, 41 and 59 (rounds are 20 s everywhere).
+    for (const [round, stage] of [[1, 0], [7, 1], [17, 2], [41, 3], [59, 4]] as const) {
       const s = fresh(round);
       const v = id(s, 'red', 'top');
       applyKill(s, d, [v.id], [id(s, 'blue', 'top').id], []);
