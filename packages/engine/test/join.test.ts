@@ -1,12 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
-import type { AiProfile, Rank } from '@lml/data/contracts';
+import type { AiProfile, GameData, Rank } from '@lml/data/contracts';
 import {
   aiAnswers,
   aiContactChoice,
   aiJoins,
   defaultOrders,
   detectContacts,
+  eventsFor,
   newGame,
   resolveJoins,
   resolveRound,
@@ -204,5 +205,57 @@ describe('AI join decision', () => {
     const lost = blueSide(30, 100);
     const answers = aiAnswers(lost.view, d, [lost.c], profile('challenger'), stubRng(0.99));
     expect(answers['river-bot']).toEqual({ blue: 'fight', joins: { blue: [lost.bm.id] } });
+  });
+});
+
+describe('where a joiner lands (fix round 1)', () => {
+  /** `d` without the link between `a` and `b` (a map where the Scuttle and its pit do not share every neighbour). */
+  const unlinked = (a: string, b: string): GameData => {
+    const adj = { ...d.graph.adj, [a]: d.graph.adj[a]!.filter((x) => x !== b), [b]: d.graph.adj[b]!.filter((x) => x !== a) };
+    return { ...d, graph: { ...d.graph, adj } };
+  };
+
+  test('a river joiner not next to the fight position lands on the contact position 1 step away, off the pit', () => {
+    const m = unlinked('gromp-blue', 'baron-pit');
+    const s = setup(14, [
+      ['blue', 'jungle', 'baron-pit'], ['red', 'jungle', 'baron-pit'], ['red', 'top', 'scuttle-top'], ['blue', 'mid', 'gromp-blue'],
+    ]);
+    s.pits['baron-pit'] = { objective: 'voidgrubs', nextSpawn: null, capture: null };
+    const o = ordersWith(s, s.champions.map(stayOn));
+    const [bj, bm] = [get(s, 'blue', 'jungle'), get(s, 'blue', 'mid')];
+    const c = detectContacts(s, m, o).find((x) => x.id === 'river-top')!;
+    expect(c.position).toBe('baron-pit');
+    expect(c.nearby.blue).toContain(bm.id);
+    const { state, events } = resolveRound(s, m, o, { 'river-top': { blue: 'objective', red: 'flee', joins: { blue: [bm.id] } } });
+    expect(events).toContainEqual({ type: 'joined', champion: bm.id, side: 'blue', from: 'gromp-blue', position: 'scuttle-top' });
+    expect(state.champions.find((x) => x.id === bm.id)!.position).toBe('scuttle-top');
+    // Only the blue jungler, acting on the pit, takes the Voidgrubs: the joiner is neither on the pit nor acting.
+    expect(events).toContainEqual(expect.objectContaining({ type: 'objectiveStarted', objective: 'voidgrubs', side: 'blue', champions: [bj.id] }));
+  });
+
+  test('a lane joiner steps onto the lane position next to it, then the lane fight pulls it in', () => {
+    // Fight on the top lane middle (the smaller blue side), the red jungler on the blue T1; the blue jungler on its
+    // Gromp is 1 step from the T1, 2 from the middle.
+    const s = setup(7, [['blue', 'top', 'top-lane'], ['red', 'top', 'top-lane'], ['red', 'jungle', 'top-t1-blue'], ['blue', 'jungle', 'gromp-blue']]);
+    const o = ordersWith(s, s.champions.map(stayOn));
+    const bj = get(s, 'blue', 'jungle');
+    const c = detectContacts(s, d, o).find((x) => x.id === 'lane-top')!;
+    expect(c.position).toBe('top-lane');
+    expect(c.nearby.blue).toContain(bj.id);
+    const { events } = resolveRound(s, d, o, { 'lane-top': { blue: 'fight', red: 'fight', joins: { blue: [bj.id] } } });
+    expect(events).toContainEqual({ type: 'joined', champion: bj.id, side: 'blue', from: 'gromp-blue', position: 'top-t1-blue' });
+    expect(events).toContainEqual({ type: 'moved', champion: bj.id, from: 'top-t1-blue', to: 'top-lane', acted: false });
+  });
+
+  test('the other side sees where a joiner came from only when it sees that position', () => {
+    const { s, rm } = river();
+    // The red mid joins from its own Wolves, out of blue's sight.
+    rm.position = 'wolves-red';
+    rm.previous = 'wolves-red';
+    const orders = ordersWith(s, s.champions.map(stayOn));
+    const r = resolveRound(s, d, orders, { 'river-bot': { blue: 'fight', red: 'fight', joins: { red: [rm.id] } } });
+    const joined = (side: 'blue' | 'red') => eventsFor(r.events, r.state, d, side).find((e) => e.type === 'joined');
+    expect(joined('red')).toMatchObject({ champion: rm.id, from: 'wolves-red' });
+    expect(joined('blue')).toMatchObject({ champion: rm.id, from: null, position: 'scuttle-bot' });
   });
 });

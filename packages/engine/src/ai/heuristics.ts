@@ -709,7 +709,8 @@ export function contactChoice(view: PlayerView, data: GameData, prompted: Contac
   const { winner, scores } = fight();
   if (options.includes('objective') && riverUp(view, data, contact)) {
     const focused = fight({ [side]: data.rules.fight.objectiveFocus }).winner;
-    const numbers = contact[side].length > contact[enemy].length;
+    // Joiners forfeit their action: they never count among the pit's takers.
+    const numbers = prompted[side].length > contact[enemy].length;
     if (focused === side || (numbers && focused === null) || winner === null) return 'objective';
   }
   const outnumbered = contact[side].length < contact[enemy].length;

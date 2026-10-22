@@ -96,5 +96,9 @@ describe('joining a fight 1 step away (web)', () => {
     const line = eventText({ type: 'joined', champion: 'Galio', side: 'blue', from: 'krugs-blue', position: 'scuttle-bot' }, data);
     expect(line).toContain('rejoint le combat');
     expect(line).toContain(championName(data, 'Galio'));
+    // An unseen origin is not told.
+    const hidden = eventText({ type: 'joined', champion: 'Galio', side: 'red', from: null, position: 'scuttle-bot' }, data);
+    expect(hidden).not.toContain('depuis');
+    expect(hidden).toContain('rejoint le combat');
   });
 });

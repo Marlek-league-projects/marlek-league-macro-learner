@@ -72,9 +72,12 @@ export function buildReplay(before: PlayerView, after: PlayerView, events: GameE
       case 'moved':
         if (shown(e.champion)) move(e.champion, e.from, e.to);
         break;
-      case 'joined':
-        if (shown(e.champion)) move(e.champion, e.from, e.position);
+      case 'joined': {
+        // Where an unseen joiner came from is hidden: it slides from where the replay last had it, if anywhere.
+        const from = e.from ?? at.get(e.champion);
+        if (shown(e.champion) && from && from !== e.position) move(e.champion, from, e.position);
         break;
+      }
       case 'fled': {
         const from = at.get(e.champion);
         if (shown(e.champion) && from && from !== e.to) move(e.champion, from, e.to);

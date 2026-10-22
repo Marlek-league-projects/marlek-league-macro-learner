@@ -164,12 +164,16 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   for (const contact of contacts) {
     here = contact.position;
     const choice = resolveChoice(contact, choices);
-    // A joiner walks its 1 step onto the contact and forfeits its own action (no camp, no farm, no objective elsewhere).
+    // A joiner walks its 1 step into the contact and forfeits its own action (no camp, no farm, no objective
+    // elsewhere): onto the fight position when it is 1 step away, else onto the first contact position (id order) that
+    // is. A prompted lane fight then pulls it in like everyone else.
     for (const side of SIDES) {
       for (const id of joinsOf.get(contact.id)![side]) {
         const c = byId(id);
-        events.push({ type: 'joined', champion: id, side, from: c.position, position: contact.position });
-        c.position = contact.position;
+        const adj = data.graph.adj[c.position] ?? [];
+        const to = adj.includes(contact.position) ? contact.position : contact.positions.find((p) => adj.includes(p))!;
+        events.push({ type: 'joined', champion: id, side, from: c.position, position: to });
+        c.position = to;
         forfeited.add(id);
       }
     }

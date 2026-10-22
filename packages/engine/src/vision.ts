@@ -266,7 +266,7 @@ export function eventsFor(events: GameEvent[], after: GameState, data: GameData,
   const enemySeen = (id: string): boolean => own(id) || visible.has(id);
   const movedTo = new Map(events.flatMap((e) => (e.type === 'moved' ? [[e.champion, e.to] as const] : [])));
 
-  return events.filter((e) => {
+  const shown = events.filter((e) => {
     switch (e.type) {
       case 'fight':
       case 'joined':
@@ -299,4 +299,6 @@ export function eventsFor(events: GameEvent[], after: GameState, data: GameData,
         return enemySeen(e.champion);
     }
   });
+  // A joiner is seen in the contact, but where it came from only when the side sees that position.
+  return shown.map((e) => (e.type === 'joined' && e.from !== null && !own(e.champion) && !seen.has(e.from) ? { ...e, from: null } : e));
 }
