@@ -39,7 +39,7 @@ function orderText(store: Store, c: ChampionState, o: Order | undefined): string
   const at = (id: string) => positionLabel(store.data, id);
   if (c.status === 'dead') return `mort (retour round ${c.respawnRound})`;
   if (c.status === 'respawning') {
-    const to = o?.kind === 'spawn' ? o.to : store.spawnPointsFor(c.id)[0];
+    const to = o?.kind === 'spawn' ? o.to : store.defaultSpawn(c.id);
     return to ? `réapparaît à ${at(to)}` : 'réapparaît';
   }
   if (o?.kind === 'recall') {

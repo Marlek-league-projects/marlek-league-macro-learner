@@ -105,7 +105,10 @@ export interface Store {
   level(xp: number): number;
   /** What the player assumes a visible enemy has (engine estimate, fog of war holds). */
   estimateEnemy(enemy: EnemyInfo): EnemyEstimate;
+  /** Where a respawning own champion may re-enter, nearest the base first. */
   spawnPointsFor(champion: string): string[];
+  /** Where a respawning own champion re-enters with no spawn order: the engine's default spawn. */
+  defaultSpawn(champion: string): string;
   setLaunchHerald(champion: string, on: boolean): void;
   /** Both sides' scores once the game is over, otherwise null. */
   finalScores(): Record<Side, ScoreBreakdown> | null;
@@ -474,6 +477,13 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     spawnPointsFor(id) {
       champion(id);
       return engine.spawnPoints(current(), data, id);
+    },
+
+    defaultSpawn(id) {
+      champion(id);
+      const def = engine.defaultOrders(current(), data, PLAYER).find((o) => o.champion === id);
+      if (def?.kind !== 'spawn') throw new Error(`${id}: not respawning`);
+      return def.to;
     },
 
     setLaunchHerald(id, on) {

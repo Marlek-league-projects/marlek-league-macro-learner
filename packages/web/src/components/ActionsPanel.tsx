@@ -181,7 +181,7 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
 
   if (c.status === 'respawning') {
     const points = store.spawnPointsFor(c.id);
-    const chosen = order?.kind === 'spawn' ? order.to : points[0];
+    const chosen = order?.kind === 'spawn' ? order.to : store.defaultSpawn(c.id);
     return (
       <>
         <div class="note">Choisis où réapparaître :</div>

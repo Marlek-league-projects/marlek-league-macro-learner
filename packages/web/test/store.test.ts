@@ -225,6 +225,9 @@ describe('store', () => {
     expect(after.status).toBe('respawning');
     expect(store.recalled.value).toEqual([top.id]);
     store.next();
+    // With no spawn order the engine's default applies: the screen shows that one (the top's T1), not the first point.
+    expect(store.defaultSpawn(top.id)).toBe('top-t1-blue');
+    expect(store.spawnPointsFor(top.id)[0]).toBe('base-blue');
     store.setSpawn(top.id, store.spawnPointsFor(top.id)[0]!);
     store.confirmRound();
     store.confirmContacts();
