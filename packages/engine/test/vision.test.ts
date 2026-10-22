@@ -281,13 +281,19 @@ describe('ward spotting', () => {
     expect(viewFor(r.state, d, 'blue').enemies.find((e) => e.id === rj)).toMatchObject({ visible: true, position: 'bluebuff-blue' });
   });
 
-  test('an unseen arrival gives a null `to`, and the last warded position as last seen', () => {
+  test('an unseen arrival gives a null `to`; the enemy shows visible on the last warded position, with level and HP', () => {
+    // Until playtest 7 the spotted enemy showed as not visible here, with no level nor HP.
     const { r, rj } = walk('gromp-blue');
     const spotted = r.events.filter((e) => e.type === 'wardSpotted');
     expect(spotted).toEqual([{ type: 'wardSpotted', side: 'blue', position: 'scuttle-top', champion: rj, to: null }]);
-    expect(r.state.lastSeen.blue[rj]).toMatchObject({ position: 'scuttle-top', round: 15 });
+    expect(r.state.lastSeen.blue[rj]).toMatchObject({ position: 'scuttle-top', round: 15, spotted: true });
+    const c = r.state.champions.find((x) => x.id === rj)!;
     const e = viewFor(r.state, d, 'blue').enemies.find((x) => x.id === rj)!;
-    expect(e).toMatchObject({ visible: false, position: 'scuttle-top', lastSeenRound: 15, level: null, hp: null });
+    expect(e).toMatchObject({ visible: true, position: 'scuttle-top', lastSeenRound: 15, level: level(c.xp, d.rules), hp: c.hp });
+    // The round after, without being seen again, it is back in the fog.
+    const r2 = resolveRound(r.state, d, ordersWith(r.state), {});
+    const later = viewFor(r2.state, d, 'blue').enemies.find((x) => x.id === rj)!;
+    if (r2.state.lastSeen.blue[rj]?.round === 15) expect(later).toMatchObject({ visible: false, level: null, hp: null });
   });
 
   test('only the ward side sees the event, and it does not reveal the enemy move', () => {
@@ -338,6 +344,59 @@ describe('ward spotting', () => {
     expect(r.state.champions.find((c) => c.id === rj)!.position).toBe('top-lane');
     const spotted = r.events.filter((e) => e.type === 'wardSpotted');
     expect(spotted).toEqual([{ type: 'wardSpotted', side: 'blue', position: 'top-t1-red', champion: rj, to: 'top-t1-red' }]);
+  });
+
+  test('an enemy crossing a Scuttle ward is revealed with its level and HP too', () => {
+    const s = newGame(d, 5);
+    s.round = 15;
+    place(s, 'red', 'jungle', 'raptors-red');
+    s.wards.push({ side: 'blue', position: 'scuttle-top', placedRound: 14, scuttle: true });
+    const rj = get(s, 'red', 'jungle').id;
+    const r = resolveRound(s, d, stayWith(s, [{ kind: 'move', champion: rj, to: 'gromp-blue' }]), {});
+    expect(r.events).toContainEqual({ type: 'wardSpotted', side: 'blue', position: 'scuttle-top', champion: rj, to: null });
+    const c = r.state.champions.find((x) => x.id === rj)!;
+    expect(viewFor(r.state, d, 'blue').enemies.find((e) => e.id === rj)).toMatchObject({
+      visible: true, position: 'scuttle-top', level: level(c.xp, d.rules), hp: c.hp,
+    });
+  });
+
+  test('an enemy clearing an own ward is revealed at the ward with its level and HP, and the log names it', () => {
+    const s = newGame(d, 5);
+    s.round = 15;
+    place(s, 'red', 'jungle', 'redbuff-red');
+    s.wards.push({ side: 'blue', position: 'raptors-red', placedRound: 14 });
+    const rj = get(s, 'red', 'jungle').id;
+    const r = resolveRound(s, d, stayWith(s, [{ kind: 'move', champion: rj, to: 'raptors-red', unward: 'to' }]), {});
+    // The ward is gone before the move: no spotting, but the clearer is seen doing it.
+    expect(r.events.some((e) => e.type === 'wardSpotted')).toBe(false);
+    const blue = eventsFor(r.events, r.state, d, 'blue');
+    expect(blue).toContainEqual({ type: 'wardCleared', side: 'blue', position: 'raptors-red', champion: rj });
+    expect(eventsFor(r.events, r.state, d, 'red')).toContainEqual({ type: 'wardCleared', side: 'blue', position: 'raptors-red', champion: rj });
+    const c = r.state.champions.find((x) => x.id === rj)!;
+    expect(viewFor(r.state, d, 'blue').enemies.find((e) => e.id === rj)).toMatchObject({
+      visible: true, position: 'raptors-red', lastSeenRound: 15, level: level(c.xp, d.rules), hp: c.hp,
+    });
+    // Its move stays hidden: only the clearing is seen.
+    expect(blue.some((e) => e.type === 'moved' && e.champion === rj)).toBe(false);
+  });
+
+  test('an enemy recall on a position an own ward sees reaches the side, even on the ward\'s last round', () => {
+    const run = (ward: boolean): ReturnType<typeof resolveRound> => {
+      const s = newGame(d, 5);
+      s.round = 15;
+      place(s, 'red', 'jungle', 'raptors-red');
+      // Placed in round 13: round 15 is its last active round, so it is gone from the state after it.
+      if (ward) s.wards.push({ side: 'blue', position: 'raptors-red', placedRound: 13 });
+      return resolveRound(s, d, stayWith(s, [{ kind: 'recall', champion: get(s, 'red', 'jungle').id }]), {});
+    };
+    const rj = get(newGame(d, 5), 'red', 'jungle').id;
+    const warded = run(true);
+    expect(warded.state.wards.some((w) => w.position === 'raptors-red')).toBe(false);
+    expect(eventsFor(warded.events, warded.state, d, 'blue')).toContainEqual(
+      expect.objectContaining({ type: 'recall', champion: rj, position: 'raptors-red' }),
+    );
+    const blind = run(false);
+    expect(eventsFor(blind.events, blind.state, d, 'blue').some((e) => e.type === 'recall')).toBe(false);
   });
 
   test('a scuttle ward taken this round does not spot moves of the same round', () => {

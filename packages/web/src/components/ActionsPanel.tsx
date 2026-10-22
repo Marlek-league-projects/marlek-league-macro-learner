@@ -209,6 +209,9 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
   const heraldTarget = c.hasHerald && target?.kind === 'tower' && target.side !== c.side;
   const stance = (move ?? recall)?.stance ?? c.stance;
   const stepThenRecall = recall?.to !== undefined || (move !== null && store.recallStep(c.id, move.to));
+  // A pending move leaving no step: the recall would drop it, so the button says why it is off.
+  const recallBlocked = recall ? null : store.recallBlocked(c.id);
+  const recallReplaced = store.recallReplaced.value.includes(c.id);
 
   return (
     <>
@@ -259,9 +262,18 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
             )}
           </>
         )}
-        <button class={`wide${recall ? ' on' : ''}`} onClick={() => run(() => store.setRecall(c.id))}>
+        <button
+          class={`wide${recall ? ' on' : ''}`}
+          disabled={recallBlocked !== null}
+          title={recallBlocked ?? undefined}
+          onClick={() => run(() => store.setRecall(c.id))}
+        >
           {stepThenRecall ? 'Déplacement puis recall' : 'Recall'}
         </button>
+        {recallBlocked !== null && <div class="note">{recallBlocked}</div>}
+        {recallReplaced && (
+          <div class="note">Recall annulé : cette destination ne laisse pas de pas pour le recall.</div>
+        )}
         {heraldTarget && (
           <button
             class={`wide${move?.launchHerald ? ' on' : ''}`}

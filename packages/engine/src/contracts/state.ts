@@ -86,8 +86,9 @@ export interface GameState {
   /** Enemy champions each side has killed. */
   kills: Record<Side, number>;
   /**
-   * Per side, enemy champion id to last known position. `spotted`: only seen passing an own ward that round, not
-   * where it ended it (so not shown as visible).
+   * Per side, enemy champion id to last known position. `spotted`: seen that round only passing (or clearing) an own
+   * ward, not where it ended it: shown as visible with its stats for the next order phase, at that ward position, but
+   * its moves stay hidden.
    */
   lastSeen: Record<Side, Record<string, { position: string; round: number; spotted?: boolean } | null>>;
   /**
@@ -95,5 +96,7 @@ export interface GameState {
    * where, and its level and HP at contact time.
    */
   met: Record<Side, Record<string, MetRecord>>;
+  /** Per side, what its active wards saw while the last round resolved (spent wards are gone by then). */
+  wardSight?: Record<Side, string[]>;
   winner: Side | 'draw' | null;
 }

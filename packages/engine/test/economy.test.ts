@@ -98,7 +98,7 @@ describe('recall', () => {
     expect(c.gold).toBe(0);
     expect(c.status).toBe('respawning');
     expect(c.respawnRound).toBe(6);
-    expect(ev[0]).toEqual({ type: 'recall', champion: c.id, itemsBought: 1200 });
+    expect(ev[0]).toEqual({ type: 'recall', champion: c.id, position: c.position, itemsBought: 1200 });
   });
   test('restores full health', () => {
     const s = fresh(5);

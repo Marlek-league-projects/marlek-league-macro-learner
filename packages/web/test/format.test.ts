@@ -42,6 +42,13 @@ describe('eventLines', () => {
     expect(eventText({ type: 'wardSpotted', side: 'blue', position: 'scuttle-top', champion: 'Garen', to: null }, data))
       .toBe(`Ward à Carapateur haut : ${name('Garen')} repéré`);
   });
+
+  test('a cleared ward names who cleared it; a recall says where from', () => {
+    expect(eventText({ type: 'wardCleared', side: 'blue', position: 'scuttle-top', champion: 'Garen' }, data))
+      .toBe(`Ward bleu détruite à Carapateur haut par ${name('Garen')}`);
+    expect(eventText({ type: 'recall', champion: 'Garen', position: 'scuttle-top', itemsBought: 300 }, data))
+      .toBe(`${name('Garen')} rentre à la base depuis Carapateur haut et dépense 300 or`);
+  });
 });
 
 describe('zone prompts', () => {

@@ -72,8 +72,9 @@ export function ReplayLayer({ store }: { store: Store }) {
     if (!p || t < a) return [];
     const k = Math.min(1, (t - a) / (b - a));
     if (s.kind === 'recall') {
-      const c = at.get(s.champion);
-      if (!c || t >= b) return [];
+      // On the token when it is drawn, else (an enemy seen only recalling) on the recall position.
+      const c = at.get(s.champion) ?? p;
+      if (t >= b) return [];
       return [
         <g key={i} class="replay-recall">
           <circle cx={c.x} cy={c.y} r={12} fill="#0b1220" stroke="#38bdf8" stroke-width={2} />

@@ -153,6 +153,7 @@ export type AiPriority =
   | 'herald'
   | 'objective'
   | 'recall'
+  | 'dangerRecall'
   | 'convert'
   | 'joinGank'
   | 'lane'
@@ -170,6 +171,11 @@ export interface AiTuning {
   recallGold: number;
   /** A laner under this HP recalls when its wave allows it, whatever its gold. */
   recallHp: number;
+  /**
+   * Any champion under this HP recalls whatever its wave or the objectives (priority `dangerRecall`), unless it is
+   * on or next to a pit objective it is taking; the `badRecall` mistake stays in instead.
+   */
+  dangerHp: number;
   /** An enemy seen at most this many rounds ago counts as known (its position is current). */
   knownRounds: number;
   /** Candidate order sets compared by the look-ahead. */

@@ -200,7 +200,10 @@ export function MapView({ store }: { store: Store }) {
     const acts = store.pendingMoveActs(id);
     if (o.kind === 'move' && acts !== null) pendingMoves[id] = { to: o.to, acts };
   }
-  const objectiveEntries = ordering ? objectivePromptEntries(view, data, roundWin, store.objectivePromptsClosed.value, pendingMoves) : [];
+  const recalling = Object.entries(pending).flatMap(([id, o]) => (o.kind === 'recall' ? [id] : []));
+  const objectiveEntries = ordering
+    ? objectivePromptEntries(view, data, roundWin, store.objectivePromptsClosed.value, pendingMoves, recalling)
+    : [];
   /** Act or arrival-only ring of a position for the selected token. */
   const ring = (id: string) => (reach && selected ? rangeRing(reach[id], (d) => store.canAct(d, selected.id)) : null);
 

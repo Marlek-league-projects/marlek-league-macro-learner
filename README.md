@@ -205,6 +205,8 @@ Each champion has a **lead gauge** made of two parts:
 
 Recalling is how you **cash in** your advantage. A champion sitting on a lot of gold is weaker than its gold says until it goes back to base. Picking the right moment to recall is a tempo decision: it costs rounds, but it turns gold into strength.
 
+**Recall after a move.** The recall is the round's action, so it needs a step left: in a 2-step round, a 1-step move then the recall, from where the move ends. A recaller whose step lands in a contact it flees recalls from where it fled to; a fight cancels the recall. In the actions panel, a pending move that leaves no step turns the Recall button off with its reason (*"Le recall demande un pas restant : déplacement d'1 pas au plus"*); a 1-step move then Recall reads "Déplacement puis recall". Picking a destination while a recall is pending keeps the recall when that destination leaves a step (your own position: a recall in place), otherwise the move replaces it and the panel says so. The log says where each recall happened.
+
 ## Movement
 
 The map positions form a graph, and a move is a walk of a few steps on it. [`docs/movement-map.html`](docs/movement-map.html) shows it: click a position to see where a champion can go in one round, for each side. After changing the map or the movement rules, regenerate it with `bun run movement-map`. Starting values:
@@ -239,6 +241,8 @@ Enemy champions are hidden in fog of war. You see an enemy champion only if it i
 - on the **same position** as one of your champions (a camp, a pit, a Scuttle…),
 - on a position where you have a **ward**.
 
+An enemy **recall** shows (log line and the recall icon in the replay) whenever you see the position it recalls from, ward vision included, even if you never saw the enemy itself.
+
 Vision is revealed when the round resolves, so you use what you saw this round to plan the next one. The enemy jungler's starting camp is visible only during the first round.
 
 **Met enemies.** Every champion in a contact that round (lane or jungle, prompted or automatic) is met by the other side. Until you see it again, its enemy card shows the level and HP it had when you met it, with where and when (`met`). Once seen again, the live values replace it. Fog of war holds otherwise.
@@ -250,7 +254,7 @@ Vision is revealed when the round resolves, so you use what you saw this round t
 - A champion can place a ward in addition to its move, **either on its starting position or on its arrival position** (the player chooses).
 - Each team can place up to **3 wards per round**.
 - A ward lasts **2 rounds** (`wards.duration`): placed in round N, it gives vision when rounds N+1 and N+2 resolve, then fades. Its marker shows the rounds it has left.
-- **Spotting.** An enemy whose path this round (its start, every step and its arrival) crosses one of your active wards is reported in your log: *"Ward à {position} : {champion} repéré"*, with its arrival position this round (before any fight pulls it, or it flees) when you see that position. A Scuttle ward taken this round spots only from the next round. Otherwise its last seen position becomes the last warded position on its path. An enemy standing still on a ward is simply visible. Only the ward's team gets the report.
+- **Spotting.** An enemy whose path this round (its start, every step and its arrival) crosses one of your active wards is reported in your log: *"Ward à {position} : {champion} repéré"*, with its arrival position this round (before any fight pulls it, or it flees) when you see that position. A Scuttle ward taken this round spots only from the next round. Otherwise its last seen position becomes the last warded position on its path. Either way the enemy is **visible for the next order phase with its level and HP**, like an enemy seen at the end of the round (at its arrival when you see it, else on that ward position), though its moves stay hidden. This holds for every ward, the Scuttle ward included. An enemy standing still on a ward is simply visible. Only the ward's team gets the report.
 - The **Scuttle ward** (see [Neutral objectives](#neutral-objectives)) shows on the dead Scuttle.
 - First round: depending on their starting side, the jungler can place their ward at the **Blue Buff** or at the **Raptors**.
 
@@ -259,6 +263,7 @@ Vision is revealed when the round resolves, so you use what you saw this round t
 - Only the **jungler** and the **support** can clear wards.
 - Each team can clear **1 ward per round**, either on the champion's starting position or on its arrival position (the player chooses).
 - A champion can place a ward and clear one in the same round, on the same position or not.
+- **Dewarding reveals.** An enemy who clears one of your wards is visible to you that round, at the ward's position (or where it ends, if you see it), with its level and HP. Your log names it: *"Ward bleu détruite à {position} par {champion}"*.
 
 ## Game screen
 
@@ -275,7 +280,7 @@ Vision is revealed when the round resolves, so you use what you saw this round t
 - **Contact prompts**: when a contact needs an answer during resolution, the choices appear in an overlay docked on the map, next to the contacts. Each prompt is titled by its zone ("Lane top", "Rivière haut (Carapateur + Nashor)", or the camp's name), lists the zone positions involved and the HP of every champion in it, and rings each of them on the map. The choices are Combattre (All-in on an even lane contact), Fuir, "Farmer sous la tour" (plain "Farmer" on an even lane contact) and, on a contested river, "Continuer l'objectif". Only a side that picks "Continuer l'objectif" progresses the pit's objective, and a recalling champion is never offered it. When offered, "Continuer l'objectif" is preselected; otherwise the contact's default is.
 - **After a round resolves**, the score bar's button becomes **Round suivant**, with **Revoir le tour** below it.
 - **Ward markers**: an eye icon on every position where your team has a ward, with the rounds it has left (from the engine's ward timing) and its expiry round in the tooltip. The Scuttle's ward sits on the dead Scuttle, with the tooltip "Ward du Carapateur".
-- **Round replay**: after a round resolves, a short animation (about 2 s, with replay and skip buttons) plays it on the map: visible tokens slide to their destination along their route, fights flash, deaths and taken objectives appear. A recalling token shows the recall icon and fades out at the end, after its step if it had one. When a ward spots an enemy, its eye pulses and a dashed ghost of the enemy flashes there, without revealing anything the ward didn't see. Only what you saw is shown.
+- **Round replay**: after a round resolves, a short animation (about 2 s, with replay and skip buttons) plays it on the map: visible tokens slide to their destination along their route, fights flash, deaths and taken objectives appear. A recalling token shows the recall icon and fades out at the end, after its step if it had one; an enemy recall you saw only through its position (a ward) shows the icon there. When a ward spots an enemy, its eye pulses and a dashed ghost of the enemy flashes there, without revealing anything the ward didn't see. Only what you saw is shown.
 - **Log** (below the map): one line per event. A move onto a camp and its clear read as one line ("… se déplace vers … et tue le camp"). An arrival on the last step reads "… arrive à … (sans action)". HP lost reads "… −N PV", a taken objective reads with its article ("Rouge prend les Larves à …", "le Héraut", "le Nashor", "le Dragon", "le Carapateur"), and a ward spotting reads "Ward à … : … repéré → …".
 - **Giving orders**: click a token, and only the positions it can reach this round light up. Positions where it can still act on arrival are yellow. Positions it reaches on its last step have a dashed ring and the tooltip "Arrivée seulement : pas d'action ce tour". Then click its next position. A dashed arrow shows the move along the engine's route; a recall after a step ends its arrow in the recall icon, and a recall in place shows the icon on the token. With no order, a laner standing in its home lane follows its wave; any other token stays where it is.
 
@@ -324,6 +329,8 @@ At any time, the AI skips an objective when the enemies it knows near the pit wo
 - otherwise it fights when it wins the fight (or, rolling *Chasing kills*, when outnumbered);
 - outnumbered under its own tower with no ganker (lane pressure), it stays and farms, unless the bigger side would win by more than `aiTuning.allInMargin` and kill it;
 - otherwise (a gank it would lose, for example) it flees.
+
+**Low HP.** A champion under `aiTuning.dangerHp` (25 HP) recalls whatever its wave or the objectives (priority `dangerRecall`, above objectives), the jungler too, unless it stands on or next to a pit objective that is up or that its side is taking. A champion rolling *Bad recall* stays in instead. Above that, a laner under `recallHp` (40 HP) still recalls only on a shoved or even wave.
 
 Master, Grandmaster and Challenger keep a small mistake rate that goes down with each rank, and they also differ in how many rounds ahead they plan.
 

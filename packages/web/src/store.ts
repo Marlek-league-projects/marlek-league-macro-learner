@@ -65,6 +65,8 @@ export interface Store {
   panelDragging: Signal<boolean>;
   /** Champions whose objective prompt was answered this order phase (shown once per round and champion). */
   objectivePromptsClosed: Signal<string[]>;
+  /** Champions whose pending recall the last chosen destination replaced (it left no step for the recall). */
+  recallReplaced: Signal<string[]>;
   start(s: Settings): void;
   /** Back to the start screen, dropping the current game. */
   reset(): void;
@@ -80,16 +82,25 @@ export interface Store {
   routeOf(champion: string, to: string): string[];
   /** A move to `to` can come before a recall: it leaves a step of the budget for the recall. */
   recallStep(champion: string, to: string): boolean;
+  /** Why `champion` cannot recall now (its pending move leaves no step for the recall), else null. */
+  recallBlocked(champion: string): string | null;
   /** Rounds an own ward stays active, seen from the view's round (1 = its last active round). */
   wardRoundsLeft(ward: Ward): number;
   /** Stays on the pit to take its objective, and closes the champion's objective prompt. */
   doObjective(champion: string): void;
   /** Closes the champion's objective prompt and selects it for another order. */
   otherOrder(champion: string): void;
+  /**
+   * Moves to `to`. With a recall pending, keeps the recall (walking to `to` first) when `to` leaves a step for it;
+   * otherwise replaces it with the move and lists the champion in `recallReplaced`.
+   */
   setMove(champion: string, to: string): void;
   setWard(champion: string, spot: WardSpot | null): void;
   setUnward(champion: string, spot: 'from' | 'to' | null): void;
-  /** Recalls; after a pending move that leaves a step (`recallStep`) the champion walks there first (recall `to`). */
+  /**
+   * Recalls; after a pending move that leaves a step (`recallStep`) the champion walks there first (recall `to`). A
+   * pending move leaving no step throws `recallBlocked`'s reason (the move is never dropped).
+   */
   setRecall(champion: string): void;
   /** Sets the champion's lane stance on its order (the pending one, else its default order). */
   setStance(champion: string, stance: Stance): void;
@@ -149,6 +160,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
   const panelAt = signal<{ x: number; y: number } | null>(null);
   const panelDragging = signal(false);
   const objectivePromptsClosed = signal<string[]>([]);
+  const recallReplaced = signal<string[]>([]);
 
   // The full state never leaves the store; components only see `view`.
   let state: GameState | null = null;
@@ -190,6 +202,24 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     return n !== undefined && n > 0 && n < budget(id);
   };
 
+  /** The step budget minus the recall's own step, in words: "d'1 pas", "de 2 pas". */
+  const stepsLeftForRecall = (id: string): string => {
+    const n = budget(id) - 1;
+    return n === 1 ? "d'1 pas" : `de ${n} pas`;
+  };
+
+  /** Why a recall cannot follow the pending order: a move that leaves no step. */
+  const recallBlocked = (id: string): string | null => {
+    const o = pending.value[id];
+    if (o?.kind !== 'move' || o.to === champion(id).position || recallStep(id, o.to)) return null;
+    return `Le recall demande un pas restant : déplacement ${stepsLeftForRecall(id)} au plus`;
+  };
+
+  const markReplaced = (id: string, replaced: boolean): void => {
+    const rest = recallReplaced.value.filter((x) => x !== id);
+    recallReplaced.value = replaced ? [...rest, id] : rest;
+  };
+
   const existingMove = (id: string): Extract<Order, { kind: 'move' }> | null => {
     const o = pending.value[id];
     return o?.kind === 'move' ? o : null;
@@ -203,16 +233,34 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     return def?.kind === 'move' ? { ...def } : { kind: 'move', champion: id, to: champion(id).position };
   };
 
-  /** A move order to `to`, keeping the champion's pending ward, unward, Herald launch and stance. */
+  /**
+   * A move order to `to`, keeping the champion's pending ward, unward, Herald launch and stance. A pending recall
+   * stays when `to` leaves a step for it (its own position: a recall in place), else the move replaces it.
+   */
   const setMove = (id: string, to: string): void => {
-    const prev = existingMove(id);
+    const pend = pending.value[id];
+    if (pend?.kind === 'recall') {
+      const here = to === champion(id).position;
+      if (here || recallStep(id, to)) {
+        const { to: _to, ...rest } = pend;
+        const order: Extract<Order, { kind: 'recall' }> = here ? rest : { ...rest, to };
+        // Without a step, the ward and the unward can only be on the start.
+        if (here && order.ward === 'to') order.ward = 'from';
+        if (here && order.unward === 'to') order.unward = 'from';
+        place(order);
+        markReplaced(id, false);
+        return;
+      }
+    }
+    const prev = existingMove(id) ?? (pend?.kind === 'recall' ? pend : null);
     const order: Order = { kind: 'move', champion: id, to };
     if (prev?.ward !== undefined) order.ward = prev.ward;
     if (prev?.unward !== undefined) order.unward = prev.unward;
-    if (prev?.launchHerald) order.launchHerald = true;
-    const stance = pending.value[id]?.stance;
+    if (prev?.kind === 'move' && prev.launchHerald) order.launchHerald = true;
+    const stance = pend?.stance;
     if (stance !== undefined) order.stance = stance;
     place(order);
+    markReplaced(id, pend?.kind === 'recall');
   };
 
   const resolve = (): void => {
@@ -264,7 +312,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
 
   return {
     data, screen, view, previousView, replaying, replayRun, selected, pending, contacts, choices, lastEvents, explanations, settings, recalled,
-    panelAt, panelDragging, objectivePromptsClosed,
+    panelAt, panelDragging, objectivePromptsClosed, recallReplaced,
 
     start(s) {
       settings.value = s;
@@ -282,6 +330,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       explanations.value = [];
       recalled.value = [];
       objectivePromptsClosed.value = [];
+      recallReplaced.value = [];
       previousView.value = null;
       stopReplay();
       panelDragging.value = false;
@@ -301,6 +350,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       explanations.value = [];
       recalled.value = [];
       objectivePromptsClosed.value = [];
+      recallReplaced.value = [];
       previousView.value = null;
       stopReplay();
       panelDragging.value = false;
@@ -335,7 +385,12 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     },
 
     doObjective(id) {
-      // Keeps a pending move onto the pit (the prompt is also offered for one); otherwise stays where it stands.
+      // Keeps a pending move onto the pit (the prompt is also offered for one); otherwise stays where it stands. A
+      // pending recall gives way (the prompt is not offered with one).
+      if (pending.value[id]?.kind === 'recall') {
+        const { [id]: _recall, ...rest } = pending.value;
+        pending.value = rest;
+      }
       setMove(id, existingMove(id)?.to ?? champion(id).position);
       objectivePromptsClosed.value = [...objectivePromptsClosed.value, id];
     },
@@ -377,6 +432,8 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     setRecall(id) {
       const prev = pending.value[id];
       if (prev?.kind === 'recall') return;
+      const blocked = recallBlocked(id);
+      if (blocked) throw new Error(blocked);
       const order: Extract<Order, { kind: 'recall' }> = { kind: 'recall', champion: id };
       if (prev?.kind === 'move') {
         const step = recallStep(id, prev.to);
@@ -386,6 +443,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       }
       if (prev?.stance !== undefined) order.stance = prev.stance;
       place(order);
+      markReplaced(id, false);
     },
 
     setStance(id, stance) {
@@ -403,6 +461,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     clearOrder(id) {
       const { [id]: _removed, ...rest } = pending.value;
       pending.value = rest;
+      markReplaced(id, false);
     },
 
     confirmRound() {
@@ -445,6 +504,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       contacts.value = [];
       choices.value = {};
       objectivePromptsClosed.value = [];
+      recallReplaced.value = [];
       previousView.value = null;
       stopReplay();
       panelDragging.value = false;
@@ -488,6 +548,10 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     recallStep(id, to) {
       champion(id);
       return recallStep(id, to);
+    },
+
+    recallBlocked(id) {
+      return recallBlocked(id);
     },
 
     spawnPointsFor(id) {

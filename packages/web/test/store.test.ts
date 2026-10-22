@@ -108,11 +108,43 @@ describe('store', () => {
     const two = reach.find(([, n]) => n === 2)![0];
     expect([store.recallStep(j.id, one), store.recallStep(j.id, two)]).toEqual([true, false]);
     store.setMove(j.id, one);
+    expect(store.recallBlocked(j.id)).toBeNull();
     store.setRecall(j.id);
     expect(store.pending.value[j.id]).toEqual({ kind: 'recall', champion: j.id, to: one });
+    store.clearOrder(j.id);
     store.setMove(j.id, two);
+    // A 2-step move leaves no step: the recall is refused with its reason, and the move is kept (never dropped).
+    const reason = "Le recall demande un pas restant : déplacement d'1 pas au plus";
+    expect(store.recallBlocked(j.id)).toBe(reason);
+    expect(() => store.setRecall(j.id)).toThrow(reason);
+    expect(store.pending.value[j.id]).toEqual({ kind: 'move', champion: j.id, to: two });
+  });
+
+  test('a destination chosen with a recall pending keeps the recall when it leaves a step, otherwise replaces it', () => {
+    const store = started();
+    const j = blue(store, 'jungle');
+    store.select(j.id);
+    const reach = Object.entries(store.reachableForSelected());
+    const one = reach.find(([, n]) => n === 1)![0];
+    const two = reach.find(([, n]) => n === 2)![0];
     store.setRecall(j.id);
     expect(store.pending.value[j.id]).toEqual({ kind: 'recall', champion: j.id });
+    store.setMove(j.id, one);
+    expect(store.pending.value[j.id]).toEqual({ kind: 'recall', champion: j.id, to: one });
+    expect(store.recallReplaced.value).toEqual([]);
+    // Back on its own position: a recall in place again.
+    store.setMove(j.id, j.position);
+    expect(store.pending.value[j.id]).toEqual({ kind: 'recall', champion: j.id });
+    store.setMove(j.id, two);
+    expect(store.pending.value[j.id]).toEqual({ kind: 'move', champion: j.id, to: two });
+    expect(store.recallReplaced.value).toEqual([j.id]);
+    store.setMove(j.id, one);
+    expect(store.recallReplaced.value).toEqual([]);
+    store.setRecall(j.id);
+    expect(store.pending.value[j.id]).toEqual({ kind: 'recall', champion: j.id, to: one });
+    store.confirmRound();
+    store.confirmContacts();
+    expect(store.lastEvents.value).toContainEqual(expect.objectContaining({ type: 'recall', champion: j.id, position: one }));
   });
 
   test('fourth ward throws /wards/', () => {

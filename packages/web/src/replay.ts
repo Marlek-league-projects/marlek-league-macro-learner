@@ -7,7 +7,7 @@ export type ReplayStep =
   | { kind: 'move'; champion: string; from: string; to: string }
   | { kind: 'fight' | 'objective' | 'camp' | 'tower'; position: string; label: string }
   | { kind: 'death'; position: string; label: string; champion: string }
-  /** The recall icon shows on the token where its move ended, then the token fades out. */
+  /** The recall icon shows where the champion recalled (on its token when shown), then the token fades out. */
   | { kind: 'recall'; champion: string; position: string }
   /** An own ward saw `champion` pass: its eye pulses and a ghost of the enemy flashes there. */
   | { kind: 'spotted'; champion: string; position: string; to: string | null };
@@ -51,7 +51,8 @@ const enemySeen = (v: PlayerView, id: string): boolean => v.enemies.some((e) => 
 /**
  * The replay of one round, in play order: first moves, fights, retreats (flights and drawn fights going
  * back) with deaths and recalls, then objective, camp and tower labels. Ward spottings flash during the moves.
- * Enemies move only while seen before or after; a recalled token fades where its move ended.
+ * Enemies move only while seen before or after; a recalled token fades where it recalled. A recall in the events
+ * always shows, even for an enemy never visible (the side saw the position, a ward's vision included).
  */
 export function buildReplay(before: PlayerView, after: PlayerView, events: GameEvent[]): ReplayStep[] {
   const shown = (id: string): boolean => isAlly(before, id) || enemySeen(before, id) || enemySeen(after, id);
@@ -85,14 +86,11 @@ export function buildReplay(before: PlayerView, after: PlayerView, events: GameE
       case 'objectiveTaken':
         ranked.push({ rank: 3, step: { kind: 'objective', position: e.position, label: OBJECTIVE_LABEL[e.objective] } });
         break;
-      case 'recall': {
-        const where = at.get(e.champion);
-        if (shown(e.champion) && where) {
-          recalled.add(e.champion);
-          ranked.push({ rank: 2, step: { kind: 'recall', champion: e.champion, position: where } });
-        }
+      case 'recall':
+        // Every recall reaching the side shows (an enemy recall the side saw, a ward's vision included).
+        recalled.add(e.champion);
+        ranked.push({ rank: 2, step: { kind: 'recall', champion: e.champion, position: e.position } });
         break;
-      }
       case 'wardSpotted':
         ranked.push({ rank: 0, step: { kind: 'spotted', champion: e.champion, position: e.position, to: e.to } });
         break;

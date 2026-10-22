@@ -348,12 +348,34 @@ function objectives(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: numb
   }
 }
 
+/** On or next to a pit whose objective is up or being taken by its side: it is taking it. */
+function takingObjective(ctx: Ctx, c: ChampionState): boolean {
+  return PITS.some(
+    (p) => dist(ctx.data, c.position, p) <= 1 && (ctx.view.pits[p].capture?.side === ctx.side || pitTiming(ctx.view, ctx.data, p).live),
+  );
+}
+
 /**
  * Recall with `recallGold` unspent, or as a laner under `recallHp`, on a shoved or even wave (no objective coming
- * for the jungler); `badRecall` inverts it. A wounded laner's recall is committed.
+ * for the jungler); `badRecall` inverts it. A wounded laner's recall is committed. Under `dangerHp` any champion
+ * recalls whatever its wave (committed, priority `dangerRecall`), unless it is taking a pit objective next to it;
+ * `badRecall` stays in.
  */
 function recall(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, o: Order, extra?: Extra) => void): void {
-  const { recallGold, recallHp } = ctx.data.aiTuning;
+  const { recallGold, recallHp, dangerHp, priorities } = ctx.data.aiTuning;
+  const order: Order = { kind: 'recall', champion: c.id };
+  // A laner off its tower steps back under it first, unless a known enemy stands there.
+  if (c.role !== 'jungle') {
+    const lane = HOME_LANE[c.role];
+    const own = front(ctx, ctx.side, lane);
+    const guarded = ctx.view.enemies.some((e) => known(ctx, e) && e.position === own);
+    const oneStep = own !== null && laneOf(ctx.data, c.position) === lane && dist(ctx.data, c.position, own) === 1;
+    if (oneStep && !guarded) order.to = own;
+  }
+  if (c.hp < dangerHp && !m.has('badRecall') && !takingObjective(ctx, c)) {
+    add(priorities.dangerRecall, order, { committed: true });
+    return;
+  }
   const wounded = c.role !== 'jungle' && c.hp < recallHp;
   if (c.gold < recallGold && !wounded) return;
   const good =
@@ -364,16 +386,7 @@ function recall(ctx: Ctx, c: ChampionState, m: Set<MistakeId>, add: (s: number, 
         })
       : ourWave(ctx.view, HOME_LANE[c.role]) >= 0;
   if (good === m.has('badRecall')) return;
-  const order: Order = { kind: 'recall', champion: c.id };
-  // A laner off its tower steps back under it first, unless a known enemy stands there.
-  if (c.role !== 'jungle') {
-    const lane = HOME_LANE[c.role];
-    const own = front(ctx, ctx.side, lane);
-    const guarded = ctx.view.enemies.some((e) => known(ctx, e) && e.position === own);
-    const oneStep = own !== null && laneOf(ctx.data, c.position) === lane && dist(ctx.data, c.position, own) === 1;
-    if (oneStep && !guarded) order.to = own;
-  }
-  add(ctx.data.aiTuning.priorities.recall, order, wounded ? { committed: true } : undefined);
+  add(priorities.recall, order, wounded ? { committed: true } : undefined);
 }
 
 /**

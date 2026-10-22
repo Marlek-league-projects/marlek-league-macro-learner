@@ -164,8 +164,8 @@ export interface PendingMove {
 /**
  * The objective prompt in the order phase: each own alive champion standing on a pit, or whose pending move ends on
  * one with a step left, when that pit's objective is up, being taken or spawning by the round's end (`end`), minus the
- * ones already answered (`closed`). A champion whose pending move leaves the pit is not offered it. Never for a
- * champion on a Scuttle.
+ * ones already answered (`closed`). A champion whose pending move leaves the pit, or with a pending recall
+ * (`recalling`: "Faire" would replace it), is not offered it. Never for a champion on a Scuttle.
  */
 export function objectivePromptEntries(
   view: PlayerView,
@@ -173,10 +173,11 @@ export function objectivePromptEntries(
   window: { start: number; end: number },
   closed: readonly string[],
   moves: Readonly<Record<string, PendingMove>> = {},
+  recalling: readonly string[] = [],
 ): ObjectivePromptEntry[] {
   const out: ObjectivePromptEntry[] = [];
   for (const c of view.allies) {
-    if (c.status !== 'alive' || closed.includes(c.id)) continue;
+    if (c.status !== 'alive' || closed.includes(c.id) || recalling.includes(c.id)) continue;
     const move = moves[c.id];
     if (move && !move.acts) continue;
     const at = move ? move.to : c.position;

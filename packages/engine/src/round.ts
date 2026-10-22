@@ -38,7 +38,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     const at = o.unward === 'from' ? c.position : o.to!;
     const enemy = other(c.side);
     for (const w of s.wards.filter((x) => x.side === enemy && x.position === at)) {
-      events.push({ type: 'wardCleared', side: enemy, position: at });
+      events.push({ type: 'wardCleared', side: enemy, position: at, champion: c.id });
     }
     s.wards = s.wards.filter((x) => !(x.side === enemy && x.position === at));
   }

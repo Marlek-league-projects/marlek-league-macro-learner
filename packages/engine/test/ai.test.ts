@@ -751,6 +751,60 @@ describe('AI recall', () => {
     validateOrders(s, d, 'blue', orders);
     expect(orderOf(orders, top.id).kind).toBe('recall');
   });
+
+  describe('under dangerHp', () => {
+    /** Round 10, no objective up: the blue jungler on a camp and the blue top under its tower, wave pushed in. */
+    const danger = (): GameState => {
+      const s = newGame(d, 7);
+      s.round = 10;
+      s.pits['dragon-pit'].nextSpawn = 600;
+      s.waves.top = -1;
+      place(s, 'blue', 'jungle', 'krugs-blue');
+      place(s, 'blue', 'top', 'top-t1-blue');
+      return s;
+    };
+
+    test('any champion recalls, the jungler too, whatever its wave', () => {
+      const s = danger();
+      const jg = get(s, 'blue', 'jungle');
+      const top = get(s, 'blue', 'top');
+      jg.hp = d.aiTuning.dangerHp - 1;
+      top.hp = d.aiTuning.dangerHp - 1;
+      jg.gold = top.gold = 0;
+      for (const rank of ['iron', 'challenger'] as const) {
+        const orders = aiOrders(viewFor(s, d, 'blue'), d, profile(rank), stubRng(() => 0.99));
+        validateOrders(s, d, 'blue', orders);
+        expect(orderOf(orders, jg.id).kind).toBe('recall');
+        expect(orderOf(orders, top.id).kind).toBe('recall');
+      }
+      jg.hp = d.aiTuning.dangerHp;
+      expect(orderOf(aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99)), jg.id).kind).not.toBe('recall');
+    });
+
+    test('not while on or next to a pit objective it is taking', () => {
+      const s = danger();
+      s.round = 12;
+      s.pits['dragon-pit'].objective = 'dragon';
+      s.pits['dragon-pit'].nextSpawn = null;
+      s.pits['dragon-pit'].capture = { side: 'blue', startedRound: 11 };
+      place(s, 'blue', 'jungle', 'dragon-pit');
+      const jg = get(s, 'blue', 'jungle');
+      jg.hp = d.aiTuning.dangerHp - 1;
+      jg.gold = 0;
+      const orders = aiOrders(viewFor(s, d, 'blue'), d, profile('challenger'), stubRng(() => 0.99));
+      expect(orderOf(orders, jg.id).kind).not.toBe('recall');
+    });
+
+    test('a badRecall mistake stays in', () => {
+      const s = danger();
+      const jg = get(s, 'blue', 'jungle');
+      jg.hp = d.aiTuning.dangerHp - 1;
+      jg.gold = 0;
+      const bad = MISTAKE_IDS.indexOf('badRecall');
+      const onlyBadRecall = stubRng((n) => (n % MISTAKE_IDS.length === bad ? 0 : 0.99));
+      expect(orderOf(aiOrders(viewFor(s, d, 'blue'), d, profile('iron'), onlyBadRecall), jg.id).kind).not.toBe('recall');
+    });
+  });
 });
 
 describe('AI gank choice and lane exposure', () => {

@@ -60,6 +60,13 @@ describe('objective offered from its spawn round', () => {
     expect(objectivePromptEntries(v, data, w, [], {})).toEqual([]);
   });
 
+  test('a champion with a pending recall is not offered ("Faire" would replace the recall)', () => {
+    const { v, store, id } = spawnRoundView(11, 'dragon-pit');
+    const w = store.roundWindow();
+    expect(objectivePromptEntries(v, data, w, [])).toHaveLength(1);
+    expect(objectivePromptEntries(v, data, w, [], {}, [id])).toEqual([]);
+  });
+
   test('a champion on the pit whose pending move leaves it is not offered', () => {
     const { v, store, id } = spawnRoundView(11, 'dragon-pit');
     expect(objectivePromptEntries(v, data, store.roundWindow(), [], { [id]: { to: 'river-bot', acts: true } })).toEqual([]);

@@ -52,7 +52,7 @@ export function completeRecall(state: GameState, data: GameData, c: ChampionStat
   c.hp = data.rules.health.max;
   c.status = 'respawning';
   c.respawnRound = state.round + 1;
-  events.push({ type: 'recall', champion: c.id, itemsBought });
+  events.push({ type: 'recall', champion: c.id, position: c.position, itemsBought });
 }
 
 /** At round start: dead champions whose timer is up become respawning, at full health. */

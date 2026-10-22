@@ -1,6 +1,7 @@
 {
   "recallGold": 2000,
   "recallHp": 40,
+  "dangerHp": 25,
   "knownRounds": 1,
   "lookaheadSets": 3,
   "captureShare": 0.5,
@@ -15,6 +16,7 @@
   "priorities": {
     "pointless": 100,
     "herald": 90,
+    "dangerRecall": 80,
     "objective": 70,
     "recall": 60,
     "convert": 55,

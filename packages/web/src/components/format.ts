@@ -173,7 +173,7 @@ export function eventText(e: GameEvent, data: GameData): string {
     case 'death':
       return `${name(e.champion)} meurt à ${at(e.position)} (retour round ${e.respawnRound})`;
     case 'recall':
-      return `${name(e.champion)} rentre à la base et dépense ${num(e.itemsBought)} or`;
+      return `${name(e.champion)} rentre à la base depuis ${at(e.position)} et dépense ${num(e.itemsBought)} or`;
     case 'wave':
       return `Vague ${LANE_LABEL[e.lane]} : ${WAVE_LABEL[e.from]} → ${WAVE_LABEL[e.to]}`;
     case 'towerDamage':
@@ -189,7 +189,7 @@ export function eventText(e: GameEvent, data: GameData): string {
     case 'wardPlaced':
       return `Ward ${SIDE_LABEL[e.side].toLowerCase()} posée à ${at(e.position)}`;
     case 'wardCleared':
-      return `Ward ${SIDE_LABEL[e.side].toLowerCase()} détruite à ${at(e.position)}`;
+      return `Ward ${SIDE_LABEL[e.side].toLowerCase()} détruite à ${at(e.position)} par ${name(e.champion)}`;
     case 'wardSpotted':
       return `Ward à ${at(e.position)} : ${name(e.champion)} repéré${e.to ? ` → ${at(e.to)}` : ''}`;
     case 'heraldLaunched':

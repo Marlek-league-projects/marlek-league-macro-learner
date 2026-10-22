@@ -353,7 +353,7 @@ describe('store stance and move + recall', () => {
     expect(store.pending.value[mid.id]).toMatchObject({ kind: 'recall', to: step, stance: 'trade' });
   });
 
-  test('recall after a 1-step move walks there first; after a 2-step move it recalls in place', () => {
+  test('recall after a 1-step move walks there first; a 2-step move replaces it, and then the recall is refused', () => {
     const store = started();
     const jg = store.view.value!.allies.find((c) => c.role === 'jungle')!;
     store.select(jg.id);
@@ -364,8 +364,9 @@ describe('store stance and move + recall', () => {
     store.setRecall(jg.id);
     expect(store.pending.value[jg.id]).toEqual({ kind: 'recall', champion: jg.id, to: one });
     store.setMove(jg.id, two);
-    store.setRecall(jg.id);
-    expect(store.pending.value[jg.id]).toEqual({ kind: 'recall', champion: jg.id });
+    expect(store.pending.value[jg.id]).toEqual({ kind: 'move', champion: jg.id, to: two });
+    expect(() => store.setRecall(jg.id)).toThrow(/pas restant/);
+    expect(store.pending.value[jg.id]).toEqual({ kind: 'move', champion: jg.id, to: two });
   });
 });
 

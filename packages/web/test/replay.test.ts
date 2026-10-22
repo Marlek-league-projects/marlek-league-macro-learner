@@ -80,7 +80,7 @@ describe('buildReplay', () => {
     const fiora = after.allies.find((c) => c.id === 'Fiora')!;
     fiora.status = 'respawning';
     fiora.position = 'base-blue';
-    const steps = buildReplay(before, after, [{ type: 'recall', champion: 'Fiora', itemsBought: 1200 }]);
+    const steps = buildReplay(before, after, [{ type: 'recall', champion: 'Fiora', position: 'top-t1-blue', itemsBought: 1200 }]);
     expect(steps).toEqual([{ kind: 'recall', champion: 'Fiora', position: 'top-t1-blue' }]);
   });
 
@@ -92,7 +92,7 @@ describe('buildReplay', () => {
     fiora.position = 'base-blue';
     const steps = buildReplay(before, after, [
       { type: 'moved', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane', acted: true },
-      { type: 'recall', champion: 'Fiora', itemsBought: 1200 },
+      { type: 'recall', champion: 'Fiora', position: 'top-lane', itemsBought: 1200 },
     ]);
     expect(steps).toEqual([
       { kind: 'move', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane' },
@@ -105,8 +105,18 @@ describe('buildReplay', () => {
     const after = structuredClone(before);
     const kindred = after.enemies.find((e) => e.id === 'Kindred')!;
     kindred.position = 'gromp-red';
-    const steps = buildReplay(before, after, [{ type: 'recall', champion: 'Kindred', itemsBought: 0 }]);
+    const steps = buildReplay(before, after, [{ type: 'recall', champion: 'Kindred', position: 'bluebuff-red', itemsBought: 0 }]);
     expect(steps).toEqual([{ kind: 'recall', champion: 'Kindred', position: 'bluebuff-red' }]);
+  });
+
+  test('an enemy recall reaching the side shows even when the enemy was never visible (seen by a ward)', () => {
+    const before = opening();
+    const after = structuredClone(before);
+    expect(before.enemies.find((e) => e.id === 'Garen')!.visible).toBe(false);
+    const steps = buildReplay(before, after, [{ type: 'recall', champion: 'Garen', position: 'top-t2-red', itemsBought: 300 }]);
+    expect(steps).toEqual([{ kind: 'recall', champion: 'Garen', position: 'top-t2-red' }]);
+    // No token appears for the hidden enemy: the icon shows on the position.
+    expect(tokensAt(before, steps, 0.7).some((t) => t.champion === 'Garen')).toBe(false);
   });
 
   test('a ward spotting is a spotted step at the ward, played during the moves', () => {
@@ -203,7 +213,7 @@ describe('recall timeline', () => {
     fiora.position = 'base-blue';
     const steps = buildReplay(before, after, [
       { type: 'moved', champion: 'Fiora', from: 'top-t1-blue', to: 'top-lane', acted: true },
-      { type: 'recall', champion: 'Fiora', itemsBought: 1200 },
+      { type: 'recall', champion: 'Fiora', position: 'top-lane', itemsBought: 1200 },
     ]);
     const at = (t: number) => tokensAt(before, steps, t).find((x) => x.champion === 'Fiora')!;
     const [a, b] = stepWindow(steps, 1);

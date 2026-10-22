@@ -115,7 +115,7 @@ export function validateAiProfiles(profiles: AiProfile[]): void {
 }
 
 const AI_PRIORITIES: AiPriority[] = [
-  'pointless', 'herald', 'objective', 'recall', 'convert', 'joinGank', 'lane',
+  'pointless', 'herald', 'dangerRecall', 'objective', 'recall', 'convert', 'joinGank', 'lane',
   'gank', 'laneAlt', 'scuttle', 'buff', 'invade', 'camp', 'wait',
 ];
 
@@ -127,6 +127,7 @@ export function validateAiTuning(t: AiTuning): void {
   };
   num('recallGold', t.recallGold, 0);
   num('recallHp', t.recallHp, 0);
+  num('dangerHp', t.dangerHp, 0);
   num('knownRounds', t.knownRounds, 0, Infinity, true);
   num('lookaheadSets', t.lookaheadSets, 1, Infinity, true);
   num('captureShare', t.captureShare, 0, 1);

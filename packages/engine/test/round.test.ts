@@ -122,7 +122,7 @@ describe('resolveRound', () => {
     bm.gold = 500;
     const o = ordersWith(s, [{ kind: 'recall', champion: bm.id }]);
     const r1 = resolveRound(s, d, o, {});
-    expect(r1.events).toContainEqual({ type: 'recall', champion: bm.id, itemsBought: 500 });
+    expect(r1.events).toContainEqual({ type: 'recall', champion: bm.id, position: bm.position, itemsBought: 500 });
     expect(r1.state.champions.find((c) => c.id === bm.id)!.status).toBe('respawning');
     const o2: Orders = { blue: defaultOrders(r1.state, d, 'blue'), red: defaultOrders(r1.state, d, 'red') };
     const spawn = o2.blue.find((x) => x.champion === bm.id)!;
@@ -140,7 +140,7 @@ describe('resolveRound', () => {
     s.wards.push({ side: 'red', position: 'mid-t1-blue', placedRound: 0 });
     const o = ordersWith(s, [{ kind: 'recall', champion: bj.id, to: 'mid-t1-blue', ward: 'to', unward: 'to' }]);
     const r = resolveRound(s, d, o, {});
-    expect(r.events).toContainEqual({ type: 'wardCleared', side: 'red', position: 'mid-t1-blue' });
+    expect(r.events).toContainEqual({ type: 'wardCleared', side: 'red', position: 'mid-t1-blue', champion: bj.id });
     expect(r.events).toContainEqual({ type: 'wardPlaced', side: 'blue', position: 'mid-t1-blue' });
     expect(r.state.wards.filter((w) => w.position === 'mid-t1-blue').map((w) => w.side)).toEqual(['blue']);
   });
@@ -459,8 +459,10 @@ describe('resolveRound', () => {
     const control = run(false);
     expect(control.state.lastSeen.red[bjId(control.state)]).toEqual({ position: 'raptors-blue', round: 4 });
     const cleared = run(true);
-    expect(cleared.events).toContainEqual({ type: 'wardCleared', side: 'red', position: 'raptors-blue' });
-    expect(cleared.state.lastSeen.red[bjId(cleared.state)]?.round ?? null).not.toBe(4);
+    expect(cleared.events).toContainEqual({ type: 'wardCleared', side: 'red', position: 'raptors-blue', champion: bjId(cleared.state) });
+    // The ward gives no vision (no spotting), but the clearer is revealed at the ward for that round.
+    expect(cleared.events.some((e) => e.type === 'wardSpotted')).toBe(false);
+    expect(cleared.state.lastSeen.red[bjId(cleared.state)]).toEqual({ position: 'raptors-blue', round: 4, spotted: true });
   });
 });
 
@@ -533,6 +535,26 @@ describe('fleeing, retreating or an interrupted recall forfeits the action', () 
     const kills = events.filter((e) => e.type === 'death').length;
     const passive = (d.rules.economy.passiveGoldPerMin * roundWindow(d.rules, 10).seconds) / 60;
     expect(get(state, 'blue', 'top').gold - before).toBeCloseTo(passive + kills * d.rules.economy.killGold, 6);
+  });
+
+  test('a recaller whose step lands in a contact and flees recalls from where it fled to', () => {
+    const s = setup(10, [
+      ['blue', 'jungle', 'gromp-blue'],
+      ['red', 'jungle', 'bluebuff-blue'],
+    ]);
+    const bj = get(s, 'blue', 'jungle').id;
+    const rj = get(s, 'red', 'jungle').id;
+    const o = ordersWith(s, [
+      { kind: 'recall', champion: bj, to: 'bluebuff-blue' },
+      { kind: 'move', champion: rj, to: 'bluebuff-blue' },
+    ]);
+    const contact = detectContacts(s, d, o).find((c) => c.blue.includes(bj))!;
+    expect(contact.options.blue).toContain('flee');
+    const { state, events } = resolveRound(s, d, o, { [contact.id]: { blue: 'flee', red: 'fight' } });
+    const fled = retreatStep(d, 'blue', 'bluebuff-blue');
+    expect(events).toContainEqual({ type: 'fled', champion: bj, to: fled });
+    expect(events).toContainEqual(expect.objectContaining({ type: 'recall', champion: bj, position: fled }));
+    expect([get(state, 'blue', 'jungle').status, get(state, 'blue', 'jungle').position]).toEqual(['respawning', fled]);
   });
 });
 
