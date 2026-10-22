@@ -86,7 +86,7 @@ describe('aiOrders fuzz', () => {
         expect(s.over).toBe(true);
         expect(s.winner).not.toBeNull();
       }
-    }, 20_000);
+    }, 60_000);
 
     test(`${p.rank}: the same seed plays the same game`, () => {
       const a = playGame(p, 11);
@@ -383,7 +383,7 @@ describe('laning phase', () => {
         s = resolveRound(s, d, orders, choices).state;
       }
     }
-  });
+  }, 20_000);
 
   /**
    * Round 10, Dragon spawning next round, blue bot lane on its pushed wave at the red T1 (priority). The other

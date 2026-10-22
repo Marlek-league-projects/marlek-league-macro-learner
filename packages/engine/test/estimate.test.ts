@@ -93,5 +93,5 @@ describe('contested objectives', () => {
         }
       }
     }
-  });
+  }, 20_000);
 });

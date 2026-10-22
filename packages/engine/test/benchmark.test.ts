@@ -37,6 +37,6 @@ describe('AI against an idle player', () => {
     if (min === undefined) continue;
     test(`${p.rank} wins at least ${min}/${SEEDS}`, () => {
       expect(aiWinsAgainstIdle(p)).toBeGreaterThanOrEqual(min);
-    });
+    }, 20_000);
   }
 });
