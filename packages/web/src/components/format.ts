@@ -30,10 +30,16 @@ export function enemySeenText(data: GameData, e: EnemyInfo): string {
 
 /**
  * The round on screen for a view at `viewRound`: in review and once the game is over the view has
- * already moved on, so it is the round just played.
+ * already moved on, so it is the round just played. The placement screen is round 0.
  */
 export function shownRound(screen: Screen, viewRound: number): number {
+  if (screen === 'placement') return 0;
   return screen === 'review' || screen === 'over' ? viewRound - 1 : viewRound;
+}
+
+/** Round 0 (placement) covers the start of the game up to round 1 (0:55). */
+export function placementWindow(rules: GameData['rules']): { start: number; end: number } {
+  return { start: 0, end: rules.phases[0]?.start ?? 0 };
 }
 
 /** `m:ss` from a time in seconds. */

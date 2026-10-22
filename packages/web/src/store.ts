@@ -20,14 +20,16 @@ import type {
   WardSpot,
 } from '@lml/engine/contracts';
 
-export type Screen = 'start' | 'orders' | 'contacts' | 'review' | 'over';
+/**
+ * `placement`: round 0 (0:00 → 0:55), before round 1's orders. The game state stays at round 1 meanwhile (nothing
+ * resolves in round 0); the store applies each placement to it with engine.placeChampions.
+ */
+export type Screen = 'start' | 'placement' | 'orders' | 'contacts' | 'review' | 'over';
 
 export interface Settings {
   rank: Rank;
   teaching: boolean;
   seed: number;
-  /** The blue jungler's start camp (a `-blue` camp id); undefined: Blue or Red Buff, picked by the seed. */
-  junglerStart?: string;
 }
 
 /** A side's final score, split as engine.teamScore adds it up. */
@@ -70,10 +72,18 @@ export interface Store {
   objectivePromptsClosed: Signal<string[]>;
   /** Champions whose pending recall the last chosen destination replaced (it left no step for the recall). */
   recallReplaced: Signal<string[]>;
+  /** A new game on the round 0 placement screen (the AI has placed its champions). */
   start(s: Settings): void;
+  /** Round 0: where own champions may start (own towers, camps and base; the lane middles). */
+  placementTargets(): string[];
+  /** Round 0: puts an own champion on an allowed start position (several may share one); throws otherwise. */
+  placeChampion(champion: string, to: string): void;
+  /** "Valider le placement": ends round 0, on to round 1's orders. */
+  confirmPlacement(): void;
   /** Back to the start screen, dropping the current game. */
   reset(): void;
   select(id: string | null): void;
+  /** Where the selected own champion may go this round, with the steps; in round 0 every start position, at 0. */
   reachableForSelected(): Record<string, number>;
   /** Steps `champion` may take this round (the base's extra steps included); arriving on the last one leaves no action. */
   stepBudget(champion: string): number;
@@ -151,10 +161,6 @@ export const playerDefault = (contact: Contact): Choice =>
   contact.options.blue.includes('objective') ? 'objective' : contact.defaults.blue;
 
 const PLAYER: Side = 'blue';
-
-/** Camps the player's jungler may start on: the own (blue) jungle camps, in map order. */
-export const junglerStartCamps = (data: GameData): string[] =>
-  Object.values(data.graph.positions).filter((p) => p.kind === 'camp' && p.side === PLAYER).map((p) => p.id);
 const ENEMY: Side = 'red';
 
 export function createStore(data: GameData, engine: GameEngine): Store {
@@ -336,7 +342,9 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       settings.value = s;
       profile = data.aiProfiles.find((p) => p.rank === s.rank) ?? null;
       if (!profile) throw new Error(`no AI profile for rank ${s.rank}`);
-      state = engine.newGame(data, s.seed, undefined, s.junglerStart !== undefined ? { blueJunglerStart: s.junglerStart } : undefined);
+      state = engine.newGame(data, s.seed);
+      // Round 0: the AI places first, from its own view (it never sees the player's placement).
+      state = engine.placeChampions(state, data, ENEMY, engine.aiPlacements(engine.viewFor(state, data, ENEMY), data));
       aiRng = engine.createRng(s.seed + 1);
       roundOrders = null;
       redChoices = {};
@@ -353,6 +361,24 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       stopReplay();
       panelDragging.value = false;
       publish();
+      screen.value = 'placement';
+    },
+
+    placementTargets() {
+      return engine.placementPositions(data, PLAYER);
+    },
+
+    placeChampion(id, to) {
+      if (screen.value !== 'placement') throw new Error('not in the placement round');
+      champion(id);
+      state = engine.placeChampions(current(), data, PLAYER, { [id]: to });
+      publish();
+    },
+
+    confirmPlacement() {
+      if (screen.value !== 'placement') throw new Error('not in the placement round');
+      selected.value = null;
+      panelDragging.value = false;
       screen.value = 'orders';
     },
 
@@ -384,6 +410,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       const id = selected.value;
       if (!id || !state) return {};
       const c = state.champions.find((x) => x.id === id && x.side === PLAYER);
+      if (c && screen.value === 'placement') return Object.fromEntries(engine.placementPositions(data, PLAYER).map((p) => [p, 0]));
       return c && c.status !== 'dead' ? engine.reachable(state, data, id) : {};
     },
 

@@ -48,10 +48,10 @@ function AllyTeam({ store, view }: { store: Store; view: PlayerView }) {
   const ours = objectiveScore(view, data, view.side);
   const theirs = objectiveScore(view, data, enemySide);
   const wardsUsed = Object.values(store.pending.value).filter((o) => o.kind !== 'spawn' && o.ward !== undefined).length;
-  const canSelect = store.screen.value === 'orders';
+  const canSelect = store.screen.value === 'orders' || store.screen.value === 'placement';
   const recalled = store.recalled.value;
   const hud = hudValues(view, data, store.level, store.estimateEnemy);
-  const idle = canSelect ? store.championsWithoutOrder() : [];
+  const idle = store.screen.value === 'orders' ? store.championsWithoutOrder() : [];
   return (
     <div class="team ally">
       <div class="teamhead">

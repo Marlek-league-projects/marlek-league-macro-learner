@@ -63,6 +63,11 @@ h2 { font-size:18px; margin:0; }
 .sbar-round .phase { color:var(--gold); }
 .sbar-sub { font-size:10px; white-space:nowrap; }
 .round-actions { display:flex; flex-direction:column; gap:4px; }
+.quit-game { font-size:12px; padding:4px 8px; opacity:.8; }
+.quit-game:hover { opacity:1; }
+.quit-confirm { display:flex; align-items:center; gap:6px; font-size:12px; white-space:nowrap; }
+.quit-confirm .quit-yes { border-color:var(--red); }
+.placement-list li small { color:var(--mut); }
 /* Narrow screens: the middle on its own row, each team below it. */
 @media (max-width: 1100px) {
   .sbar { grid-template-columns:1fr 1fr; }

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
 import type { AiProfile, Rank } from '@lml/data/contracts';
-import { aiAnswers, aiOrders, createRng, defaultOrders, detectContacts, newGame, resolveRound, viewFor } from '@lml/engine';
+import { aiAnswers, aiOrders, aiPlacements, createRng, defaultOrders, detectContacts, newGame, placeChampions, resolveRound, viewFor } from '@lml/engine';
 import type { Orders } from '@lml/engine/contracts';
 
 /**
@@ -18,6 +18,8 @@ function aiWinsAgainstIdle(p: AiProfile): number {
   let wins = 0;
   for (let seed = 1; seed <= SEEDS; seed++) {
     let s = newGame(d, seed);
+    // Round 0: blue keeps the default placement, red places as the AI does.
+    s = placeChampions(s, d, 'red', aiPlacements(viewFor(s, d, 'red'), d));
     const rng = createRng(seed + 1);
     while (!s.over) {
       const view = viewFor(s, d, 'red');

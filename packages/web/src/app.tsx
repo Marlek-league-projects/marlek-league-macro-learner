@@ -1,10 +1,10 @@
 import { useEffect } from 'preact/hooks';
 import type { Store } from './store';
-import { bannerPrimary } from './components/banner-action';
+import { bannerPrimary, runBannerAction } from './components/banner-action';
 import { isConfirmKey } from './components/confirm-round';
 import { GameOver } from './components/GameOver';
 import { MapView } from './components/MapView';
-import { runBannerAction } from './components/RoundBanner';
+import { quitAsked } from './components/quit';
 import { RoundPanel } from './components/RoundPanel';
 import { ScoreBar } from './components/ScoreBar';
 import { StartScreen } from './components/StartScreen';
@@ -20,7 +20,8 @@ function Game({ store }: { store: Store }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const primary = bannerPrimary(store.screen.value);
-      if (!primary?.enter) return;
+      // While "Quitter la partie ?" is asked, Enter does nothing (the player answers Oui or Non).
+      if (!primary?.enter || quitAsked.value) return;
       const t = e.target instanceof HTMLElement ? e.target : null;
       const { key, ctrlKey, metaKey, altKey, shiftKey, repeat } = e;
       if (!isConfirmKey({ key, ctrlKey, metaKey, altKey, shiftKey, repeat, target: t })) return;

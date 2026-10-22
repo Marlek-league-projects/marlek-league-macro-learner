@@ -6,10 +6,6 @@ import type { GameState, Rng, Ward } from './state';
 import type { Explanation } from './teaching';
 import type { EnemyEstimate, EnemyInfo, PlayerView } from './view';
 
-export interface NewGameOptions {
-  blueJunglerStart?: string;
-}
-
 export type Draft = Record<Side, Record<Role, string>>;
 
 /** Time window covered by one round. */
@@ -28,8 +24,17 @@ export interface RoundResult {
 
 /** The engine surface the web app uses. */
 export interface GameEngine {
-  /** `options.blueJunglerStart`: one of the 6 blue camp ids where the blue jungler starts (cleared); default: the seeded buff. Invalid ids throw. */
-  newGame(data: GameData, seed: number, draft?: Draft, options?: NewGameOptions): GameState;
+  /** The game before round 0's placement: laners on their own T1, each jungler on a seeded buff, no camp cleared. */
+  newGame(data: GameData, seed: number, draft?: Draft): GameState;
+  /** Round 0: the positions a `side` champion may start on (own towers, camps, base; the lane middles), in map order. */
+  placementPositions(data: GameData, side: Side): string[];
+  /**
+   * Round 0 (before round 1 resolves): `side`'s champions to their start positions (champion id → position id; several
+   * may share one). Only positions change, nothing resolves; throws on another side's champion or a position not allowed.
+   */
+  placeChampions(state: GameState, data: GameData, side: Side, placements: Record<string, string>): GameState;
+  /** The AI's round 0 placement from its view: laners on their own T1, the jungler on its seeded buff. */
+  aiPlacements(view: PlayerView, data: GameData): Record<string, string>;
   defaultOrders(state: GameState, data: GameData, side: Side): Order[];
   /** True when the champion is an alive laner in its home lane, so its default order follows the wave. */
   followsWave(state: GameState, data: GameData, championId: string): boolean;

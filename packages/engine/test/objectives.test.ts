@@ -460,9 +460,7 @@ describe('camps', () => {
     const s = newGame(d, 7);
     s.round = 2;
     const jg = get(s, 'blue', 'jungle');
-    const start = jg.position;
     for (const camp of ['bluebuff-blue', 'gromp-blue', 'wolves-blue', 'raptors-blue', 'redbuff-blue', 'krugs-blue']) {
-      if (camp === start) continue;
       jg.position = camp;
       clear(s);
     }

@@ -8,11 +8,8 @@ const d = loadGameData();
 test('2026 timers: camps first spawn per camp type, objectives from the 2026 table', () => {
   expect(d.rules.camps.firstSpawnByCamp).toEqual({ bluebuff: 55, redbuff: 55, wolves: 55, raptors: 55, krugs: 67, gromp: 67 });
   const g = newGame(d, 3);
-  for (const [id, t] of Object.entries(g.camps)) {
-    const camp = id.split('-')[0] as CampType;
-    if (t === d.rules.camps.firstSpawnByCamp[camp]) continue;
-    expect(t).toBe(d.rules.camps.firstSpawnByCamp[camp] + d.rules.camps.buffRespawn); // the jungler's cleared start buff
-  }
+  // No camp is pre-cleared: the jungler clears its first camp in round 1.
+  for (const [id, t] of Object.entries(g.camps)) expect(t).toBe(d.rules.camps.firstSpawnByCamp[id.split('-')[0] as CampType]);
   expect(g.camps['krugs-blue']).toBe(67);
   expect(g.camps['gromp-red']).toBe(67);
   expect(g.camps['wolves-blue']).toBe(55);

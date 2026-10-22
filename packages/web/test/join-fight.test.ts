@@ -39,6 +39,7 @@ function rigged(build: (ids: Record<string, string>) => Contact[]) {
   };
   const store = createStore(data, spy);
   store.start({ rank: 'gold', teaching: false, seed: 1 });
+  store.confirmPlacement();
   const v = store.view.value!;
   const ally = (role: string) => v.allies.find((c) => c.role === role)!.id;
   const enemy = (role: string) => v.enemies.find((c) => c.role === role)!.id;

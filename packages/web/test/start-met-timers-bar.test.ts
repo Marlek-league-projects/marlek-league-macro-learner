@@ -6,40 +6,18 @@ import { enemySeenText, eventText, objectiveWithArticle } from '../src/component
 import { metHud, powerOf } from '../src/components/hud';
 import { pitTimer } from '../src/components/map-marks';
 import { goldShort, scoreBarSides } from '../src/components/score-bar';
-import { createStore, junglerStartCamps } from '../src/store';
+import { createStore } from '../src/store';
 
 const data = loadGameData();
 
-function started(junglerStart?: string, seed = 1) {
+function started(seed = 1) {
   const store = createStore(data, createEngine());
-  store.start({ rank: 'gold', teaching: false, seed, ...(junglerStart ? { junglerStart } : {}) });
+  store.start({ rank: 'gold', teaching: false, seed });
+  store.confirmPlacement();
   return store;
 }
 
 const view = (): PlayerView => structuredClone(started().view.value!);
-
-describe('jungler start choice', () => {
-  test('the six own camps are offered', () => {
-    const camps = junglerStartCamps(data);
-    expect(camps).toHaveLength(6);
-    expect(camps.every((id) => id.endsWith('-blue') && data.graph.positions[id]!.kind === 'camp')).toBe(true);
-    expect(camps).toContain('gromp-blue');
-    expect(camps).toContain('bluebuff-blue');
-  });
-
-  test('the chosen camp is where the blue jungler starts, and it is remembered in the settings', () => {
-    for (const camp of junglerStartCamps(data)) {
-      const store = started(camp);
-      expect(store.view.value!.allies.find((c) => c.role === 'jungle')!.position).toBe(camp);
-      expect(store.settings.value.junglerStart).toBe(camp);
-    }
-  });
-
-  test('no choice: the seed picks Blue or Red Buff, as before', () => {
-    const jungle = started().view.value!.allies.find((c) => c.role === 'jungle')!;
-    expect(['bluebuff-blue', 'redbuff-blue']).toContain(jungle.position);
-  });
-});
 
 describe('met enemy card', () => {
   const enemy = (over: Partial<EnemyInfo>): EnemyInfo => ({

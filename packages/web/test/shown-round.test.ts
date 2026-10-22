@@ -11,4 +11,8 @@ describe('shownRound', () => {
     expect(shownRound('review', 6)).toBe(5);
     expect(shownRound('over', 72)).toBe(71);
   });
+
+  test('is round 0 on the placement screen (the state waits at round 1)', () => {
+    expect(shownRound('placement', 1)).toBe(0);
+  });
 });

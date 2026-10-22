@@ -30,6 +30,7 @@ import {
   dec,
   errorText,
   kindLabel,
+  placementWindow,
   plural,
   recallIcon,
   roleIcon,
@@ -179,14 +180,16 @@ export function MapView({ store }: { store: Store }) {
   if (!view) return null;
   const { data } = store;
   const { positions } = data.graph;
-  const ordering = store.screen.value === 'orders';
+  // Round 0 places champions: a selected one may go to any allowed start position (no step budget).
+  const placing = store.screen.value === 'placement';
+  const ordering = store.screen.value === 'orders' || placing;
   const selectedId = ordering ? store.selected.value : null;
   const selected = view.allies.find((c) => c.id === selectedId) ?? null;
 
   // Positions the selected pawn can be ordered to, with the number of moves (a respawning one walks from its base).
   const reach: Record<string, number> | null = selected && selected.status !== 'dead' ? store.reachableForSelected() : null;
 
-  const roundWin = store.roundWindow();
+  const roundWin = placing ? { ...store.roundWindow(), ...placementWindow(data.rules) } : store.roundWindow();
   const now = roundWin.start;
   const pending = store.pending.value;
   const replayable = store.screen.value === 'review' || store.screen.value === 'over';
@@ -201,7 +204,7 @@ export function MapView({ store }: { store: Store }) {
     if (o.kind === 'move' && acts !== null) pendingMoves[id] = { to: o.to, acts };
   }
   const recalling = Object.entries(pending).flatMap(([id, o]) => (o.kind === 'recall' ? [id] : []));
-  const objectiveEntries = ordering
+  const objectiveEntries = ordering && !placing
     ? objectivePromptEntries(view, data, roundWin, store.objectivePromptsClosed.value, pendingMoves, recalling)
     : [];
   /** Act or arrival-only ring of a position for the selected token. */
@@ -210,7 +213,8 @@ export function MapView({ store }: { store: Store }) {
   const order = (to: string) => {
     if (!selected) return;
     try {
-      if (selected.status === 'respawning') store.setSpawn(selected.id, to);
+      if (placing) store.placeChampion(selected.id, to);
+      else if (selected.status === 'respawning') store.setSpawn(selected.id, to);
       else store.setMove(selected.id, to);
     } catch (err) {
       setTip({ text: errorText(err), x: tip?.x ?? 0, y: tip?.y ?? 0 });
@@ -222,7 +226,8 @@ export function MapView({ store }: { store: Store }) {
     if (p.kind === 'tower') parts.push(`${dec(Math.max(0, view.towers[p.id] ?? 0))} / ${data.rules.towers.hp} PV`);
     if (reach) {
       const d = reach[p.id];
-      if (d === undefined) parts.push('hors de portée ce round');
+      if (d === undefined) parts.push(placing ? 'départ interdit (côté adverse ou rivière)' : 'hors de portée ce round');
+      else if (placing) parts.push('position de départ');
       else if (selected?.status === 'respawning') parts.push('point de réapparition');
       else {
         parts.push(d === 0 ? 'rester ici' : plural(d, 'mouvement'));
@@ -374,7 +379,7 @@ export function MapView({ store }: { store: Store }) {
   const selectedPawn = pawns.find((pawn) => pawn.ally && pawn.id === selected?.id);
   const anchor = selectedPawn ? pawnPoint(selectedPawn) : null;
 
-  const idleIds = ordering ? store.championsWithoutOrder() : [];
+  const idleIds = ordering && !placing ? store.championsWithoutOrder() : [];
   const pawnNodes = [...pawns].sort((a, b) => Number(a.ally) - Number(b.ally)).map((pawn) => {
     const at = pawnPoint(pawn);
     if (!at) return null;
@@ -455,7 +460,7 @@ export function MapView({ store }: { store: Store }) {
         {!replaying && <g pointer-events="none">{recallsInPlace}</g>}
         <g pointer-events="none">{timers}</g>
       </svg>
-      {ordering && anchor && (
+      {ordering && !placing && anchor && (
         <ActionsPanel
           store={store}
           anchor={{ x: anchor.x / SIZE, y: anchor.y / SIZE }}

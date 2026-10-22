@@ -3,13 +3,13 @@ import { jsonGameDataSource } from '@lml/data';
 import { createEngine } from '@lml/engine';
 import { App } from './app';
 import { parseAutostart } from './autostart';
-import { createStore, junglerStartCamps } from './store';
+import { createStore } from './store';
 
 // Composition root: the only module that picks the data source and engine implementations.
 const store = createStore(jsonGameDataSource.load(), createEngine());
 
-// Shortcut (any build): ?autostart=1&rank=gold&seed=42 (&jungle=gromp-blue) skips the start screen.
-const autostart = parseAutostart(location.search, store.data.aiProfiles.map((p) => p.rank), undefined, junglerStartCamps(store.data));
+// Shortcut (any build): ?autostart=1&rank=gold&seed=42 skips the start screen (the game opens on round 0's placement).
+const autostart = parseAutostart(location.search, store.data.aiProfiles.map((p) => p.rank));
 if (autostart) store.start({ ...autostart, teaching: true });
 
 const root = document.getElementById('app');

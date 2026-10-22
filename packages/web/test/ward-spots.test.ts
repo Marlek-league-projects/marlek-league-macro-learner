@@ -18,6 +18,7 @@ describe('deepWardSpots', () => {
     for (const position of deepWardSpots(data, { role: 'jungle', side: 'blue' }, 1)) {
       const store = createStore(data, createEngine());
       store.start({ rank: 'gold', teaching: false, seed: 1 });
+      store.confirmPlacement();
       const j = store.view.value!.allies.find((c) => c.role === 'jungle')!;
       store.setWard(j.id, { position });
       expect(store.pending.value[j.id]).toMatchObject({ ward: { position } });

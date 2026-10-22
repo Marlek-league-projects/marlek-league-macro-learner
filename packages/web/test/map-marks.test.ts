@@ -19,6 +19,7 @@ const { positions } = data.graph;
 function view(): PlayerView {
   const store = createStore(data, createEngine());
   store.start({ rank: 'gold', teaching: false, seed: 1 });
+  store.confirmPlacement();
   return structuredClone(store.view.value!);
 }
 

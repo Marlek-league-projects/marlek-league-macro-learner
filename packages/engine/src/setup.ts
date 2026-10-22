@@ -1,6 +1,6 @@
 import type { GameData, Role, Side } from '@lml/data/contracts';
-import type { ChampionState, Draft, NewGameOptions, GameState, PitState, Rng } from './contracts';
-import { grant } from './lanes';
+import type { ChampionState, Draft, GameState, PitState, Rng } from './contracts';
+import { laneStart } from './placement';
 import { createRng } from './rng';
 
 const SIDES: Side[] = ['blue', 'red'];
@@ -22,26 +22,19 @@ export function randomDraft(data: GameData, rng: Rng): Draft {
   return draft;
 }
 
-function laneStart(side: Side, role: Role): string {
-  const lane = role === 'top' ? 'top' : role === 'mid' ? 'mid' : 'bot';
-  return `${lane}-t1-${side}`;
-}
-
-export function newGame(data: GameData, seed: number, draft?: Draft, options?: NewGameOptions): GameState {
+/**
+ * The game before round 0's placement: laners on their own T1, each jungler on a seeded buff (the default start, see
+ * placeChampions). No camp is cleared: every camp first spawns at its `firstSpawnByCamp` (round 1, from 0:55).
+ */
+export function newGame(data: GameData, seed: number, draft?: Draft): GameState {
   const { rules, graph } = data;
   const rng = createRng(seed);
-  const start = options?.blueJunglerStart;
-  if (start !== undefined) {
-    const p = data.graph.positions[start];
-    if (!p || p.kind !== 'camp' || !start.endsWith('-blue')) throw new Error(`Invalid jungler start camp: ${start}`);
-  }
   const picks = draft ?? randomDraft(data, rng);
 
   const champions: ChampionState[] = [];
   for (const side of SIDES) {
     for (const role of ROLES) {
-      const seeded = role === 'jungle' ? `${rng.pick(JUNGLE_START_CAMPS)}-${side}` : null;
-      const position = seeded === null ? laneStart(side, role) : side === 'blue' && start !== undefined ? start : seeded;
+      const position = role === 'jungle' ? `${rng.pick(JUNGLE_START_CAMPS)}-${side}` : laneStart(side, role);
       champions.push({
         id: picks[side][role], side, role, position, previous: position,
         status: 'alive', respawnRound: null, xp: 0, gold: 0, items: 0, bonusLead: 0, goldEarned: 0, hasHerald: false,
@@ -57,16 +50,10 @@ export function newGame(data: GameData, seed: number, draft?: Draft, options?: N
     else if (p.kind === 'camp') camps[p.id] = rules.camps.firstSpawnByCamp[p.camp!];
   }
 
-  // Each jungler has already cleared its start buff camp.
-  for (const j of champions.filter((c) => c.role === 'jungle')) {
-    const buff = JUNGLE_START_CAMPS.includes(graph.positions[j.position]!.camp!);
-    camps[j.position] = rules.camps.firstSpawnByCamp[graph.positions[j.position]!.camp!] + (buff ? rules.camps.buffRespawn : rules.camps.smallRespawn);
-    grant(j, buff ? rules.camps.buffGold : rules.camps.smallGold, buff ? rules.camps.buffXp : rules.camps.smallXp);
-  }
-
   const scuttleSpawn = rules.objectives.scuttle.firstSpawn;
   const pit = (spawn: number): PitState => ({ objective: null, nextSpawn: spawn, capture: null });
 
+  // Each side sees the enemy jungler's start in round 1 (placeChampions moves the sighting with it).
   const lastSeen: GameState['lastSeen'] = { blue: {}, red: {} };
   for (const side of SIDES) {
     for (const enemy of champions.filter((c) => c.side !== side)) {

@@ -1,7 +1,8 @@
 import type { Side } from '@lml/data/contracts';
 import type { Store } from '../store';
 import { RoundActions, shownRound } from './RoundBanner';
-import { clock } from './format';
+import { clock, placementWindow } from './format';
+import { QuitGame } from './QuitGame';
 import { type ScoreSide, scoreBarSides } from './score-bar';
 
 const TEAM_NAME: Record<Side, string> = { blue: 'Bleu', red: 'Rouge' };
@@ -34,15 +35,16 @@ function Team({ s, you }: { s: ScoreSide; you: boolean }) {
 
 /**
  * Broadcast-style score bar across the top, like a competitive match: blue on the left, red on the right, the game
- * clock, the round and the round's buttons in the middle. Everything shown is public.
+ * clock, the round, the round's buttons and "Quitter la partie" in the middle. Everything shown is public.
  */
 export function ScoreBar({ store, subtitle }: { store: Store; subtitle: string }) {
   const view = store.view.value;
   if (!view) return null;
   const sides = scoreBarSides(view.scoreboard);
   const round = shownRound(store);
-  const win = store.roundWindow(round);
-  const phase = store.data.rules.phases[win.phase];
+  // Round 0 is the placement, before round 1 (0:00 → 0:55).
+  const win = round === 0 ? placementWindow(store.data.rules) : store.roundWindow(round);
+  const phase = round === 0 ? null : store.data.rules.phases[store.roundWindow(round).phase];
   return (
     <div class="sbar">
       <Team s={sides.blue} you={view.side === 'blue'} />
@@ -51,11 +53,12 @@ export function ScoreBar({ store, subtitle }: { store: Store; subtitle: string }
           <div class="sbar-clock" title={`Ce round : ${clock(win.start)} → ${clock(win.end)}`}>{clock(win.start)}</div>
           <div class="sbar-round">
             Round {round}/{store.totalRounds()}
-            {phase && <> · <span class="phase">{phase.name}</span></>}
+            {round === 0 ? <> · <span class="phase">placement</span></> : phase && <> · <span class="phase">{phase.name}</span></>}
           </div>
           <div class="sbar-sub muted">{subtitle}</div>
         </div>
         <RoundActions store={store} />
+        <QuitGame store={store} />
       </div>
       <Team s={sides.red} you={view.side === 'red'} />
     </div>

@@ -13,6 +13,7 @@ const data = loadGameData();
 function started(seed = 1) {
   const store = createStore(data, createEngine());
   store.start({ rank: 'gold', teaching: false, seed });
+  store.confirmPlacement();
   return store;
 }
 

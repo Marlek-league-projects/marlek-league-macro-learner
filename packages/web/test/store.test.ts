@@ -10,6 +10,7 @@ const engine = createEngine();
 function started(seed = 1) {
   const store = createStore(data, engine);
   store.start({ rank: 'gold', teaching: true, seed });
+  store.confirmPlacement();
   return store;
 }
 const blue = (store: ReturnType<typeof started>, role: string) =>
@@ -275,7 +276,7 @@ describe('store', () => {
     expect(store.pending.value).toEqual({});
     expect(store.finalScores()).toBeNull();
     store.start({ rank: 'iron', teaching: false, seed: 3 });
-    expect(store.screen.value).toBe('orders');
+    expect(store.screen.value).toBe('placement');
   });
 
   test('setLaunchHerald needs the herald and keeps the move', () => {
@@ -356,6 +357,7 @@ describe('store', () => {
     };
     const store = createStore(data, spy);
     store.start({ rank: 'gold', teaching: false, seed: 2 });
+    store.confirmPlacement();
     while (store.screen.value !== 'over') {
       store.confirmRound();
       expect(store.contacts.value.every((c) => !c.auto)).toBe(true);

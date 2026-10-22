@@ -19,10 +19,8 @@ describe('parseAutostart', () => {
       expect(parseAutostart(q, ranks, () => 99)?.seed).toBe(99);
     }
   });
-  test('jungle: a known camp is kept; an unknown one or none leaves the seed to pick', () => {
-    const camps = ['gromp-blue', 'bluebuff-blue'];
-    expect(parseAutostart('?autostart=1&seed=7&jungle=gromp-blue', ranks, () => 1, camps)).toEqual({ rank: 'gold', seed: 7, junglerStart: 'gromp-blue' });
-    expect(parseAutostart('?autostart=1&seed=7&jungle=krugs-red', ranks, () => 1, camps)).toEqual({ rank: 'gold', seed: 7 });
-    expect(parseAutostart('?autostart=1&seed=7', ranks, () => 1, camps)).toEqual({ rank: 'gold', seed: 7 });
+  test('no jungle= param any more: round 0 places the jungler, a stray jungle= is ignored', () => {
+    expect(parseAutostart('?autostart=1&seed=7&jungle=gromp-blue', ranks, () => 1)).toEqual({ rank: 'gold', seed: 7 });
+    expect(parseAutostart('?autostart=1&seed=7', ranks, () => 1)).toEqual({ rank: 'gold', seed: 7 });
   });
 });

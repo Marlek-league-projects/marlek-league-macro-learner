@@ -3,7 +3,7 @@ import type { Store } from '../store';
 import { confirmError, confirmRound } from './confirm-round';
 import { EventLog } from './EventLog';
 import { shownRound } from './RoundBanner';
-import { championName, clock, idleText, noOrderText, OBJECTIVE_LABEL, objectiveTimers, positionLabel } from './format';
+import { championName, clock, idleText, noOrderText, OBJECTIVE_LABEL, objectiveTimers, placementWindow, positionLabel } from './format';
 
 /** Rounds until the objective spawning at `at` is up (it spawns during the round whose window ends at or after it). */
 function roundsUntil(store: Store, round: number, at: number): number | null {
@@ -88,11 +88,46 @@ function Orders({ store }: { store: Store }) {
   );
 }
 
+/** Round 0: where each own champion starts, and "Valider le placement". */
+function Placement({ store }: { store: Store }) {
+  const view = store.view.value!;
+  return (
+    <>
+      <div>
+        <h3>Placement de départ</h3>
+        <div class="note">
+          Clique un de tes champions puis n'importe quelle position de ton côté de la carte (tours, camps, base) ou le
+          milieu d'une voie. Plusieurs champions peuvent partager une position. Les camps apparaissent à{' '}
+          {clock(store.data.rules.phases[0]?.start ?? 0)} : aucun n'est nettoyé avant le round 1.
+        </div>
+        <ul class="orders placement-list">
+          {view.allies.map((c) => (
+            <li key={c.id}>{championName(store.data, c.id)} : {positionLabel(store.data, c.position)}</li>
+          ))}
+        </ul>
+      </div>
+      <button class="go" onClick={() => store.confirmPlacement()}>Valider le placement</button>
+    </>
+  );
+}
+
 export function RoundPanel({ store }: { store: Store }) {
   const view = store.view.value;
   if (!view) return null;
   const screen = store.screen.value;
   const round = shownRound(store);
+  if (round === 0) {
+    const w = placementWindow(store.data.rules);
+    return (
+      <div class="side">
+        <div>
+          <h3>Résumé du round</h3>
+          <div><strong>Round 0 · placement</strong> · {clock(w.start)} → {clock(w.end)}</div>
+        </div>
+        <Placement store={store} />
+      </div>
+    );
+  }
   const win = store.roundWindow(round);
   const phase = store.data.rules.phases[win.phase];
   return (

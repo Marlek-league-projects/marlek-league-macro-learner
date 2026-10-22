@@ -7,6 +7,7 @@ import { detectContacts } from './contacts';
 import { canAct, defaultOrders, followsWave, isLaneChange, reachable, route, spawnPoints, stepBudget, stepBudgetFor, validateOrders } from './movement';
 import { resolveRound } from './round';
 import { newGame } from './setup';
+import { aiPlacements, placeChampions, placementPositions } from './placement';
 import { explainRound } from './teaching';
 import { eventsFor, viewFor, wardRoundsLeft } from './vision';
 import { estimateEnemy } from './estimate';
@@ -16,6 +17,7 @@ export { createRng } from './rng';
 export { roundWindow, totalRounds } from './time';
 export type { RoundWindow } from './time';
 export { randomDraft, newGame } from './setup';
+export { aiPlacements, placeChampions, placementPositions } from './placement';
 export { budgetFrom, canAct, isLaneChange, moveStart, reachable, reachableFrom, route, spawnPoints, spawnPointsFor, stepBudget, stepBudgetFor, validateOrders, defaultOrders, followsWave } from './movement';
 export { arrivalPositions, detectContacts, resolveChoice, resolveJoins, withJoiners } from './contacts';
 export { lead, fightScore, resolveFight, gankModifier, fightVictims } from './fight';
@@ -30,7 +32,7 @@ export { aiOrders, aiContactChoice, aiJoins, aiAnswers, evaluate } from './ai';
 
 export function createEngine(): GameEngine {
   return {
-    newGame, defaultOrders, followsWave, reachable, route, stepBudget, stepBudgetFor, canAct, isLaneChange, spawnPoints, validateOrders, detectContacts, resolveRound, viewFor, eventsFor, wardRoundsLeft, estimateEnemy,
+    newGame, placementPositions, placeChampions, aiPlacements, defaultOrders, followsWave, reachable, route, stepBudget, stepBudgetFor, canAct, isLaneChange, spawnPoints, validateOrders, detectContacts, resolveRound, viewFor, eventsFor, wardRoundsLeft, estimateEnemy,
     aiOrders, aiContactChoice, aiJoins, aiAnswers, explainRound, createRng, roundWindow, totalRounds, level, teamScore,
   };
 }

@@ -10,6 +10,7 @@ const engine = createEngine();
 function started() {
   const store = createStore(data, engine);
   store.start({ rank: 'gold', teaching: true, seed: 1 });
+  store.confirmPlacement();
   return store;
 }
 const ally = (store: ReturnType<typeof started>, role: string) => store.view.value!.allies.find((c) => c.role === role)!;
