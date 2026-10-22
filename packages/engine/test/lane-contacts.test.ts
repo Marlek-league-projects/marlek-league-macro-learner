@@ -50,8 +50,8 @@ describe('gank or lane pressure', () => {
     const ra = get(s, 'red', 'adc').id;
     expect(events).toContainEqual({ type: 'fled', champion: ra, to: 'bot-t1-red' });
     expect(alive(state, ra)).toBe(true);
-    // Fleeing a side that fights while outnumbered costs gankHpLoss.
-    expect(get(state, 'red', 'adc').hp).toBe(d.rules.health.max - d.rules.fight.gankHpLoss);
+    // Fleeing a side that fights while outnumbered (not a gank) costs fleeHpLoss.
+    expect(get(state, 'red', 'adc').hp).toBe(d.rules.health.max - d.rules.fight.fleeHpLoss);
   });
 
   test('the smaller side away from its tower cannot farm', () => {

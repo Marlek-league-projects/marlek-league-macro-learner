@@ -239,7 +239,8 @@ describe('resolveRound', () => {
     expect(events).toContainEqual({ type: 'fled', champion: bt, to: 'top-t2-blue' });
     const after = state.champions.find((c) => c.id === bt)!;
     expect([after.position, after.status]).toEqual(['top-t2-blue', 'alive']);
-    expect(state.towers['top-t1-blue']).toBe(d.rules.towers.hp - d.rules.towers.pushDamage[1]!);
+    // The gank ended with no kill and the wave was already at the tower: push damage plus a plate.
+    expect(state.towers['top-t1-blue']).toBe(d.rules.towers.hp - d.rules.towers.pushDamage[1]! - 1);
   });
 
   test('fleeing in place off a T3 goes to base; off a non-lane tile to the neighbour closest to base', () => {

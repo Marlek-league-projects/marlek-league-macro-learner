@@ -88,6 +88,8 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   const tradeWinners: Partial<Record<Lane, Side | null>> = {};
   /** Lanes whose uneven presence is not lane pressure: only a smaller side staying to farm farms at a reduced share. */
   const noPressure = new Set<Lane>();
+  /** Lanes where a gank ended with no kill, by the side that won it (the ganked side fled, or lost without dying). */
+  const gankWins: Partial<Record<Lane, Side>> = {};
   /** In a contested river without choosing the objective: no pit objective this round (the Scuttle is unaffected). */
   const offPit = new Set<string>();
   const loseHp = (id: string, amount: number): void => {
@@ -105,7 +107,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
    * A decided fight: graded deaths among the `eligible` losers, then every losing survivor loses `fight.survivorLoss`
    * HP. In a gank, every surviving ganked champion loses `fight.gankHpLoss` instead (win or lose, never both).
    */
-  const settle = (winner: Side, losers: string[], eligible: string[], gap: number, winners: string[], ganked: Side | null): void => {
+  const settle = (winner: Side, losers: string[], eligible: string[], gap: number, winners: string[], ganked: Side | null, lane: Lane | null): void => {
     const victims = fightVictims(s, data, eligible, gap);
     for (const id of losers) {
       if (!victims.includes(id) && other(winner) !== ganked) loseHp(id, F.survivorLoss);
@@ -115,6 +117,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
         if (!victims.includes(id)) loseHp(id, F.gankHpLoss);
       }
     }
+    if (ganked && lane && winner !== ganked && victims.length === 0) gankWins[lane] = winner;
     applyKill(s, data, victims, winners, events);
     // Surviving losers leave the spot to the winners, like a flee.
     retreat(losers);
@@ -163,7 +166,12 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
         const fled = fleeing[0]!;
         const stayed = other(fled);
         // Fleeing a side that commits to fight while outnumbered still costs HP.
-        if (n[fled] < n[stayed] && choice[stayed] === 'fight') for (const id of ids[fled]) loseHp(id, F.gankHpLoss);
+        // A ganked side that flees leaves the gank (no kill) to the gankers, and pays `gankHpLoss` if they fight.
+        const gankFled = fled === defender;
+        if (gankFled && lane) gankWins[lane] = stayed;
+        if (n[fled] < n[stayed] && choice[stayed] === 'fight') {
+          for (const id of ids[fled]) loseHp(id, gankFled ? F.gankHpLoss : F.fleeHpLoss);
+        }
         // In lane, the side that stayed wins the trade.
         if (lane) {
           tradeWinners[lane] = stayed;
@@ -181,7 +189,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
       if (winner === bigger && gap > data.aiTuning.allInMargin) {
         events.push({ type: 'fight', position: contact.position, blue: contact.blue, red: contact.red, winner, scores });
         for (const id of [...contact.blue, ...contact.red]) fighters.add(id);
-        settle(winner, ids[smaller], ids[smaller], gap, ids[bigger], defender);
+        settle(winner, ids[smaller], ids[smaller], gap, ids[bigger], defender, lane);
       } else {
         for (const id of ids[smaller]) loseHp(id, F.pressureHpLoss);
       }
@@ -221,7 +229,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
       // a survivor).
       const losers = ids[other(winner)];
       const eligible = contact.kind === 'trade' ? losers.filter((id) => !playsSafe(byId(id).stance)) : losers;
-      settle(winner, losers, eligible, scores[winner] - scores[other(winner)], ids[winner], defender);
+      settle(winner, losers, eligible, scores[winner] - scores[other(winner)], ids[winner], defender, lane);
     }
   }
 
@@ -248,7 +256,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   for (const e of events) if (e.type === 'moved') e.acted = acting.has(e.champion) || recalled.has(e.champion);
   clearCamps(s, data, acting, events);
   captureObjectives(s, data, events, acting, new Set([...acting].filter((id) => !offPit.has(id))));
-  updateLanes(s, data, tradeWinners, events, noPressure, acting);
+  updateLanes(s, data, tradeWinners, events, noPressure, acting, gankWins);
 
   // 10. new wards
   for (const { c, o } of steps) {

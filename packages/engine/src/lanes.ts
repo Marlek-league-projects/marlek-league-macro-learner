@@ -100,6 +100,9 @@ export function lanePressure(state: GameState, data: GameData, lane: Lane): Side
  * Mutates `state`: waves, tower hp, gold, xp and trade lead for one round. A lane in `tradeWinners` had a trade
  * contact this round (null: tied); otherwise even laners push by fight score. An uneven lane with both sides
  * present that is not in `noPressure` is under pressure: the smaller side farms at `economy.pressureFarmShare`.
+ * A lane in `gankWins` had a gank that ended with no kill, won by that side (or fled by the ganked side): the wave goes
+ * straight to the ganked side's tower, or, already there, the ganked side's front tower takes 1 damage (a plate), instead
+ * of the lane's normal wave move.
  * Only `acting` champions (a step left on arrival, no flee or retreat) farm: a laner arriving in its lane on its last
  * step still counts for the wave and the towers, but gets no farm.
  */
@@ -110,6 +113,7 @@ export function updateLanes(
   events: GameEvent[],
   noPressure: ReadonlySet<Lane>,
   acting: ReadonlySet<string>,
+  gankWins: Partial<Record<Lane, Side>> = {},
 ): void {
   const { rules } = data;
   const win = roundWindow(rules, state.round);
@@ -122,6 +126,7 @@ export function updateLanes(
     const from = state.waves[lane];
     const nb = present.blue.length, nr = present.red.length;
     const winner = tradeWinners[lane] ?? null;
+    const gankWinner = gankWins[lane] ?? null;
     let step: number;
     if (nb !== nr) step = waveToward(nb < nr ? 'blue' : 'red');
     else if (nb > 0) {
@@ -132,7 +137,14 @@ export function updateLanes(
     // A side with a Push laner in the lane shoves the wave one extra step toward the enemy (both pushing cancel).
     let extra = 0;
     for (const side of ['blue', 'red'] as Side[]) if (pushing(present[side])) extra += waveToward(other(side));
-    const to = Math.max(-1, Math.min(1, from + sign(step) + extra)) as WavePos;
+    let to = Math.max(-1, Math.min(1, from + sign(step) + extra)) as WavePos;
+    if (gankWinner) {
+      const ganked = other(gankWinner);
+      to = waveToward(ganked);
+      // Already at the tower: the gankers take a plate instead.
+      const front = from === to ? frontTower(state, data, ganked, lane) : null;
+      if (front) damageTower(state, data, front, 1, present[gankWinner], events);
+    }
     state.waves[lane] = to;
     if (to !== from) events.push({ type: 'wave', lane, from, to });
 

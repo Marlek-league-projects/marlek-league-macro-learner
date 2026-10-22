@@ -138,7 +138,7 @@ test('validateRules rejects bad graded-death and gank values', () => {
   const a = structuredClone(data.rules);
   a.fight.deathGap = 0;
   expect(() => validateRules(a)).toThrow(/rules\.fight.*deathGap/);
-  for (const key of ['survivorLoss', 'gankExposed', 'gankHpLoss'] as const) {
+  for (const key of ['survivorLoss', 'gankExposed', 'gankHpLoss', 'fleeHpLoss'] as const) {
     const r = structuredClone(data.rules);
     r.fight[key] = -1;
     expect(() => validateRules(r)).toThrow(new RegExp(`rules\\.fight.*${key}`));

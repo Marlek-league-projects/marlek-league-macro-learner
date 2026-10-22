@@ -182,6 +182,45 @@ describe('ganks and lane position', () => {
     expect(get(state, 'blue', 'top').hp).toBe(H.max - W.gankHpLoss);
   });
 
+  test('a gank with no kill costs the ganked 50 HP and sends the wave to its tower; with a kill it behaves as before', () => {
+    expect(W.gankHpLoss).toBe(50);
+    const { s, o, blue, red } = gank(0);
+    setGap(s, get(s, 'blue', 'top'), 'top-lane', blue, red, -W.deathGap / 2, 'blue');
+    const r = resolveRound(s, d, o, fight);
+    expect(get(r.state, 'blue', 'top').hp).toBe(H.max - 50);
+    expect(r.state.waves.top).toBe(-1);
+    expect(r.events).toContainEqual({ type: 'wave', lane: 'top', from: 0, to: -1 });
+    // A gank that kills: no plate, no extra damage on the tower.
+    const k = gank(-1);
+    setGap(k.s, get(k.s, 'blue', 'top'), 'top-lane', k.blue, k.red, -W.deathGap * 2, 'blue');
+    const kt = k.s.towers['top-t1-blue']!;
+    const kr = resolveRound(k.s, d, k.o, fight);
+    expect(kr.events.some((e) => e.type === 'death')).toBe(true);
+    expect(kr.state.towers['top-t1-blue']).toBe(kt);
+  });
+
+  test('a gank with no kill while the wave is already at the tower takes a plate, with gold before 14:00', () => {
+    const run = (round: number) => {
+      const { s, o } = gank(-1);
+      s.round = round;
+      const tower = s.towers['top-t1-blue']!;
+      const gold = get(s, 'red', 'jungle').goldEarned + get(s, 'red', 'top').goldEarned;
+      const r = resolveRound(s, d, o, { 'lane-top': { blue: 'flee' } });
+      return { r, tower, gold };
+    };
+    const early = run(10);
+    expect(early.r.state.waves.top).toBe(-1);
+    expect(early.r.state.towers['top-t1-blue']).toBe(early.tower - 1);
+    expect(early.r.state.platesTaken.red).toBe(1);
+    const earned = (x: ReturnType<typeof run>): number =>
+      get(x.r.state, 'red', 'jungle').goldEarned + get(x.r.state, 'red', 'top').goldEarned - x.gold;
+    const late = run(45);
+    expect(late.r.state.towers['top-t1-blue']).toBe(late.tower - 1);
+    expect(late.r.state.platesTaken.red).toBe(1);
+    // Plate gold only before 14:00 (farm and passive income differ by round, so compare the plate part).
+    expect(earned(early) - earned(late)).toBeGreaterThanOrEqual(d.rules.towers.plateGold - 1);
+  });
+
   test('fleeing a committed gank still costs gankHpLoss; nothing if the ganker backs off too', () => {
     const { s, o } = gank(0);
     const fled = resolveRound(s, d, o, { 'lane-top': { blue: 'flee' } }).state;
