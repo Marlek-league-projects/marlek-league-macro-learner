@@ -2,7 +2,9 @@ import { describe, expect, test } from 'bun:test';
 import { loadGameData, MISTAKE_IDS } from '@lml/data';
 import type { AiProfile, Rank } from '@lml/data/contracts';
 import {
+  aiAnswers,
   aiContactChoice,
+  aiJoins,
   aiOrders,
   createRng,
   defaultOrders,
@@ -23,6 +25,12 @@ import { stateFromView } from '../src/ai/simulate';
 import { gankedSide } from '../src/contacts';
 
 const d = loadGameData();
+/** Blue's and red's answers (`aiAnswers`) in one map. */
+const bothSides = (blue: ContactChoices, red: ContactChoices): ContactChoices =>
+  Object.fromEntries(Object.keys(blue).map((id) => [
+    id,
+    { blue: blue[id]!.blue, red: red[id]!.red, joins: { blue: blue[id]!.joins?.blue ?? [], red: red[id]!.joins?.red ?? [] } },
+  ]));
 const profile = (rank: Rank): AiProfile => d.aiProfiles.find((p) => p.rank === rank)!;
 const get = (s: GameState, side: string, role: string): ChampionState =>
   s.champions.find((c) => c.side === side && role === c.role)!;
@@ -68,13 +76,8 @@ function playGame(p: AiProfile, seed: number): GameState {
     validateOrders(s, d, 'blue', orders.blue);
     validateOrders(s, d, 'red', orders.red);
     expect([...towerViolations(views.blue, orders.blue), ...towerViolations(views.red, orders.red)]).toEqual([]);
-    const choices: ContactChoices = {};
-    for (const c of detectContacts(s, d, orders)) {
-      choices[c.id] = {
-        blue: aiContactChoice(viewFor(s, d, 'blue'), d, c, p, rng.blue),
-        red: aiContactChoice(viewFor(s, d, 'red'), d, c, p, rng.red),
-      };
-    }
+    const contacts = detectContacts(s, d, orders);
+    const choices = bothSides(aiAnswers(views.blue, d, contacts, p, rng.blue), aiAnswers(views.red, d, contacts, p, rng.red));
     s = resolveRound(s, d, orders, choices).state;
   }
   return s;

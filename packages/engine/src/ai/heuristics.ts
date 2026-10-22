@@ -1,7 +1,7 @@
 import { MISTAKE_IDS, mirrorId } from '@lml/data';
 import type { AiProfile, GameData, Lane, MistakeId, ObjectiveId, Role, Side } from '@lml/data/contracts';
 import type { ChampionState, Choice, Contact, EnemyInfo, GameState, Order, PlayerView, Rng, Stance } from '../contracts';
-import { fightPosition, gankedSide } from '../contacts';
+import { fightPosition, gankedSide, withJoiners } from '../contacts';
 import { resolveFight } from '../fight';
 import { budgetFrom, canAct, reachableFrom, spawnPointsFor, stepBudget } from '../movement';
 import { type PitId, SCUTTLE_PIT } from '../objectives';
@@ -653,6 +653,34 @@ function riverUp(view: PlayerView, data: GameData, contact: Contact): boolean {
   });
 }
 
+/** `stateFromView` with the HP the contact shows: everyone in the contact is seen there (contact = vision). */
+function contactState(view: PlayerView, data: GameData, contact: Contact): GameState {
+  const state = stateFromView(view, data);
+  for (const c of state.champions) if (contact.hp[c.id] !== undefined) c.hp = contact.hp[c.id]!;
+  return state;
+}
+
+/**
+ * Which of `view.side`'s `nearby` champions (minus `taken`, already joining another contact) join a prompted contact,
+ * by the same predicted fight as `contactChoice`: none when the fight is already won; otherwise the fewest, in
+ * `nearby` order, that turn a lost or tied fight into a won one; none when even all of them would not (staying out of
+ * a losing fight). The enemy's possible joiners are not counted (unknown until the contact resolves).
+ */
+export function joinChoice(view: PlayerView, data: GameData, contact: Contact, taken: ReadonlySet<string> = new Set()): string[] {
+  const side = view.side;
+  const mine = contact.nearby[side].filter((id) => !taken.has(id));
+  if (mine.length === 0) return [];
+  const state = contactState(view, data, contact);
+  const stage = roundWindow(data.rules, view.round).stage;
+  const wins = (joins: string[]): boolean => {
+    const c = withJoiners(state, data, contact, { [side]: joins });
+    return resolveFight(state, data, c.position, c.blue, c.red, stage, gankedSide(c)).winner === side;
+  };
+  if (wins([])) return [];
+  for (let n = 1; n <= mine.length; n++) if (wins(mine.slice(0, n))) return mine.slice(0, n);
+  return [];
+}
+
 /**
  * Contact choice for a prompted contact, with what `view.side` knows and the HP the contact shows (contact = vision):
  * - `objective` (keep taking the river objective) when there is one to take and the fight scored at
@@ -663,16 +691,17 @@ function riverUp(view: PlayerView, data: GameData, contact: Contact): boolean {
  * - otherwise `farm` under our tower when it is offered and no ganker came (pressure), unless the bigger side would
  *   win by more than `aiTuning.allInMargin` (it would kill us);
  * - otherwise `flee`.
- * A contact with a single option (lane contacts resolved from stances) takes it.
+ * A contact with a single option (lane contacts resolved from stances) takes it. `joins`: our champions joining it
+ * (`joinChoice`), counted in the fight.
  */
-export function contactChoice(view: PlayerView, data: GameData, contact: Contact, chase: boolean): Choice {
+export function contactChoice(view: PlayerView, data: GameData, prompted: Contact, chase: boolean, joins: string[] = []): Choice {
   const side = view.side;
   const enemy = other(side);
-  const options = contact.options[side];
+  const options = prompted.options[side];
   if (options.length === 1) return options[0]!;
-  const state = stateFromView(view, data);
-  // Contact = vision: everyone in the contact is seen, at the HP the contact shows.
-  for (const c of state.champions) if (contact.hp[c.id] !== undefined) c.hp = contact.hp[c.id]!;
+  const state = contactState(view, data, prompted);
+  // Our own joiners fight with us (the enemy's are unknown until the contact resolves).
+  const contact = withJoiners(state, data, prompted, { [side]: joins });
   const stage = roundWindow(data.rules, view.round).stage;
   const fight = (focus: Partial<Record<Side, number>> = {}) =>
     resolveFight(state, data, contact.position, contact.blue, contact.red, stage, gankedSide(contact), focus);

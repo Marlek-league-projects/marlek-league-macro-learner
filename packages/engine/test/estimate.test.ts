@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
 import type { AiProfile, Rank } from '@lml/data/contracts';
 import {
-  aiContactChoice,
+  aiAnswers,
   aiOrders,
   createEngine,
   createRng,
@@ -17,6 +17,12 @@ import type { ContactChoices, GameState, Orders } from '@lml/engine/contracts';
 
 const d = loadGameData();
 const profile = (rank: Rank): AiProfile => d.aiProfiles.find((p) => p.rank === rank)!;
+/** Blue's and red's answers (`aiAnswers`) in one map. */
+const bothSides = (blue: ContactChoices, red: ContactChoices): ContactChoices =>
+  Object.fromEntries(Object.keys(blue).map((id) => [
+    id,
+    { blue: blue[id]!.blue, red: red[id]!.red, joins: { blue: blue[id]!.joins?.blue ?? [], red: red[id]!.joins?.red ?? [] } },
+  ]));
 
 describe('estimateEnemy', () => {
   function midGame(): GameState {
@@ -74,14 +80,14 @@ describe('contested objectives', () => {
             blue: aiOrders(viewFor(s, d, 'blue'), d, profile(rank), blue),
             red: aiOrders(viewFor(s, d, 'red'), d, profile(rank), red),
           };
-          const choices: ContactChoices = {};
+          const contacts = detectContacts(s, d, orders);
+          const choices = bothSides(
+            aiAnswers(viewFor(s, d, 'blue'), d, contacts, profile(rank), blue),
+            aiAnswers(viewFor(s, d, 'red'), d, contacts, profile(rank), red),
+          );
           const mutual = new Set<string>();
-          for (const c of detectContacts(s, d, orders)) {
-            const choice = {
-              blue: aiContactChoice(viewFor(s, d, 'blue'), d, c, profile(rank), blue),
-              red: aiContactChoice(viewFor(s, d, 'red'), d, c, profile(rank), red),
-            };
-            choices[c.id] = choice;
+          for (const c of contacts) {
+            const choice = choices[c.id]!;
             if (c.kind === 'objective' && choice.blue === 'flee' && choice.red === 'flee') mutual.add(c.position);
           }
           for (const p of [...run.keys()]) if (!mutual.has(p)) run.delete(p);

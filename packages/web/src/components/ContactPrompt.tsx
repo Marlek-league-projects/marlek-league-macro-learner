@@ -1,3 +1,5 @@
+/** @jsxImportSource preact */
+// The pragma lets `bun test` run from the repo root render this component (test/join-fight.test.ts).
 import type { Contact } from '@lml/engine/contracts';
 import { playerDefault, type Store } from '../store';
 import { championImage, championName, choiceLabel, CONTACT_LABEL, positionLabel, zoneTitle } from './format';
@@ -14,6 +16,34 @@ function Names({ store, ids, hp }: { store: Store; ids: string[]; hp: Record<str
         </span>
       ))}
     </span>
+  );
+}
+
+/**
+ * The player's champions 1 step away from the contact, each with "Rejoindre le combat" / "Rester" (default). A joiner
+ * fights with its side and loses its own action this round; it joins one contact at most. The enemy's possible
+ * joiners are never listed (fog of war): they show in the log once the contact resolves.
+ */
+function Joiners({ store, contact }: { store: Store; contact: Contact }) {
+  if (contact.nearby.blue.length === 0) return null;
+  const joining = store.joinsOf(contact.id);
+  const hp = Object.fromEntries((store.view.value?.allies ?? []).map((a) => [a.id, a.hp]));
+  return (
+    <div class="joiners">
+      <div class="note">À 1 pas (rejoindre = pas d'autre action ce round) :</div>
+      {contact.nearby.blue.map((id) => {
+        const on = joining.includes(id);
+        return (
+          <div key={id} class="joiner">
+            <Names store={store} ids={[id]} hp={hp} />
+            <span class="choices">
+              <button class={on ? 'on' : ''} onClick={() => store.setJoin(contact.id, id, true)}>Rejoindre le combat</button>
+              <button class={on ? '' : 'on'} onClick={() => store.setJoin(contact.id, id, false)}>Rester</button>
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -41,6 +71,7 @@ export function ContactPrompt({ store, contact }: { store: Store; contact: Conta
           </button>
         ))}
       </div>
+      <Joiners store={store} contact={contact} />
     </div>
   );
 }
@@ -54,7 +85,7 @@ export function ContactsOverlay({ store, dock }: { store: Store; dock: 'top' | '
     <div class={`contacts-overlay ${dock}`}>
       <div>
         <strong>Contacts</strong>
-        <span class="note"> · Tes champions croisent l'adversaire. Choisis la réaction de chacun.</span>
+        <span class="note"> · Tes champions croisent l'adversaire. Choisis la réaction de chacun, et qui les rejoint depuis 1 pas.</span>
       </div>
       <div class="contacts">
         {store.contacts.value.map((c) => <ContactPrompt key={c.id} store={store} contact={c} />)}

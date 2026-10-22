@@ -1,7 +1,7 @@
 import { createRng } from './rng';
 import { roundWindow, totalRounds } from './time';
 import { level, teamScore } from './economy';
-import { aiContactChoice, aiOrders } from './ai';
+import { aiAnswers, aiContactChoice, aiJoins, aiOrders } from './ai';
 import type { GameEngine } from './contracts';
 import { detectContacts } from './contacts';
 import { canAct, defaultOrders, isLaneChange, reachable, route, spawnPoints, stepBudget, stepBudgetFor, validateOrders } from './movement';
@@ -17,7 +17,7 @@ export { roundWindow, totalRounds } from './time';
 export type { RoundWindow } from './time';
 export { randomDraft, newGame } from './setup';
 export { budgetFrom, canAct, isLaneChange, moveStart, reachable, reachableFrom, route, spawnPoints, spawnPointsFor, stepBudget, stepBudgetFor, validateOrders, defaultOrders } from './movement';
-export { arrivalPositions, detectContacts, resolveChoice } from './contacts';
+export { arrivalPositions, detectContacts, resolveChoice, resolveJoins, withJoiners } from './contacts';
 export { lead, fightScore, resolveFight, gankModifier, fightVictims } from './fight';
 export { damageTower, frontTower, laneExposure, lanePressure, towerMultiplier, updateLanes } from './lanes';
 export { spawnObjectives, clearCamps, captureObjectives, launchHeralds } from './objectives';
@@ -26,11 +26,11 @@ export { visibleEnemies, viewFor, eventsFor, spotByWards, wardRoundsLeft } from 
 export { resolveRound } from './round';
 export { estimateEnemy } from './estimate';
 export { explainRound } from './teaching';
-export { aiOrders, aiContactChoice, evaluate } from './ai';
+export { aiOrders, aiContactChoice, aiJoins, aiAnswers, evaluate } from './ai';
 
 export function createEngine(): GameEngine {
   return {
     newGame, defaultOrders, reachable, route, stepBudget, stepBudgetFor, canAct, isLaneChange, spawnPoints, validateOrders, detectContacts, resolveRound, viewFor, eventsFor, wardRoundsLeft, estimateEnemy,
-    aiOrders, aiContactChoice, explainRound, createRng, roundWindow, totalRounds, level, teamScore,
+    aiOrders, aiContactChoice, aiJoins, aiAnswers, explainRound, createRng, roundWindow, totalRounds, level, teamScore,
   };
 }

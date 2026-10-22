@@ -164,6 +164,8 @@ export function eventText(e: GameEvent, data: GameData): string {
         : `${name(e.champion)} : ${at(e.from)} → ${at(e.to)}`;
     case 'fled':
       return `${name(e.champion)} fuit vers ${at(e.to)}`;
+    case 'joined':
+      return `${name(e.champion)} rejoint le combat à ${at(e.position)} (depuis ${at(e.from)}, sans action)`;
     case 'fight': {
       const result = e.winner ? `victoire ${SIDE_LABEL[e.winner].toLowerCase()}` : 'égalité';
       return `Combat à ${at(e.position)} (${names(e.blue)} contre ${names(e.red)}) : ${result}`;

@@ -319,6 +319,7 @@ describe('promptContacts', () => {
     invader: null,
     auto,
     hp: { a: 100, b: 100 },
+    nearby: { blue: [], red: [] },
   });
 
   test('automatic contacts are not prompted', () => {

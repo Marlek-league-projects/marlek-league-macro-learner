@@ -269,6 +269,7 @@ export function eventsFor(events: GameEvent[], after: GameState, data: GameData,
   return events.filter((e) => {
     switch (e.type) {
       case 'fight':
+      case 'joined':
       case 'trade':
       case 'death':
       case 'wave':

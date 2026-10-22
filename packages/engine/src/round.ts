@@ -1,6 +1,6 @@
 import type { GameData, Lane, Side } from '@lml/data/contracts';
 import type { ChampionState, ContactChoices, GameEvent, GameState, Order, Orders, RoundResult } from './contracts';
-import { detectContacts, gankedSide, playsSafe, resolveChoice } from './contacts';
+import { detectContacts, gankedSide, playsSafe, resolveChoice, resolveJoins, withJoiners } from './contacts';
 import { advanceRespawns, applyKill, changeHp, completeRecall, finishIfOver, level } from './economy';
 import { fightVictims, resolveFight } from './fight';
 import { updateLanes } from './lanes';
@@ -44,7 +44,17 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   }
 
   // 4. moves and spawns; contacts come from the input state, where only ordered champions are on the map
-  const contacts = detectContacts(state, data, orders);
+  const detected = detectContacts(state, data, orders);
+  // Joiners (1 step away, "Rejoindre le combat") fight with their side: each joins at most one contact, the first in
+  // id order it was chosen for, and the contact's kind follows the new numbers (`withJoiners`).
+  const taken = new Set<string>();
+  const joinsOf = new Map<string, Record<Side, string[]>>();
+  const contacts = detected.map((contact) => {
+    const joins = resolveJoins(contact, choices, taken);
+    for (const id of [...joins.blue, ...joins.red]) taken.add(id);
+    joinsOf.set(contact.id, joins);
+    return withJoiners(state, data, contact, joins);
+  });
   /** Whether `c`, its move starting on `from`, has a step left on arrival at `to` (out of reach: no action left). */
   const actsAt = (c: ChampionState, from: string, to: string): boolean => {
     const budget = budgetFrom(data.rules, s.round, from, c.side);
@@ -154,6 +164,15 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   for (const contact of contacts) {
     here = contact.position;
     const choice = resolveChoice(contact, choices);
+    // A joiner walks its 1 step onto the contact and forfeits its own action (no camp, no farm, no objective elsewhere).
+    for (const side of SIDES) {
+      for (const id of joinsOf.get(contact.id)![side]) {
+        const c = byId(id);
+        events.push({ type: 'joined', champion: id, side, from: c.position, position: contact.position });
+        c.position = contact.position;
+        forfeited.add(id);
+      }
+    }
     const lane = data.graph.positions[contact.position]!.lane ?? null;
     const ids: Record<Side, string[]> = { blue: contact.blue, red: contact.red };
     const n: Record<Side, number> = { blue: contact.blue.length, red: contact.red.length };

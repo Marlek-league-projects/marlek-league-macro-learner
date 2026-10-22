@@ -125,7 +125,9 @@ export type MistakeId =
   | 'badRecall'
   | 'poorVision'
   | 'noConversion'
-  | 'ignoreJungler';
+  | 'ignoreJungler'
+  /** Inverts the decision to join a fight 1 step away: ignores a winning join, or joins a fight it does not need or would not win. */
+  | 'joinFight';
 
 export type Rank =
   | 'iron'

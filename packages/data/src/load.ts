@@ -38,6 +38,7 @@ export const MISTAKE_IDS: MistakeId[] = [
   'poorVision',
   'noConversion',
   'ignoreJungler',
+  'joinFight',
 ];
 
 function fail(section: string, message: string): never {

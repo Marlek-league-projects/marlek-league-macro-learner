@@ -1,5 +1,5 @@
 import { mirrorId } from '@lml/data';
-import type { GameData, Side } from '@lml/data/contracts';
+import type { GameData, Lane, Side } from '@lml/data/contracts';
 import type { ChampionState, Choice, Contact, ContactChoices, ContactKind, GameState, Orders, Stance } from './contracts';
 import { budgetFrom, canAct, HOME_LANE, moveStart, reachableFrom } from './movement';
 import { roundWindow } from './time';
@@ -86,7 +86,7 @@ export function fightPosition(data: GameData, arrival: Record<string, string>, b
 type Zone = { id: string; position: string; positions: string[]; blue: string[]; red: string[] };
 
 /** A prompted contact: fight or flee (plus `extra[side]`); the smaller side flees by default, otherwise it fights. */
-function build(kind: ContactKind, zone: Zone, invader: Side | null, extra: Partial<Record<Side, Choice>> = {}): Omit<Contact, 'hp'> {
+function build(kind: ContactKind, zone: Zone, invader: Side | null, extra: Partial<Record<Side, Choice>> = {}): Omit<Contact, 'hp' | 'nearby'> {
   const { blue, red } = zone;
   const n: Record<Side, number> = { blue: blue.length, red: red.length };
   const options = {} as Record<Side, Choice[]>;
@@ -103,9 +103,26 @@ function build(kind: ContactKind, zone: Zone, invader: Side | null, extra: Parti
 }
 
 /** A lane contact resolved without a prompt: each side's only option is `choice[side]`. */
-function buildAuto(kind: ContactKind, zone: Zone, choice: Record<Side, Choice>): Omit<Contact, 'hp'> {
+function buildAuto(kind: ContactKind, zone: Zone, choice: Record<Side, Choice>): Omit<Contact, 'hp' | 'nearby'> {
   const options = { blue: [choice.blue], red: [choice.red] };
   return { ...zone, kind, options, defaults: { ...choice }, invader: null, auto: true };
+}
+
+/**
+ * A prompted lane contact's kind: even, a `skirmish`; uneven, a `gank` when the bigger side includes a champion who
+ * arrived from outside the lane this round (or spawned, or `joined` it from 1 step away), else `pressure`. A laner
+ * coming back to (or joining a fight in) its own lane is not a ganker.
+ */
+function promptedLaneKind(state: GameState, data: GameData, lane: Lane, sides: Record<Side, string[]>, joined: Set<string>): ContactKind {
+  const { blue, red } = sides;
+  if (blue.length === red.length) return 'skirmish';
+  const bigger: Side = blue.length > red.length ? 'blue' : 'red';
+  const arrived = (id: string): boolean => {
+    const c = state.champions.find((x) => x.id === id)!;
+    if (c.role !== 'jungle' && HOME_LANE[c.role] === lane) return false;
+    return joined.has(id) || c.status !== 'alive' || data.graph.positions[c.position]?.lane !== lane;
+  };
+  return sides[bigger].some(arrived) ? 'gank' : 'pressure';
 }
 
 /**
@@ -114,7 +131,7 @@ function buildAuto(kind: ContactKind, zone: Zone, choice: Record<Side, Choice>):
  * lane this round (or spawned), else `pressure`; even, a `skirmish`. A laner coming back to its own lane is not a
  * ganker. A smaller side whose champions all arrive on their own standing tower may also stay and `farm`.
  */
-function laneContact(state: GameState, data: GameData, orders: Orders, arrival: Record<string, string>, zone: Zone): Omit<Contact, 'hp'> {
+function laneContact(state: GameState, data: GameData, orders: Orders, arrival: Record<string, string>, zone: Zone): Omit<Contact, 'hp' | 'nearby'> {
   const { blue, red } = zone;
   const champ = (id: string): ChampionState => state.champions.find((c) => c.id === id)!;
   const lane = data.graph.positions[zone.position]!.lane!;
@@ -122,12 +139,9 @@ function laneContact(state: GameState, data: GameData, orders: Orders, arrival: 
   if (blue.length === red.length && [...blue, ...red].every((id) => homeLaner(champ(id)))) {
     return buildAuto('trade', zone, { blue: stanceChoice(state, orders, blue), red: stanceChoice(state, orders, red) });
   }
-  if (blue.length === red.length) return build('skirmish', zone, null);
-  const bigger: Side = blue.length > red.length ? 'blue' : 'red';
-  const smaller = other(bigger);
-  const arrived = (c: ChampionState): boolean =>
-    !homeLaner(c) && (c.status !== 'alive' || data.graph.positions[c.position]?.lane !== lane);
-  const kind: ContactKind = zone[bigger].some((id) => arrived(champ(id))) ? 'gank' : 'pressure';
+  const kind = promptedLaneKind(state, data, lane, zone, new Set());
+  if (kind === 'skirmish') return build('skirmish', zone, null);
+  const smaller: Side = blue.length < red.length ? 'blue' : 'red';
   const onOwnTower = zone[smaller].every((id) => {
     const p = data.graph.positions[arrival[id]!]!;
     return p.kind === 'tower' && p.side === smaller && (state.towers[arrival[id]!] ?? 0) > 0;
@@ -171,7 +185,7 @@ export function detectContacts(state: GameState, data: GameData, orders: Orders)
     const budget = budgetFrom(data.rules, state.round, from, c.side);
     return canAct(reachableFrom(data, from, budget, c.side)[arrival[id]!] ?? budget, budget);
   };
-  const out: Omit<Contact, 'hp'>[] = [];
+  const out: Omit<Contact, 'hp' | 'nearby'>[] = [];
   for (const [id, { blue, red }] of zones) {
     if (blue.length === 0 || red.length === 0) continue;
     blue.sort();
@@ -191,9 +205,56 @@ export function detectContacts(state: GameState, data: GameData, orders: Orders)
       out.push(build('skirmish', zone, null));
     }
   }
-  const hp = (c: Omit<Contact, 'hp'>): Record<string, number> =>
+  const hp = (c: Omit<Contact, 'hp' | 'nearby'>): Record<string, number> =>
     Object.fromEntries([...c.blue, ...c.red].map((id) => [id, state.champions.find((x) => x.id === id)!.hp]));
-  return out.map((c) => ({ ...c, hp: hp(c) })).sort((a, b) => byId(a.id, b.id));
+  const inContact = new Set(out.flatMap((c) => [...c.blue, ...c.red]));
+  /** Alive, in no contact, not recalling (a spawn is not alive yet), arrived 1 step from one of `c.positions`. */
+  const nearby = (c: Omit<Contact, 'hp' | 'nearby'>): Record<Side, string[]> => {
+    const near: Record<Side, string[]> = { blue: [], red: [] };
+    if (c.auto) return near;
+    for (const champ of state.champions) {
+      if (champ.status !== 'alive' || inContact.has(champ.id)) continue;
+      if (orders[champ.side].find((o) => o.champion === champ.id)?.kind === 'recall') continue;
+      const adj = data.graph.adj[arrival[champ.id]!] ?? [];
+      if (c.positions.some((p) => adj.includes(p))) near[champ.side].push(champ.id);
+    }
+    near.blue.sort();
+    near.red.sort();
+    return near;
+  };
+  return out.map((c) => ({ ...c, hp: hp(c), nearby: nearby(c) })).sort((a, b) => byId(a.id, b.id));
+}
+
+/**
+ * Each side's joiners of `contact` as given in `choices` (validated against `contact.nearby`; throws otherwise),
+ * minus the champions in `taken` (already joining an earlier contact: a champion joins at most one).
+ */
+export function resolveJoins(contact: Contact, choices: ContactChoices, taken: ReadonlySet<string> = new Set()): Record<Side, string[]> {
+  const given = choices[contact.id]?.joins ?? {};
+  const out: Record<Side, string[]> = { blue: [], red: [] };
+  for (const s of SIDES) {
+    for (const id of given[s] ?? []) {
+      if (!contact.nearby[s].includes(id)) throw new Error(`${s}: ${id} cannot join ${contact.id}`);
+      if (!taken.has(id) && !out[s].includes(id)) out[s].push(id);
+    }
+    out[s].sort();
+  }
+  return out;
+}
+
+/**
+ * `contact` with `joins` added to its sides (sorted) and, for a lane contact, its kind re-evaluated on the new
+ * numbers (`promptedLaneKind`: a joiner from outside the lane making its side bigger turns it into a gank, evening
+ * the numbers into a skirmish). Options, defaults, position and HP stay as prompted; a river or camp keeps its kind.
+ */
+export function withJoiners(state: GameState, data: GameData, contact: Contact, joins: Partial<Record<Side, string[]>>): Contact {
+  const joined = new Set([...(joins.blue ?? []), ...(joins.red ?? [])]);
+  if (joined.size === 0) return contact;
+  const blue = [...contact.blue, ...(joins.blue ?? [])].sort();
+  const red = [...contact.red, ...(joins.red ?? [])].sort();
+  const lane = data.graph.positions[contact.position]!.lane;
+  const kind = lane && !contact.auto ? promptedLaneKind(state, data, lane, { blue, red }, joined) : contact.kind;
+  return { ...contact, blue, red, kind };
 }
 
 /** Fills missing choices with defaults. Throws if a given choice is not among the side's options. */

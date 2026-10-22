@@ -5,6 +5,8 @@ export type GameEvent =
   /** `acted`: the move left a step for an action at `to` (clear its camp, take its objective, farm its wave). */
   | { type: 'moved'; champion: string; from: string; to: string; acted: boolean }
   | { type: 'fled'; champion: string; to: string }
+  /** A champion 1 step away from a prompted contact joined it: it moved from `from` onto the contact's `position`. */
+  | { type: 'joined'; champion: string; side: Side; from: string; position: string }
   | { type: 'fight'; position: string; blue: string[]; red: string[]; winner: Side | null; scores: Record<Side, number> }
   | { type: 'trade'; position: string; lane: Lane; winner: Side | null }
   | { type: 'death'; champion: string; position: string; respawnRound: number }

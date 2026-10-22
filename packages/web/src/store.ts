@@ -51,7 +51,10 @@ export interface Store {
   replayRun: Signal<number>;
   selected: Signal<string | null>;
   pending: Signal<Record<string, Order>>;
-  /** Contacts the player answers; lane contacts resolved from stances (`auto`) are left out. */
+  /**
+   * Contacts the player answers; lane contacts resolved from stances (`auto`) are left out. Fog of war: each one's
+   * `nearby.red` is emptied (where an enemy ends its move is its hidden order; its joiners show once it resolves).
+   */
   contacts: Signal<Contact[]>;
   choices: Signal<ContactChoices>;
   lastEvents: Signal<GameEvent[]>;
@@ -108,6 +111,13 @@ export interface Store {
   clearOrder(champion: string): void;
   confirmRound(): void;
   choose(contactId: string, choice: Choice): void;
+  /**
+   * An own champion near a contact (`contact.nearby.blue`) joins it ("Rejoindre le combat") or stays (default). It
+   * joins at most one contact: joining one leaves any other.
+   */
+  setJoin(contactId: string, champion: string, join: boolean): void;
+  /** Own champions joining `contactId`. */
+  joinsOf(contactId: string): string[];
   confirmContacts(): void;
   next(): void;
   /** Restarts the round replay (review and game over screens). */
@@ -269,7 +279,11 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     if (!orders) throw new Error('no round in progress');
     const full: ContactChoices = {};
     for (const c of contacts.value) {
-      full[c.id] = { blue: choices.value[c.id]?.blue ?? playerDefault(c), red: redChoices[c.id]?.red ?? c.defaults.red };
+      full[c.id] = {
+        blue: choices.value[c.id]?.blue ?? playerDefault(c),
+        red: redChoices[c.id]?.red ?? c.defaults.red,
+        joins: { blue: choices.value[c.id]?.joins?.blue ?? [], red: redChoices[c.id]?.joins?.red ?? [] },
+      };
     }
     const result = engine.resolveRound(before, data, orders, full);
     state = result.state;
@@ -474,11 +488,9 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       roundOrders = { blue, red };
       const involving = promptContacts(engine.detectContacts(s, data, roundOrders).filter((c) => c.blue.length > 0));
       const redView = engine.viewFor(s, data, ENEMY);
-      redChoices = {};
-      for (const c of involving) {
-        redChoices[c.id] = { red: engine.aiContactChoice(redView, data, c, profile!, aiRng!) };
-      }
-      contacts.value = involving;
+      // The AI decides its joiners first (each joins at most one contact), then answers with them in the fight.
+      redChoices = engine.aiAnswers(redView, data, involving, profile!, aiRng!);
+      contacts.value = involving.map((c) => ({ ...c, nearby: { blue: c.nearby.blue, red: [] } }));
       choices.value = {};
       if (involving.length === 0) resolve();
       else screen.value = 'contacts';
@@ -488,7 +500,25 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       const c = contacts.value.find((x) => x.id === contactId);
       if (!c) throw new Error(`${contactId}: unknown contact`);
       if (!c.options.blue.includes(choice)) throw new Error(`${contactId}: ${choice} is not an option`);
-      choices.value = { ...choices.value, [contactId]: { blue: choice } };
+      choices.value = { ...choices.value, [contactId]: { ...choices.value[contactId], blue: choice } };
+    },
+
+    setJoin(contactId, id, join) {
+      const c = contacts.value.find((x) => x.id === contactId);
+      if (!c) throw new Error(`${contactId}: unknown contact`);
+      if (!c.nearby.blue.includes(id)) throw new Error(`${id}: cannot join ${contactId}`);
+      const next: ContactChoices = {};
+      for (const x of contacts.value) {
+        const prev = choices.value[x.id];
+        const rest = (prev?.joins?.blue ?? []).filter((j) => j !== id);
+        const blue = join && x.id === contactId ? [...rest, id].sort() : rest;
+        if (prev || blue.length > 0) next[x.id] = { ...prev, joins: { blue } };
+      }
+      choices.value = next;
+    },
+
+    joinsOf(contactId) {
+      return choices.value[contactId]?.joins?.blue ?? [];
     },
 
     confirmContacts() {

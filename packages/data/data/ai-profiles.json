@@ -11,7 +11,8 @@
       "badRecall": 0.48,
       "poorVision": 0.6,
       "noConversion": 0.48,
-      "ignoreJungler": 0.6
+      "ignoreJungler": 0.6,
+      "joinFight": 0.6
     },
     "lookahead": 0,
     "waveSacrifice": false
@@ -28,7 +29,8 @@
       "badRecall": 0.4,
       "poorVision": 0.5,
       "noConversion": 0.4,
-      "ignoreJungler": 0.5
+      "ignoreJungler": 0.5,
+      "joinFight": 0.5
     },
     "lookahead": 0,
     "waveSacrifice": false
@@ -45,7 +47,8 @@
       "badRecall": 0.32,
       "poorVision": 0.4,
       "noConversion": 0.32,
-      "ignoreJungler": 0.4
+      "ignoreJungler": 0.4,
+      "joinFight": 0.4
     },
     "lookahead": 0,
     "waveSacrifice": false
@@ -62,7 +65,8 @@
       "badRecall": 0.256,
       "poorVision": 0.32,
       "noConversion": 0.256,
-      "ignoreJungler": 0.32
+      "ignoreJungler": 0.32,
+      "joinFight": 0.32
     },
     "lookahead": 0,
     "waveSacrifice": false
@@ -79,7 +83,8 @@
       "badRecall": 0.176,
       "poorVision": 0.22,
       "noConversion": 0.176,
-      "ignoreJungler": 0.22
+      "ignoreJungler": 0.22,
+      "joinFight": 0.22
     },
     "lookahead": 0,
     "waveSacrifice": false
@@ -96,7 +101,8 @@
       "badRecall": 0.128,
       "poorVision": 0.16,
       "noConversion": 0.128,
-      "ignoreJungler": 0.16
+      "ignoreJungler": 0.16,
+      "joinFight": 0.16
     },
     "lookahead": 0,
     "waveSacrifice": true
@@ -113,7 +119,8 @@
       "badRecall": 0.064,
       "poorVision": 0.08,
       "noConversion": 0.064,
-      "ignoreJungler": 0.08
+      "ignoreJungler": 0.08,
+      "joinFight": 0.08
     },
     "lookahead": 0,
     "waveSacrifice": true
@@ -130,7 +137,8 @@
       "badRecall": 0.024,
       "poorVision": 0.03,
       "noConversion": 0.024,
-      "ignoreJungler": 0.03
+      "ignoreJungler": 0.03,
+      "joinFight": 0.03
     },
     "lookahead": 1,
     "waveSacrifice": true
@@ -147,7 +155,8 @@
       "badRecall": 0.016,
       "poorVision": 0.02,
       "noConversion": 0.016,
-      "ignoreJungler": 0.02
+      "ignoreJungler": 0.02,
+      "joinFight": 0.02
     },
     "lookahead": 1,
     "waveSacrifice": true
@@ -164,7 +173,8 @@
       "badRecall": 0.008,
       "poorVision": 0.01,
       "noConversion": 0.008,
-      "ignoreJungler": 0.01
+      "ignoreJungler": 0.01,
+      "joinFight": 0.01
     },
     "lookahead": 2,
     "waveSacrifice": true

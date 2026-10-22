@@ -28,7 +28,19 @@ export interface Contact {
   auto: boolean;
   /** HP of every champion in the contact: meeting there, each side sees the other's (contact = vision). */
   hp: Record<string, number>;
+  /**
+   * Per side, champions who may join this prompted contact (sorted): alive, in no contact, not recalling, arrived 1
+   * step (graph adjacency) from one of `positions`. Empty on automatic contacts. A champion near several contacts is
+   * listed in each and joins at most one (the first in contact id order it is chosen for).
+   */
+  nearby: Record<Side, string[]>;
 }
 
+/**
+ * A contact's answers: each side's choice, plus, per side, the `nearby` champions who join it ("Rejoindre le
+ * combat"; absent: "Rester").
+ */
+export type ContactChoice = Partial<Record<Side, Choice>> & { joins?: Partial<Record<Side, string[]>> };
+
 /** Contact id to the choices given so far. */
-export type ContactChoices = Record<string, Partial<Record<Side, Choice>>>;
+export type ContactChoices = Record<string, ContactChoice>;

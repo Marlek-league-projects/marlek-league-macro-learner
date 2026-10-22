@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
 import type { AiProfile, Rank } from '@lml/data/contracts';
-import { aiContactChoice, aiOrders, createRng, defaultOrders, detectContacts, newGame, resolveRound, viewFor } from '@lml/engine';
-import type { ContactChoices, Orders } from '@lml/engine/contracts';
+import { aiAnswers, aiOrders, createRng, defaultOrders, detectContacts, newGame, resolveRound, viewFor } from '@lml/engine';
+import type { Orders } from '@lml/engine/contracts';
 
 /**
  * Difficulty sanity: blue idles (default orders and default contact choices) against the red AI.
@@ -22,8 +22,7 @@ function aiWinsAgainstIdle(p: AiProfile): number {
     while (!s.over) {
       const view = viewFor(s, d, 'red');
       const orders: Orders = { blue: defaultOrders(s, d, 'blue'), red: aiOrders(view, d, p, rng) };
-      const choices: ContactChoices = {};
-      for (const c of detectContacts(s, d, orders)) choices[c.id] = { red: aiContactChoice(view, d, c, p, rng) };
+      const choices = aiAnswers(view, d, detectContacts(s, d, orders), p, rng);
       s = resolveRound(s, d, orders, choices).state;
     }
     if (s.winner === 'red') wins++;

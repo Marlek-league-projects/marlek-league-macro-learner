@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
 import {
-  advanceRespawns, aiContactChoice, aiOrders, applyKill, createRng, detectContacts, resolveRound, viewFor, completeRecall, finishIfOver, level, newGame, teamScore, totalRounds,
+  advanceRespawns, aiAnswers, aiOrders, applyKill, createRng, detectContacts, resolveRound, viewFor, completeRecall, finishIfOver, level, newGame, teamScore, totalRounds,
 } from '@lml/engine';
 import type { ContactChoices, GameEvent, GameState, Orders } from '@lml/engine/contracts';
 
@@ -151,10 +151,13 @@ describe('kills counter', () => {
     while (!s.over) {
       const views = { blue: viewFor(s, d, 'blue'), red: viewFor(s, d, 'red') };
       const orders: Orders = { blue: aiOrders(views.blue, d, p, rng), red: aiOrders(views.red, d, p, rng) };
-      const choices: ContactChoices = {};
-      for (const c of detectContacts(s, d, orders)) {
-        choices[c.id] = { blue: aiContactChoice(views.blue, d, c, p, rng), red: aiContactChoice(views.red, d, c, p, rng) };
-      }
+      const contacts = detectContacts(s, d, orders);
+      const blue = aiAnswers(views.blue, d, contacts, p, rng);
+      const red = aiAnswers(views.red, d, contacts, p, rng);
+      const choices: ContactChoices = Object.fromEntries(contacts.map((c) => [
+        c.id,
+        { blue: blue[c.id]!.blue, red: red[c.id]!.red, joins: { blue: blue[c.id]!.joins?.blue ?? [], red: red[c.id]!.joins?.red ?? [] } },
+      ]));
       const r = resolveRound(s, d, orders, choices);
       for (const e of r.events) {
         if (e.type !== 'death') continue;

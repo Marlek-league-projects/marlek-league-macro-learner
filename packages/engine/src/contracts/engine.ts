@@ -54,7 +54,15 @@ export interface GameEngine {
   wardRoundsLeft(ward: Ward, round: number, rules: Rules): number;
   /** AI orders from what its side sees (a view, never the state). */
   aiOrders(view: PlayerView, data: GameData, profile: AiProfile, rng: Rng): Order[];
-  aiContactChoice(view: PlayerView, data: GameData, contact: Contact, profile: AiProfile, rng: Rng): Choice;
+  /** `joins`: the side's own champions joining the contact (from `aiJoins`), counted in its fight estimate. */
+  aiContactChoice(view: PlayerView, data: GameData, contact: Contact, profile: AiProfile, rng: Rng, joins?: string[]): Choice;
+  /**
+   * The AI's champions joining a prompted contact from 1 step away (of `contact.nearby[view.side]`, minus `taken`):
+   * those that turn a lost or tied fight into a won one, inverted on a `joinFight` mistake roll.
+   */
+  aiJoins(view: PlayerView, data: GameData, contact: Contact, profile: AiProfile, rng: Rng, taken?: ReadonlySet<string>): string[];
+  /** `view.side`'s answers (choice and joiners) to a round's contacts, in id order: `aiJoins` then `aiContactChoice` per contact. */
+  aiAnswers(view: PlayerView, data: GameData, contacts: Contact[], profile: AiProfile, rng: Rng): ContactChoices;
   /** Tempo lessons for `side` from the round `before` → `after`, using only what `side` saw. */
   explainRound(before: GameState, after: GameState, events: GameEvent[], data: GameData, side: Side): Explanation[];
   createRng(seed: number): Rng;
