@@ -157,9 +157,6 @@ export const junglerStartCamps = (data: GameData): string[] =>
   Object.values(data.graph.positions).filter((p) => p.kind === 'camp' && p.side === PLAYER).map((p) => p.id);
 const ENEMY: Side = 'red';
 
-/** A laner's home lane, as the engine's default orders see it (the jungler has none). */
-const HOME_LANE: Record<string, string> = { top: 'top', mid: 'mid', adc: 'bot', support: 'bot' };
-
 export function createStore(data: GameData, engine: GameEngine): Store {
   const screen = signal<Screen>('start');
   const view = signal<PlayerView | null>(null);
@@ -604,17 +601,15 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     },
 
     followsWave(id) {
-      const c = champion(id);
-      const lane = HOME_LANE[c.role];
-      return c.status === 'alive' && lane !== undefined && data.graph.positions[c.position]?.lane === lane;
+      champion(id);
+      return engine.followsWave(current(), data, id);
     },
 
     championsWithoutOrder() {
       const pend = pending.value;
       return current().champions.flatMap((c) => {
         if (c.side !== PLAYER || c.status !== 'alive' || pend[c.id]) return [];
-        const lane = HOME_LANE[c.role];
-        if (lane !== undefined && data.graph.positions[c.position]?.lane === lane) return [];
+        if (engine.followsWave(current(), data, c.id)) return [];
         const def = engine.defaultOrders(current(), data, PLAYER).find((o) => o.champion === c.id);
         return def?.kind === 'move' && def.to === c.position ? [c.id] : [];
       });

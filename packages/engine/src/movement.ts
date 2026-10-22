@@ -263,6 +263,13 @@ function followWave(state: GameState, data: GameData, c: ChampionState): string 
   )[0]!;
 }
 
+/** Whether the champion's default order is to follow its wave: an alive laner standing in its home lane. */
+export function followsWave(state: GameState, data: GameData, championId: string): boolean {
+  const c = state.champions.find((x) => x.id === championId);
+  if (c === undefined || c.status !== 'alive' || c.role === 'jungle') return false;
+  return data.graph.positions[c.position]?.lane === HOME_LANE[c.role];
+}
+
 /** Default respawn: a laner's frontmost standing tower of its home lane, the jungler's nearest own camp. */
 function defaultSpawn(state: GameState, data: GameData, c: ChampionState): string {
   const points = spawnPoints(state, data, c.id);

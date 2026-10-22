@@ -4,7 +4,7 @@ import { level, teamScore } from './economy';
 import { aiAnswers, aiContactChoice, aiJoins, aiOrders } from './ai';
 import type { GameEngine } from './contracts';
 import { detectContacts } from './contacts';
-import { canAct, defaultOrders, isLaneChange, reachable, route, spawnPoints, stepBudget, stepBudgetFor, validateOrders } from './movement';
+import { canAct, defaultOrders, followsWave, isLaneChange, reachable, route, spawnPoints, stepBudget, stepBudgetFor, validateOrders } from './movement';
 import { resolveRound } from './round';
 import { newGame } from './setup';
 import { explainRound } from './teaching';
@@ -16,7 +16,7 @@ export { createRng } from './rng';
 export { roundWindow, totalRounds } from './time';
 export type { RoundWindow } from './time';
 export { randomDraft, newGame } from './setup';
-export { budgetFrom, canAct, isLaneChange, moveStart, reachable, reachableFrom, route, spawnPoints, spawnPointsFor, stepBudget, stepBudgetFor, validateOrders, defaultOrders } from './movement';
+export { budgetFrom, canAct, isLaneChange, moveStart, reachable, reachableFrom, route, spawnPoints, spawnPointsFor, stepBudget, stepBudgetFor, validateOrders, defaultOrders, followsWave } from './movement';
 export { arrivalPositions, detectContacts, resolveChoice, resolveJoins, withJoiners } from './contacts';
 export { lead, fightScore, resolveFight, gankModifier, fightVictims } from './fight';
 export { damageTower, frontTower, laneExposure, lanePressure, towerMultiplier, updateLanes } from './lanes';
@@ -30,7 +30,7 @@ export { aiOrders, aiContactChoice, aiJoins, aiAnswers, evaluate } from './ai';
 
 export function createEngine(): GameEngine {
   return {
-    newGame, defaultOrders, reachable, route, stepBudget, stepBudgetFor, canAct, isLaneChange, spawnPoints, validateOrders, detectContacts, resolveRound, viewFor, eventsFor, wardRoundsLeft, estimateEnemy,
+    newGame, defaultOrders, followsWave, reachable, route, stepBudget, stepBudgetFor, canAct, isLaneChange, spawnPoints, validateOrders, detectContacts, resolveRound, viewFor, eventsFor, wardRoundsLeft, estimateEnemy,
     aiOrders, aiContactChoice, aiJoins, aiAnswers, explainRound, createRng, roundWindow, totalRounds, level, teamScore,
   };
 }

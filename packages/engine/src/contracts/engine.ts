@@ -31,6 +31,8 @@ export interface GameEngine {
   /** `options.blueJunglerStart`: one of the 6 blue camp ids where the blue jungler starts (cleared); default: the seeded buff. Invalid ids throw. */
   newGame(data: GameData, seed: number, draft?: Draft, options?: NewGameOptions): GameState;
   defaultOrders(state: GameState, data: GameData, side: Side): Order[];
+  /** True when the champion is an alive laner in its home lane, so its default order follows the wave. */
+  followsWave(state: GameState, data: GameData, championId: string): boolean;
   reachable(state: GameState, data: GameData, championId: string): Record<string, number>;
   /** True when a step between two positions changes lane (which ends the move). */
   isLaneChange(data: GameData, from: string, to: string): boolean;

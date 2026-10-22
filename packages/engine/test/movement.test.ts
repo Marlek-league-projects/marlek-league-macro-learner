@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData, mirrorId } from '@lml/data';
-import { canAct, defaultOrders, newGame, reachable, reachableFrom, route, spawnPoints, stepBudget, stepBudgetFor, totalRounds, validateOrders } from '@lml/engine';
+import { canAct, defaultOrders, followsWave, newGame, reachable, reachableFrom, route, spawnPoints, stepBudget, stepBudgetFor, totalRounds, validateOrders } from '@lml/engine';
 import { retreatStep } from '../src/movement';
 import type { ChampionState, GameState, Order } from '@lml/engine/contracts';
 
@@ -328,5 +328,25 @@ describe('retreatStep', () => {
     for (const p of Object.keys(d.graph.positions)) {
       expect(retreatStep(d, 'red', mirrorId(p))).toBe(mirrorId(retreatStep(d, 'blue', p)));
     }
+  });
+});
+
+describe('followsWave', () => {
+  test('a laner on its home lane follows its wave, not flagged idle', () => {
+    const s = fresh();
+    const mid = get(s, 'blue', 'mid');
+    expect(followsWave(s, d, mid.id)).toBe(true);
+    expect(followsWave(s, d, get(s, 'blue', 'jungle').id)).toBe(false);
+  });
+  test('a laner outside its home lane stays put (idle), and so does a dead one', () => {
+    const s = fresh();
+    const top = get(s, 'blue', 'top');
+    const away = Object.values(d.graph.positions).find((p) => p.lane !== 'top')!;
+    top.position = away.id;
+    expect(followsWave(s, d, top.id)).toBe(false);
+    top.position = Object.values(d.graph.positions).find((p) => p.lane === 'top')!.id;
+    expect(followsWave(s, d, top.id)).toBe(true);
+    top.status = 'dead';
+    expect(followsWave(s, d, top.id)).toBe(false);
   });
 });
