@@ -199,6 +199,37 @@ describe('ganks and lane position', () => {
     expect(kr.state.towers['top-t1-blue']).toBe(kt);
   });
 
+  test('a gank with no kill sends a wave on the gankers\' side straight to the ganked tower', () => {
+    const { s, o, blue, red } = gank(1);
+    setGap(s, get(s, 'blue', 'top'), 'top-lane', blue, red, -W.deathGap / 2, 'blue');
+    const r = resolveRound(s, d, o, fight);
+    expect(r.events.some((e) => e.type === 'death')).toBe(false);
+    expect(r.state.waves.top).toBe(-1);
+    expect(r.events).toContainEqual({ type: 'wave', lane: 'top', from: 1, to: -1 });
+  });
+
+  test('a ganked laner farming under its tower still pays the failed-gank price', () => {
+    const s = setup([
+      ['blue', 'top', 'top-t1-blue'],
+      ['red', 'top', 'top-t1-red'],
+      ['red', 'jungle', 'scuttle-top'],
+    ]);
+    s.waves.top = 0;
+    const bt = get(s, 'blue', 'top');
+    const o = ordersWith(s, [
+      { kind: 'move', champion: bt.id, to: 'top-t1-blue' },
+      { kind: 'move', champion: get(s, 'red', 'top').id, to: 'top-t1-blue' },
+      { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'top-t1-blue' },
+    ]);
+    const blue = [bt.id];
+    const red = [get(s, 'red', 'top').id, get(s, 'red', 'jungle').id].sort();
+    setGap(s, bt, 'top-t1-blue', blue, red, -d.aiTuning.allInMargin / 2, 'blue');
+    const r = resolveRound(s, d, o, { 'lane-top': { blue: 'farm' } });
+    expect(r.events.some((e) => e.type === 'death')).toBe(false);
+    expect(get(r.state, 'blue', 'top').hp).toBe(H.max - W.gankHpLoss);
+    expect(r.state.waves.top).toBe(-1);
+  });
+
   test('a gank with no kill while the wave is already at the tower takes a plate, with gold before 14:00', () => {
     const run = (round: number) => {
       const { s, o } = gank(-1);

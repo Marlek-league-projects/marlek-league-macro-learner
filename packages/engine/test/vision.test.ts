@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
-import { defaultOrders, eventsFor, lanePressure, newGame, resolveRound, route, viewFor, visibleEnemies, wardRoundsLeft } from '@lml/engine';
+import { level, defaultOrders, eventsFor, lanePressure, newGame, resolveRound, route, viewFor, visibleEnemies, wardRoundsLeft } from '@lml/engine';
 import type { ChampionState, GameState, Order, Orders } from '@lml/engine/contracts';
 
 const d = loadGameData();
@@ -380,7 +380,7 @@ describe('eventsFor', () => {
       stayWith(s, [
         { kind: 'move', champion: rj, to: 'bluebuff-red' },
         { kind: 'move', champion: rm, to: 'mid-lane' },
-        { kind: 'move', champion: bm, to: 'wolves-blue' },
+        { kind: 'move', champion: bm, to: 'gromp-red' },
       ]),
       {},
     );
@@ -476,6 +476,43 @@ describe('met enemies', () => {
     expect(r.state.met.blue[rt]!.round).toBe(1);
     expect(r.state.met.red[bt]!.hp).toBeGreaterThan(0);
     expect(r.state.met.blue[rt]!.level).toBeGreaterThanOrEqual(1);
+  });
+
+  test('met keeps the HP and level after the fight, across rounds, until the enemy is seen again', () => {
+    const s = newGame(d, 5);
+    place(s, 'blue', 'jungle', 'gromp-red');
+    place(s, 'red', 'jungle', 'gromp-red');
+    const rj = get(s, 'red', 'jungle').id;
+    const bj = get(s, 'blue', 'jungle').id;
+    const fullHp = get(s, 'red', 'jungle').hp;
+    const r = resolveRound(s, d, ordersWith(s), { 'gromp-red': { blue: 'fight', red: 'fight' } });
+    const red = r.state.champions.find((c) => c.id === rj)!;
+    const blue = r.state.champions.find((c) => c.id === bj)!;
+    // The enemy lost HP in the contact; the record shows what it has after, not what it had on contact.
+    expect(red.hp).toBeLessThan(fullHp);
+    expect(r.state.met.blue[rj]).toMatchObject({ round: 1, hp: red.hp, level: level(red.xp, d.rules) });
+    expect(r.state.met.red[bj]!.hp).toBe(blue.hp);
+    // Round 2: red walks off into the fog and blue goes elsewhere; the card keeps the post-fight HP, not the HP at contact.
+    // (Blue's laners are pulled back so that the bot lane gives no vision of the retreating enemy.)
+    const next = structuredClone(r.state);
+    for (const role of ['adc', 'support']) place(next, 'blue', role, 'base-blue');
+    const r2 = resolveRound(
+      next,
+      d,
+      ordersWith(next, [
+        { kind: 'move', champion: bj, to: 'gromp-red' },
+        { kind: 'move', champion: rj, to: red.position },
+      ]),
+      {},
+    );
+    expect(r2.state.lastSeen.blue[rj]!.round).toBe(1);
+    const card = viewFor(r2.state, d, 'blue').enemies.find((x) => x.id === rj)!;
+    expect(card.visible).toBe(false);
+    expect(card.met).toMatchObject({ round: 1, hp: red.hp, level: level(red.xp, d.rules) });
+    // Once seen again, no card.
+    const seen = structuredClone(r2.state);
+    seen.lastSeen.blue[rj] = { position: 'raptors-red', round: 2 };
+    expect(viewFor(seen, d, 'blue').enemies.find((x) => x.id === rj)!.met).toBeNull();
   });
 
   test('EnemyInfo.met shows the record while unseen, null once seen again', () => {

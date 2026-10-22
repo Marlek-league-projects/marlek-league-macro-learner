@@ -146,11 +146,6 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     }
   };
   for (const contact of contacts) {
-    for (const side of SIDES) {
-      for (const id of contact[other(side)]) {
-        s.met[side][id] = { round: s.round, position: contact.position, level: level(byId(id).xp, data.rules), hp: contact.hp[id]! };
-      }
-    }
     const choice = resolveChoice(contact, choices);
     const lane = data.graph.positions[contact.position]!.lane ?? null;
     const ids: Record<Side, string[]> = { blue: contact.blue, red: contact.red };
@@ -196,6 +191,10 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
         events.push({ type: 'fight', position: contact.position, blue: contact.blue, red: contact.red, winner, scores });
         for (const id of [...contact.blue, ...contact.red]) fighters.add(id);
         settle(winner, ids[smaller], ids[smaller], gap, ids[bigger], defender, lane);
+      } else if (defender === smaller && winner === bigger && lane) {
+        // A ganked laner farming under its tower still pays the failed-gank price: the gankers won without a kill.
+        for (const id of ids[smaller]) loseHp(id, F.gankHpLoss);
+        gankWins[lane] = bigger;
       } else {
         for (const id of ids[smaller]) loseHp(id, F.pressureHpLoss);
       }
@@ -236,6 +235,16 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
       const losers = ids[other(winner)];
       const eligible = contact.kind === 'trade' ? losers.filter((id) => !playsSafe(byId(id).stance)) : losers;
       settle(winner, losers, eligible, scores[winner] - scores[other(winner)], ids[winner], defender, lane);
+    }
+  }
+
+  // Each side witnessed the fight: it remembers the enemies it met with the HP and level they have after it.
+  for (const contact of contacts) {
+    for (const side of SIDES) {
+      for (const id of contact[other(side)]) {
+        const c = byId(id);
+        s.met[side][id] = { round: s.round, position: contact.position, level: level(c.xp, data.rules), hp: c.hp };
+      }
     }
   }
 

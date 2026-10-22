@@ -62,7 +62,7 @@ export interface MetRecord {
 export interface GameState {
   seed: number;
   rngState: number;
-  /** 1..37 */
+  /** 1..totalRounds */
   round: number;
   over: boolean;
   champions: ChampionState[];
