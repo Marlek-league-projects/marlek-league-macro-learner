@@ -524,19 +524,106 @@ describe('a contested river', () => {
     expect(get(state, 'red', 'jungle').status).toBe('alive');
   });
 
-  test('objective against objective on an exact tie: nobody takes anything', () => {
-    const { s, o, bj, rj } = river();
-    // Even the scores out through the red jungler's lead (full HP: one lead point is `fight.lead / 1000` score).
-    const stage = roundWindow(d.rules, 11).stage;
+  /** Evens the scores out through the red jungler's lead (full HP: one lead point is `fight.lead / 1000` score). */
+  const evenOut = (s: GameState, bj: string, rj: string, position: string): void => {
+    const stage = roundWindow(d.rules, s.round).stage;
     const gap = (): number => {
-      const { scores } = resolveFight(s, d, 'dragon-pit', [bj], [rj], stage);
+      const { scores } = resolveFight(s, d, position, [bj], [rj], stage);
       return scores.blue - scores.red;
     };
     get(s, 'red', 'jungle').bonusLead += (gap() * 1000) / d.rules.fight.lead;
     expect(Math.abs(gap())).toBeLessThan(1e-9);
+  };
+
+  test('objective against objective on an exact tie, the enemy on the Scuttle: the pit side has the numbers there', () => {
+    const { s, o, bj, rj } = river();
+    evenOut(s, bj, rj, 'dragon-pit');
+    const { state, events } = resolveRound(s, d, o, { 'river-bot': { blue: 'objective', red: 'objective' } });
+    expect(events.some((e) => e.type === 'fled' || e.type === 'death')).toBe(false);
+    // 1 blue against 0 red on the pit, held since round 10: taken. Red in the river still contests the Scuttle.
+    expect(taken(events, 'dragon')).toMatchObject({ side: 'blue', champions: [bj] });
+    expect(taken(events, 'scuttle')).toBeUndefined();
+    expect(state.objectivesTaken.red.scuttle).toBeUndefined();
+  });
+
+  test('objective against objective on an exact tie on the pit: equal numbers, the capture resets', () => {
+    const { s, o, bj, rj } = river();
+    o.red = o.red.map((x) => (x.champion === rj ? { ...x, to: 'dragon-pit' } : x));
+    evenOut(s, bj, rj, 'dragon-pit');
     const { state, events } = resolveRound(s, d, o, { 'river-bot': { blue: 'objective', red: 'objective' } });
     expect(events.some((e) => e.type === 'objectiveTaken' || e.type === 'fled' || e.type === 'death')).toBe(false);
-    expect(state.pits['dragon-pit'].objective).toBe('dragon');
+    expect(state.pits['dragon-pit']).toMatchObject({ objective: 'dragon', capture: null });
+  });
+});
+
+describe('a pit taken with the numbers', () => {
+  /** Round 11, Dragon up, Scuttle down; blue jungler and mid and the red jungler all on the Dragon pit. */
+  function pit(): { s: GameState; o: Orders; ids: Record<string, string> } {
+    const s = setup(11, [
+      ['blue', 'jungle', 'dragon-pit'],
+      ['blue', 'mid', 'dragon-pit'],
+      ['red', 'jungle', 'dragon-pit'],
+    ]);
+    s.pits['dragon-pit'] = { objective: 'dragon', nextSpawn: null, capture: null };
+    s.scuttles['scuttle-bot'] = 1e9;
+    const ids = { bj: get(s, 'blue', 'jungle').id, bm: get(s, 'blue', 'mid').id, rj: get(s, 'red', 'jungle').id };
+    const o = ordersWith(s, [
+      { kind: 'move', champion: ids.bj, to: 'dragon-pit' },
+      { kind: 'move', champion: ids.bm, to: 'dragon-pit' },
+      { kind: 'move', champion: ids.rj, to: 'dragon-pit' },
+    ]);
+    return { s, o, ids };
+  }
+  /** Both sides race for the objective at an exact tie: nobody leaves the pit. */
+  const tie = (s: GameState, ids: Record<string, string>): void => {
+    const stage = roundWindow(d.rules, s.round).stage;
+    const gap = (): number => {
+      const { scores } = resolveFight(s, d, 'dragon-pit', [ids.bj!, ids.bm!], [ids.rj!], stage);
+      return scores.blue - scores.red;
+    };
+    get(s, 'red', 'jungle').bonusLead += (gap() * 1000) / d.rules.fight.lead;
+    expect(Math.abs(gap())).toBeLessThan(1e-9);
+  };
+  const race = { 'river-bot': { blue: 'objective', red: 'objective' } } as const;
+
+  test('2 against 1 on the pit, keeping on the objective 2 rounds in a row: taken at the end of the 2nd', () => {
+    const { s, o, ids } = pit();
+    tie(s, ids);
+    let r = resolveRound(s, d, o, race);
+    expect(r.events).toContainEqual(expect.objectContaining({ type: 'objectiveStarted', objective: 'dragon', side: 'blue' }));
+    expect(r.state.pits['dragon-pit'].capture).toEqual({ side: 'blue', startedRound: 11 });
+    r = resolveRound(r.state, d, ordersWith(r.state), race);
+    expect(r.events).toContainEqual(
+      expect.objectContaining({ type: 'objectiveTaken', objective: 'dragon', side: 'blue', champions: [ids.bj, ids.bm] }),
+    );
+    expect(r.state.objectivesTaken.blue.dragon).toBe(1);
+  });
+
+  test('the side with the numbers not keeping on the objective does not progress it', () => {
+    const { s, o, ids } = pit();
+    tie(s, ids);
+    const { state, events } = resolveRound(s, d, o, { 'river-bot': { blue: 'fight', red: 'objective' } });
+    expect(events.some((e) => e.type === 'objectiveStarted' || e.type === 'objectiveTaken')).toBe(false);
+    expect(state.pits['dragon-pit'].capture).toBeNull();
+  });
+
+  test('the numbers flip: the capture restarts for the other side', () => {
+    const { s, o, ids } = pit();
+    tie(s, ids);
+    const r = resolveRound(s, d, o, race);
+    expect(r.state.pits['dragon-pit'].capture).toEqual({ side: 'blue', startedRound: 11 });
+    // Round 12: the blue mid leaves and the red mid joins; red now has 2 against 1 on the pit.
+    const s2 = r.state;
+    const rm = get(s2, 'red', 'mid');
+    rm.position = 'dragon-pit';
+    rm.previous = 'dragon-pit';
+    const o2 = ordersWith(s2, [{ kind: 'move', champion: ids.bm!, to: 'mid-lane' }]);
+    const stage = roundWindow(d.rules, 12).stage;
+    const { scores } = resolveFight(s2, d, 'dragon-pit', [ids.bj!], [ids.rj!, rm.id], stage);
+    get(s2, 'blue', 'jungle').bonusLead += ((scores.red - scores.blue) * 1000) / d.rules.fight.lead;
+    const r2 = resolveRound(s2, d, o2, race);
+    expect(r2.events.some((e) => e.type === 'objectiveTaken')).toBe(false);
+    expect(r2.state.pits['dragon-pit'].capture).toEqual({ side: 'red', startedRound: 12 });
   });
 });
 

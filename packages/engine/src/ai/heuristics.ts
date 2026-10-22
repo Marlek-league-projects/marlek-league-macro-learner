@@ -643,7 +643,9 @@ function riverUp(view: PlayerView, data: GameData, contact: Contact): boolean {
 /**
  * Contact choice for a prompted contact, with what `view.side` knows and the HP the contact shows (contact = vision):
  * - `objective` (keep taking the river objective) when there is one to take and the fight scored at
- *   `fight.objectiveFocus` of our strength is still won;
+ *   `fight.objectiveFocus` of our strength is still won, or not lost while we have the numbers (the bigger side
+ *   progresses the pit), or when the plain fight is an exact tie: a race then costs no HP and the stronger side
+ *   stays, where both sides fleeing an even fight they each estimate as a tie would come back and flee again;
  * - otherwise `fight` when the fight is won, or when `chase` and outnumbered;
  * - otherwise `farm` under our tower when it is offered and no ganker came (pressure), unless the bigger side would
  *   win by more than `aiTuning.allInMargin` (it would kill us);
@@ -662,10 +664,12 @@ export function contactChoice(view: PlayerView, data: GameData, contact: Contact
   const fight = (focus: Partial<Record<Side, number>> = {}) =>
     resolveFight(state, data, contact.position, contact.blue, contact.red, stage, gankedSide(contact), focus);
   const pick = (choice: Choice): Choice => (options.includes(choice) ? choice : contact.defaults[side]);
-  if (options.includes('objective') && riverUp(view, data, contact)) {
-    if (fight({ [side]: data.rules.fight.objectiveFocus }).winner === side) return 'objective';
-  }
   const { winner, scores } = fight();
+  if (options.includes('objective') && riverUp(view, data, contact)) {
+    const focused = fight({ [side]: data.rules.fight.objectiveFocus }).winner;
+    const numbers = contact[side].length > contact[enemy].length;
+    if (focused === side || (numbers && focused === null) || winner === null) return 'objective';
+  }
   const outnumbered = contact[side].length < contact[enemy].length;
   if (winner === side || (chase && outnumbered)) return pick('fight');
   const safe = scores[enemy] - scores[side] <= data.aiTuning.allInMargin;

@@ -19,6 +19,8 @@ import {
 import type { ChampionState, ContactChoices, GameState, Order, Orders, PlayerView, Rng } from '@lml/engine/contracts';
 import { assignStances, makeContext, planCandidates, rollMistakes, towerAllowed } from '../src/ai/heuristics';
 import { updateVision } from '../src/vision';
+import { stateFromView } from '../src/ai/simulate';
+import { gankedSide } from '../src/contacts';
 
 const d = loadGameData();
 const profile = (rank: Rank): AiProfile => d.aiProfiles.find((p) => p.rank === rank)!;
@@ -970,6 +972,52 @@ describe('AI contact choices', () => {
     expect(blueChoice(0, 0.5)).toBe('fight');
     // Losing anyway: it flees.
     expect(blueChoice(-100_000)).toBe('flee');
+  });
+
+  /**
+   * The contested river of `river(0)`, the blue mid also on the pit when `numbers`, and the blue jungler's lead set so
+   * that blue's own estimate of the fight (its score × `focus`) is an exact tie, plus `extra` lead.
+   */
+  const tiedRiver = (numbers: boolean, focus: number, extra = 0) => {
+    const { s, orders } = river(0);
+    if (numbers) {
+      place(s, 'blue', 'mid', 'dragon-pit');
+      const bm = get(s, 'blue', 'mid').id;
+      orders.blue = orders.blue.map((o) => (o.champion === bm ? { kind: 'move', champion: bm, to: 'dragon-pit' } : o));
+    }
+    const c = detectContacts(s, d, orders).find((x) => x.id === 'river-bot')!;
+    const bj = get(s, 'blue', 'jungle');
+    const gap = (): number => {
+      const est = stateFromView(viewFor(s, d, 'blue'), d);
+      for (const x of est.champions) if (c.hp[x.id] !== undefined) x.hp = c.hp[x.id]!;
+      const stage = roundWindow(d.rules, s.round).stage;
+      const { scores } = resolveFight(est, d, c.position, c.blue, c.red, stage, gankedSide(c), { blue: focus });
+      return scores.blue - scores.red;
+    };
+    // The score is linear in the lead at full HP: solve for the tie from two points.
+    const g0 = gap();
+    bj.bonusLead += 1000;
+    const g1 = gap();
+    bj.bonusLead += (-g0 * 1000) / (g1 - g0) - 1000;
+    expect(Math.abs(gap())).toBeLessThan(1e-9);
+    bj.bonusLead += extra;
+    return aiContactChoice(viewFor(s, d, 'blue'), d, c, profile('challenger'), noChase);
+  };
+  const focus = d.rules.fight.objectiveFocus;
+
+  test('with the numbers, the AI keeps on the objective while the fight at objectiveFocus is not lost', () => {
+    expect(tiedRiver(true, focus)).toBe('objective');
+    // Lost at objectiveFocus (but won at full strength): it fights instead.
+    expect(tiedRiver(true, focus, -1)).toBe('fight');
+    // Without the numbers, the same tie at objectiveFocus is not enough.
+    expect(tiedRiver(false, focus)).toBe('fight');
+  });
+
+  test('an even fight over a river objective is contested with objective, not fled', () => {
+    // Both AIs see an exact tie of the same 1v1 (each sizes the other on its own mirror): fleeing both, they would come
+    // back and flee again. Choosing objective races for it instead: the stronger one stays, nobody loses HP.
+    expect(tiedRiver(false, 1)).toBe('objective');
+    expect(tiedRiver(false, 1, -1)).toBe('flee');
   });
 
   test('on a river with nothing up, the AI does not choose objective', () => {

@@ -68,12 +68,122 @@ describe('grouped river', () => {
     expect(s.pits['dragon-pit'].capture).toBeNull();
   });
 
-  test('an enemy anywhere in the river contests both the pit and the Scuttle', () => {
+  test('an enemy on the Scuttle contests the Scuttle, not the pit: the pit side with the numbers there progresses', () => {
     const s = fresh(11);
     get(s, 'blue', 'jungle').position = 'dragon-pit';
     get(s, 'red', 'jungle').position = 'scuttle-bot';
-    expect(capture(s)).toEqual([]);
+    expect(capture(s).map((e) => e.type)).toEqual(['objectiveStarted']);
+    expect(s.pits['dragon-pit'].capture).toEqual({ side: 'blue', startedRound: 11 });
+    // Taking the Dragon with an enemy in the river does not take the Scuttle.
+    nextRound(s);
+    const ev = capture(s);
+    expect(ev.map((e) => e.type === 'objectiveTaken' && e.objective)).toEqual(['dragon']);
+    expect(s.objectivesTaken.red.scuttle).toBeUndefined();
+  });
+
+  test('the Scuttle keeps its rule: any enemy in the river contests it, even outnumbered', () => {
+    const s = fresh(11);
+    get(s, 'blue', 'jungle').position = 'scuttle-bot';
+    get(s, 'blue', 'mid').position = 'scuttle-bot';
+    get(s, 'red', 'jungle').position = 'dragon-pit';
+    // Red alone on the pit starts the Dragon; blue takes no Scuttle.
+    expect(capture(s).map((e) => e.type === 'objectiveStarted' && e.side)).toEqual(['red']);
+    expect(s.objectivesTaken.blue.scuttle).toBeUndefined();
+  });
+});
+
+describe('contested pit: the numbers', () => {
+  test('2 against 1 on the pit 2 rounds in a row: taken at the end of the 2nd, without the contested Scuttle', () => {
+    const s = fresh(11);
+    get(s, 'blue', 'jungle').position = 'dragon-pit';
+    get(s, 'blue', 'mid').position = 'dragon-pit';
+    get(s, 'red', 'jungle').position = 'dragon-pit';
+    expect(capture(s).map((e) => e.type)).toEqual(['objectiveStarted']);
+    expect(s.pits['dragon-pit'].capture).toEqual({ side: 'blue', startedRound: 11 });
+    nextRound(s);
+    const ev = capture(s);
+    expect(ev.map((e) => e.type === 'objectiveTaken' && e.objective)).toEqual(['dragon']);
+    expect(s.objectivesTaken.blue.dragon).toBe(1);
+    expect(get(s, 'blue', 'mid').gold).toBe(d.rules.objectives.dragon.gold / 2);
+  });
+
+  test('every alive enemy on the pit counts, acting or not; deaths do not', () => {
+    const s = fresh(11);
+    const bj = get(s, 'blue', 'jungle');
+    bj.position = 'dragon-pit';
+    get(s, 'red', 'jungle').position = 'dragon-pit';
+    get(s, 'red', 'mid').position = 'dragon-pit';
+    // 1 acting blue against 2 red with no step left: no progress.
+    expect(capture(s, new Set([bj.id]))).toEqual([]);
+    // The 2 red champions dead: blue alone progresses.
+    for (const r of ['jungle', 'mid']) get(s, 'red', r).status = 'dead';
+    capture(s, new Set([bj.id]));
+    expect(s.pits['dragon-pit'].capture).toEqual({ side: 'blue', startedRound: 11 });
+  });
+
+  test('the side with the numbers but without enough acting champions there does not progress', () => {
+    const s = fresh(11);
+    const bj = get(s, 'blue', 'jungle');
+    const bm = get(s, 'blue', 'mid');
+    bj.position = 'dragon-pit';
+    bm.position = 'dragon-pit';
+    get(s, 'red', 'jungle').position = 'dragon-pit';
+    // Only 1 of the 2 blue champions acts: 1 against 1, a tie.
+    capture(s, new Set([bj.id]));
     expect(s.pits['dragon-pit'].capture).toBeNull();
+  });
+
+  test('equal numbers reset a capture in progress', () => {
+    const s = fresh(11);
+    get(s, 'blue', 'jungle').position = 'dragon-pit';
+    get(s, 'blue', 'mid').position = 'dragon-pit';
+    get(s, 'red', 'jungle').position = 'dragon-pit';
+    capture(s);
+    nextRound(s);
+    get(s, 'red', 'mid').position = 'dragon-pit';
+    expect(capture(s)).toEqual([]);
+    expect(s.pits['dragon-pit']).toMatchObject({ objective: 'dragon', capture: null });
+  });
+
+  test('the numbers flip: the capture restarts for the other side, which takes it a round later', () => {
+    const s = fresh(11);
+    get(s, 'blue', 'jungle').position = 'dragon-pit';
+    get(s, 'blue', 'mid').position = 'dragon-pit';
+    get(s, 'red', 'jungle').position = 'dragon-pit';
+    capture(s);
+    nextRound(s);
+    get(s, 'blue', 'mid').position = 'mid-lane';
+    get(s, 'red', 'mid').position = 'dragon-pit';
+    expect(capture(s).map((e) => e.type)).toEqual(['objectiveStarted']);
+    expect(s.pits['dragon-pit'].capture).toEqual({ side: 'red', startedRound: 12 });
+    nextRound(s);
+    capture(s);
+    expect(s.objectivesTaken.red.dragon).toBe(1);
+    expect(s.objectivesTaken.blue.dragon).toBeUndefined();
+  });
+
+  test('Baron keeps minChampions 3: 2 against 1 never progresses, 3 against 2 does', () => {
+    const s = fresh(57);
+    get(s, 'blue', 'jungle').position = 'baron-pit';
+    get(s, 'blue', 'mid').position = 'baron-pit';
+    get(s, 'red', 'jungle').position = 'baron-pit';
+    expect(capture(s)).toEqual([]);
+    expect(s.pits['baron-pit'].capture).toBeNull();
+    get(s, 'blue', 'top').position = 'baron-pit';
+    get(s, 'red', 'mid').position = 'baron-pit';
+    capture(s);
+    expect(s.pits['baron-pit'].capture).toEqual({ side: 'blue', startedRound: 57 });
+    nextRound(s);
+    capture(s);
+    expect(s.objectivesTaken.blue.baron).toBe(1);
+  });
+
+  test('instantAt still takes it in one round with the numbers', () => {
+    const s = fresh(11);
+    for (const r of ['jungle', 'mid', 'adc', 'support']) get(s, 'blue', r).position = 'dragon-pit';
+    get(s, 'red', 'jungle').position = 'dragon-pit';
+    capture(s);
+    expect(s.objectivesTaken.blue.dragon).toBe(1);
   });
 });
 

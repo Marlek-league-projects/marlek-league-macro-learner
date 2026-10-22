@@ -175,14 +175,15 @@ Tower damage bonuses stack: Voidgrubs plus Baron gives ×3. The Herald launch is
 
 *(design calls, values in data)*
 - Each objective has a minimum number of champions needed to take it. Starting values: 1 for Scuttle, Dragon, Voidgrubs and Herald, 3 for Baron.
-- **Dragon, Voidgrubs, Herald and Baron take time.** You arrive on the pit one round and take the objective at the end of the next round, as long as you stay there. With **4 or more champions** on the pit, Dragon, Voidgrubs and Herald are taken on arrival. Baron always takes the extra round, even with 5 champions. In between, the enemy has a round to contest it. The Scuttle Crab is taken on arrival.
+- **Dragon, Voidgrubs, Herald and Baron take time.** You arrive on the pit one round and take the objective at the end of the next round, as long as you stay there with the numbers (below). With **4 or more champions** on the pit, Dragon, Voidgrubs and Herald are taken on arrival. Baron always takes the extra round, even with 5 champions. In between, the enemy has a round to contest it. The Scuttle Crab is taken on arrival.
 - Voidgrubs, Herald and Baron follow their real spawn timers from the current patch, stored in data. They share the Baron pit, each one replacing the previous.
 - There is no Dragon Soul bonus. Each Dragon simply adds team lead.
-- **The river is one grouped fight.** A champion with a step left on a pit starts or continues its objective. When the pit objective is taken, the river's Scuttle is taken in the same round if it is up, shared by the same champions. A champion on the Scuttle takes only the Scuttle and never starts the pit objective. Any enemy anywhere in the river contests both.
+- **The river is one grouped fight.** A champion with a step left on a pit starts or continues its objective. When the pit objective is taken, the river's Scuttle is taken in the same round if it is up and no enemy is in the river, shared by the same champions. A champion on the Scuttle takes only the Scuttle and never starts the pit objective. Any enemy anywhere in the river contests the Scuttle.
+- **With the numbers on the pit.** After the river contact resolves (flees and retreats applied, the dead removed), a side progresses the pit objective when its champions on the pit with a step left, and that chose to keep taking the objective, outnumber every alive enemy still on the pit, acting or not. An uncontested side progresses as before. The same side progressing 2 rounds in a row takes it at the end of the 2nd round (4 or more champions still take Dragon, Voidgrubs and Herald in one round). Equal numbers: no progress, and the capture resets; when the numbers flip, the capture restarts for the other side. Baron still needs 3 champions. *(design call)* An enemy on the Scuttle is not on the pit: it contests the Scuttle, not the pit objective.
 - **A contested river** offers each side **fight**, **flee**, and **keep taking the objective** (only to a side with a champion acting on the pit or the Scuttle, and only when that side knows of something to take: the pit objective is up or spawns this round, or the Scuttle is up as that side last saw it):
   - *objective* against *flee*: the objective (and the Scuttle) proceeds;
   - *objective* against *fight*: a fight where the objective side's score is multiplied by `fight.objectiveFocus` (0.8); if it still wins, it takes the objective this round as well as the kills;
-  - *objective* against *objective*: a race. The higher fight score keeps taking it and the other side leaves; nobody dies or loses HP. On a tie, both stay and nobody takes it.
+  - *objective* against *objective*: a race. The higher fight score keeps taking it and the other side leaves; nobody dies or loses HP. On a tie, both stay, and the numbers on the pit decide: the bigger side progresses it, equal numbers reset it.
   - *fight* (won, or against *flee*): the winner takes the kills but does not start, continue or take the pit objective this round; a capture in progress is lost. A champion on the Scuttle with a step left still takes the Scuttle.
   - A champion arriving on its last step (no action left), or recalling, cannot choose the objective, but still fights.
 - Jungle camps respawn on their real timers and give gold and XP to whoever clears them: one camp per round, the one the champion stands on with a step left (see [Movement](#movement)). `clearSpeed` no longer lets a jungler clear a second camp on the way. Clearing an enemy camp works like your own, and you then know its respawn timer.
@@ -316,7 +317,7 @@ At any time, the AI skips an objective when the enemies it knows near the pit wo
 
 **Contacts.** The AI answers a prompted contact with what it knows:
 
-- on a contested river with something to take, it keeps taking the objective when its fight score × `fight.objectiveFocus` still wins;
+- on a contested river with something to take, it keeps taking the objective when its fight score × `fight.objectiveFocus` still wins, or is not lost while it has the numbers, or when the plain fight is an exact tie as it estimates it (a race costs no HP, where both sides fleeing an even fight would come back and flee again);
 - otherwise it fights when it wins the fight (or, rolling *Chasing kills*, when outnumbered);
 - outnumbered under its own tower with no ganker (lane pressure), it stays and farms, unless the bigger side would win by more than `aiTuning.allInMargin` and kill it;
 - otherwise (a gank it would lose, for example) it flees.

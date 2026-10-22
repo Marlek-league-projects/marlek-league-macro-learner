@@ -153,7 +153,8 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     const smaller: Side | null = n.blue < n.red ? 'blue' : n.red < n.blue ? 'red' : null;
     const defender = gankedSide(contact);
     const fleeing = SIDES.filter((side) => choice[side] === 'flee');
-    // In a contested river, only a side keeping on the objective may start, continue or take the pit objective.
+    // In a contested river, only a side keeping on the objective may start, continue or take the pit objective, and
+    // only with the numbers on the pit once the contact is resolved (`captureObjectives`).
     if (contact.kind === 'objective') for (const side of SIDES) if (choice[side] !== 'objective') for (const id of ids[side]) offPit.add(id);
     if (lane && !contact.auto) {
       // Without a flee, both sides meet where the fight happens.
@@ -198,7 +199,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     const focusing = SIDES.filter((side) => choice[side] === 'objective');
     if (focusing.length === 2) {
       // A race for the river objective: the higher fight score keeps taking it and the other side leaves, nobody
-      // dies or loses HP. On a tie both stay and contest it.
+      // dies or loses HP. On a tie both stay: the numbers on the pit decide (`captureObjectives`).
       const { winner } = resolveFight(s, data, contact.position, contact.blue, contact.red, stage);
       if (winner) retreat(ids[other(winner)]);
       continue;
