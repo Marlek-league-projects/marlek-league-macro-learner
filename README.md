@@ -202,7 +202,7 @@ Recalling is how you **cash in** your advantage. A champion sitting on a lot of 
 
 ## Movement
 
-The map positions form a graph, and a move is a walk of a few steps on it. Starting values:
+The map positions form a graph, and a move is a walk of a few steps on it. [`docs/movement-map.html`](docs/movement-map.html) shows it: click a position to see where a champion can go in one round, for each budget and side. After changing the map or the movement rules, regenerate it with `bun run movement-map`. Starting values:
 
 - **Step budget**: every champion, laner or jungler, has the same number of steps per round, set by the round's length: 2 steps in 20 s rounds, 3 in 40 s rounds, 4 in 1 min rounds (`rules.moves.budgetBySeconds`).
 - **An action costs a step**: clearing a camp, taking a Scuttle, starting or continuing a pit objective, farming your lane's wave, and recalling all need a step left once you arrive. Staying where you are always leaves one.

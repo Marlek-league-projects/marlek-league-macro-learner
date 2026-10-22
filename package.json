@@ -9,7 +9,8 @@
     "check-deps": "bun scripts/check-deps.ts",
     "build": "bun run --filter @lml/web build",
     "dev": "bun run --filter @lml/web dev",
-    "fetch-data": "bun packages/data/scripts/fetch-champions.ts"
+    "fetch-data": "bun packages/data/scripts/fetch-champions.ts",
+    "movement-map": "bun packages/engine/scripts/movement-map.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
