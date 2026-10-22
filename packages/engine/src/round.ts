@@ -101,8 +101,11 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     if (before > c.hp) events.push({ type: 'hpLost', champion: id, amount: before - c.hp });
     if (c.hp === 0 && c.status === 'alive') applyKill(s, data, [id], credit, events);
   };
-  /** A tied fight: everyone stays where the fight happened, with no action this round. */
+  /** Where the contact being resolved happens (`contact.position`). */
+  let here = '';
+  /** A tied fight: everyone is at the fight position (a river contact's other tile included), with no action. */
   const stay = (ids: string[]): void => {
+    pullIn(ids, here);
     for (const id of ids) forfeited.add(id);
   };
   /**
@@ -134,6 +137,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
       const c = byId(id);
       if (c.status !== 'alive') continue;
       forfeited.add(id);
+      c.position = here;
       c.position = retreatStep(data, c.side, c.position);
       events.push({ type: 'fled', champion: id, to: c.position });
     }
@@ -148,6 +152,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     }
   };
   for (const contact of contacts) {
+    here = contact.position;
     const choice = resolveChoice(contact, choices);
     const lane = data.graph.positions[contact.position]!.lane ?? null;
     const ids: Record<Side, string[]> = { blue: contact.blue, red: contact.red };
@@ -279,7 +284,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   // 10. new wards
   for (const { c, o } of steps) {
     if (o.kind === 'spawn' || o.ward === undefined) continue;
-    // A champion who did not end on its destination (fled, tied fight) cannot ward it.
+    // A champion who did not end on its destination (fled) cannot ward it; a tied champion stays on it and still wards (placing is free).
     if (o.ward === 'to' && c.position !== o.to) continue;
     const position = typeof o.ward === 'object' ? o.ward.position : o.ward === 'from' ? c.previous : c.position;
     s.wards.push({ side: c.side, position, placedRound: s.round });

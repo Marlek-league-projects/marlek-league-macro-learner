@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
-import { defaultOrders, eventsFor, newGame, resolveFight, resolveRound, roundWindow } from '@lml/engine';
+import { defaultOrders, detectContacts, eventsFor, newGame, resolveFight, resolveRound, roundWindow } from '@lml/engine';
+import { retreatStep } from '../src/movement';
 import type { ChampionState, ContactChoices, GameEvent, GameState, Order, Orders, Stance } from '@lml/engine/contracts';
 
 const d = loadGameData();
@@ -283,6 +284,49 @@ describe('resolveRound', () => {
     const { state } = resolveRound(s, d, o, { 'lane-top': { blue: 'flee' } });
     const after = state.champions.find((c) => c.id === bt.id)!;
     expect([after.position, after.status]).toEqual(['top-t2-blue', 'alive']);
+  });
+
+  test('a river tie leaves both on the fight position without action, from either tile', () => {
+    const s = setup(12, [
+      ['blue', 'jungle', 'dragon-pit'],
+      ['red', 'jungle', 'scuttle-bot'],
+    ]);
+    const bj = get(s, 'blue', 'jungle');
+    const rj = get(s, 'red', 'jungle');
+    const stage = roundWindow(d.rules, 12).stage;
+    const o0 = ordersWith(s, [
+      { kind: 'move', champion: bj.id, to: 'dragon-pit' },
+      { kind: 'move', champion: rj.id, to: 'scuttle-bot' },
+    ]);
+    const contact = detectContacts(s, d, o0).find((c) => c.blue.includes(bj.id))!;
+    const { scores } = resolveFight(s, d, contact.position, [bj.id], [rj.id], stage);
+    const weaker = scores.blue < scores.red ? bj : rj;
+    weaker.bonusLead += (Math.abs(scores.blue - scores.red) * 1000) / d.rules.fight.lead;
+    const { state, events } = resolveRound(s, d, o0, { [contact.id]: { blue: 'fight', red: 'fight' } });
+    expect(events.find((e) => e.type === 'fight')).toMatchObject({ winner: null });
+    expect(get(state, 'blue', 'jungle').position).toBe(contact.position);
+    expect(get(state, 'red', 'jungle').position).toBe(contact.position);
+    expect(events.some((e) => e.type === 'fled' || e.type === 'death')).toBe(false);
+  });
+
+  test('a river flee steps toward the base from the contact position (a champion on the other tile)', () => {
+    const s = setup(12, [
+      ['blue', 'jungle', 'scuttle-bot'],
+      ['blue', 'mid', 'scuttle-bot'],
+      ['red', 'jungle', 'dragon-pit'],
+    ]);
+    const bj = get(s, 'blue', 'jungle');
+    const o = ordersWith(s, [
+      { kind: 'move', champion: bj.id, to: 'scuttle-bot' },
+      { kind: 'move', champion: get(s, 'blue', 'mid').id, to: 'scuttle-bot' },
+      { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'dragon-pit' },
+    ]);
+    const contact = detectContacts(s, d, o).find((c) => c.blue.includes(bj.id))!;
+    const { state, events } = resolveRound(s, d, o, { [contact.id]: { blue: 'flee', red: 'fight' } });
+    const to = retreatStep(d, 'blue', contact.position);
+    expect(contact.position).toBe('dragon-pit');
+    expect(events).toContainEqual({ type: 'fled', champion: bj.id, to });
+    expect(get(state, 'blue', 'jungle').position).toBe(to);
   });
 
   test('a flee in the mid lane goes to the own T1, and from the T1 to the own T2', () => {
