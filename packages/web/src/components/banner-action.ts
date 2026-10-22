@@ -1,6 +1,5 @@
 import type { Store } from '../store';
 import { confirmRound } from './confirm-round';
-import { quitAsked } from './quit';
 
 export type BannerAction = 'place' | 'confirm' | 'next' | 'new';
 
@@ -23,8 +22,5 @@ export function runBannerAction(store: Store, action: BannerAction): void {
   if (action === 'place') store.confirmPlacement();
   else if (action === 'confirm') confirmRound(store);
   else if (action === 'next') store.next();
-  else {
-    quitAsked.value = false;
-    store.reset();
-  }
+  else store.reset();
 }

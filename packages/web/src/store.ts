@@ -72,6 +72,8 @@ export interface Store {
   objectivePromptsClosed: Signal<string[]>;
   /** Champions whose pending recall the last chosen destination replaced (it left no step for the recall). */
   recallReplaced: Signal<string[]>;
+  /** "Quitter la partie ?" is asked in the score bar; cleared by start() and reset(). */
+  quitAsked: Signal<boolean>;
   /** A new game on the round 0 placement screen (the AI has placed its champions). */
   start(s: Settings): void;
   /** Round 0: where own champions may start (own towers, camps and base; the lane middles). */
@@ -181,6 +183,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
   const panelDragging = signal(false);
   const objectivePromptsClosed = signal<string[]>([]);
   const recallReplaced = signal<string[]>([]);
+  const quitAsked = signal(false);
 
   // The full state never leaves the store; components only see `view`.
   let state: GameState | null = null;
@@ -188,14 +191,25 @@ export function createStore(data: GameData, engine: GameEngine): Store {
   let aiRng: Rng | null = null;
   let roundOrders: Orders | null = null;
   let redChoices: ContactChoices = {};
+  /** The AI's round 0 placement, applied on "Valider le placement". */
+  let redPlacements: Record<string, string> = {};
 
   const current = (): GameState => {
     if (!state) throw new Error('game not started');
     return state;
   };
 
+  /**
+   * Round 0 is simultaneous: on the placement screen no enemy is shown or known (the round-1 sighting of the enemy
+   * jungler, and the usual vision, apply once the placement is validated).
+   */
   const publish = (): void => {
-    view.value = engine.viewFor(current(), data, PLAYER);
+    const v = engine.viewFor(current(), data, PLAYER);
+    view.value = screen.value !== 'placement' ? v : {
+      ...v,
+      enemies: v.enemies.map((e) => ({ ...e, visible: false, position: null, lastSeenRound: null, level: null, hp: null, met: null })),
+      pressure: { top: null, mid: null, bot: null },
+    };
   };
 
   /** Pending orders over the defaults, one per champion that can act. */
@@ -336,15 +350,15 @@ export function createStore(data: GameData, engine: GameEngine): Store {
 
   return {
     data, screen, view, previousView, replaying, replayRun, selected, pending, contacts, choices, lastEvents, explanations, settings, recalled,
-    panelAt, panelDragging, objectivePromptsClosed, recallReplaced,
+    panelAt, panelDragging, objectivePromptsClosed, recallReplaced, quitAsked,
 
     start(s) {
       settings.value = s;
       profile = data.aiProfiles.find((p) => p.rank === s.rank) ?? null;
       if (!profile) throw new Error(`no AI profile for rank ${s.rank}`);
       state = engine.newGame(data, s.seed);
-      // Round 0: the AI places first, from its own view (it never sees the player's placement).
-      state = engine.placeChampions(state, data, ENEMY, engine.aiPlacements(engine.viewFor(state, data, ENEMY), data));
+      redPlacements = engine.aiPlacements(engine.viewFor(state, data, ENEMY), data);
+      quitAsked.value = false;
       aiRng = engine.createRng(s.seed + 1);
       roundOrders = null;
       redChoices = {};
@@ -360,8 +374,8 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       previousView.value = null;
       stopReplay();
       panelDragging.value = false;
-      publish();
       screen.value = 'placement';
+      publish();
     },
 
     placementTargets() {
@@ -377,13 +391,17 @@ export function createStore(data: GameData, engine: GameEngine): Store {
 
     confirmPlacement() {
       if (screen.value !== 'placement') throw new Error('not in the placement round');
+      // Round 0 is simultaneous: the AI's placement (chosen at the start, blind to the player's) applies now.
+      state = engine.placeChampions(current(), data, ENEMY, redPlacements);
       selected.value = null;
       panelDragging.value = false;
       screen.value = 'orders';
+      publish();
     },
 
     reset() {
       state = null;
+      quitAsked.value = false;
       roundOrders = null;
       redChoices = {};
       selected.value = null;

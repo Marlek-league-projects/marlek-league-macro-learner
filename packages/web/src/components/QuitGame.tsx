@@ -1,11 +1,11 @@
 import type { Store } from '../store';
-import { answerQuit, askQuit, quitAsked } from './quit';
+import { answerQuit, askQuit } from './quit';
 
 /** "Quitter la partie" in the score bar, on every game screen, with its confirmation inside the page. */
 export function QuitGame({ store }: { store: Store }) {
-  if (!quitAsked.value) {
+  if (!store.quitAsked.value) {
     return (
-      <button class="quit-game" onClick={askQuit} title="Abandonner la partie et revenir à l'écran de départ">
+      <button class="quit-game" onClick={() => askQuit(store)} title="Abandonner la partie et revenir à l'écran de départ">
         Quitter la partie
       </button>
     );

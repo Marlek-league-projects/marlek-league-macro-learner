@@ -3,7 +3,7 @@ import { loadGameData } from '@lml/data';
 import { createEngine, newGame } from '@lml/engine';
 import { bannerPrimary, runBannerAction } from '../src/components/banner-action';
 import { placementWindow, shownRound } from '../src/components/format';
-import { answerQuit, askQuit, quitAsked } from '../src/components/quit';
+import { answerQuit, askQuit } from '../src/components/quit';
 import { createStore } from '../src/store';
 
 const data = loadGameData();
@@ -33,6 +33,20 @@ describe('round 0 placement in the store', () => {
     for (const [id, t] of Object.entries(store.view.value!.camps)) {
       expect(t).toBe(data.rules.camps.firstSpawnByCamp[id.split('-')[0] as keyof typeof data.rules.camps.firstSpawnByCamp]);
     }
+  });
+
+  test('round 0 is simultaneous: no enemy is visible or known while placing; round 1 shows the enemy jungler', () => {
+    const store = placing(9);
+    const v = store.view.value!;
+    expect(v.enemies.every((e) => !e.visible && e.position === null && e.lastSeenRound === null && e.level === null)).toBe(true);
+    expect(v.pressure).toEqual({ top: null, mid: null, bot: null });
+    store.placeChampion(ally(store, 'top').id, 'top-lane');
+    expect(store.view.value!.enemies.every((e) => !e.visible && e.position === null)).toBe(true);
+    store.confirmPlacement();
+    const redJungler = newGame(data, 9).champions.find((c) => c.side === 'red' && c.role === 'jungle')!;
+    const e = store.view.value!.enemies.find((x) => x.id === redJungler.id)!;
+    expect(e).toMatchObject({ visible: true, position: redJungler.position });
+    expect(['bluebuff-red', 'redbuff-red']).toContain(e.position!);
   });
 
   test('a selected champion may go to every allowed start position, at 0 steps', () => {
@@ -75,30 +89,54 @@ describe('Quitter la partie', () => {
     const store = placing();
     store.confirmPlacement();
     const before = store.view.value;
-    askQuit();
-    expect(quitAsked.value).toBe(true);
+    askQuit(store);
+    expect(store.quitAsked.value).toBe(true);
     expect(store.screen.value).toBe('orders');
     answerQuit(store, false);
-    expect(quitAsked.value).toBe(false);
+    expect(store.quitAsked.value).toBe(false);
     expect(store.screen.value).toBe('orders');
     expect(store.view.value).toBe(before);
   });
 
-  test('Oui goes back to the start screen, from any game screen', () => {
-    for (const stage of ['placement', 'orders', 'review'] as const) {
-      const store = placing();
-      if (stage !== 'placement') store.confirmPlacement();
-      if (stage === 'review') {
+  /** A store on `stage`: placement, orders, contacts (a prompted contact), review or over. */
+  const on = (stage: 'placement' | 'orders' | 'contacts' | 'review' | 'over') => {
+    for (let seed = 1; seed < 40; seed++) {
+      const store = placing(seed);
+      if (stage === 'placement') return store;
+      store.confirmPlacement();
+      if (stage === 'orders') return store;
+      while (store.screen.value !== 'over') {
         store.confirmRound();
+        if (store.screen.value === 'contacts' && stage === 'contacts') return store;
         store.confirmContacts();
+        if (store.screen.value === stage) return store;
+        store.next();
       }
+      if (stage === 'over') return store;
+    }
+    throw new Error(`no game reaches ${stage}`);
+  };
+
+  test('Oui goes back to the start screen, from every game screen', () => {
+    for (const stage of ['placement', 'orders', 'contacts', 'review', 'over'] as const) {
+      const store = on(stage);
       expect(store.screen.value).toBe(stage);
-      askQuit();
+      askQuit(store);
       answerQuit(store, true);
-      expect(quitAsked.value).toBe(false);
+      expect(store.quitAsked.value).toBe(false);
       expect(store.screen.value).toBe('start');
       expect(store.view.value).toBeNull();
     }
+  });
+
+  test('an unanswered question never leaks into the next game (GameOver "Nouvelle partie" resets directly)', () => {
+    const store = placing();
+    askQuit(store);
+    store.reset();
+    expect(store.quitAsked.value).toBe(false);
+    askQuit(store);
+    store.start({ rank: 'gold', teaching: false, seed: 2 });
+    expect(store.quitAsked.value).toBe(false);
   });
 
   test('the confirmation never uses a browser dialog', async () => {
