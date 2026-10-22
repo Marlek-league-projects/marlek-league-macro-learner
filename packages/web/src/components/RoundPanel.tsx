@@ -97,7 +97,7 @@ function Placement({ store }: { store: Store }) {
         <h3>Placement de départ</h3>
         <div class="note">
           Clique un de tes champions puis n'importe quelle position de ton côté de la carte (tours, camps, base) ou le
-          milieu d'une voie. Plusieurs champions peuvent partager une position. Les camps apparaissent à{' '}
+          milieu d'une voie. Plusieurs champions peuvent partager une position. Les camps apparaissent à partir de{' '}
           {clock(store.data.rules.phases[0]?.start ?? 0)} : aucun n'est nettoyé avant le round 1.
         </div>
         <ul class="orders placement-list">

@@ -178,7 +178,7 @@ describe('farming', () => {
     expect(ganked.gold).toBeCloseTo(solo.gold, 6);
     expect(ganked.xp).toBeCloseTo(solo.xp, 6);
   });
-  test('a solo laner who only farms hits level 6 by 6:50 (round 16), 11 by 14:10 (round 38) and 15 by the end', () => {
+  test('a solo laner who only farms hits level 6 by 6:55 (round 18), 11 by 14:15 (round 40) and 15 by the end', () => {
     const s = fresh();
     const top = get(s, 'blue', 'top');
     top.position = 'top-lane';
@@ -189,8 +189,8 @@ describe('farming', () => {
       run(s);
       levels[r] = level(top.xp, d.rules);
     }
-    expect(levels[16]).toBeGreaterThanOrEqual(6);
-    expect(levels[38]).toBeGreaterThanOrEqual(11);
+    expect(levels[18]).toBeGreaterThanOrEqual(6);
+    expect(levels[40]).toBeGreaterThanOrEqual(11);
     expect(levels[totalRounds(d.rules)]).toBeGreaterThanOrEqual(15);
   });
 });

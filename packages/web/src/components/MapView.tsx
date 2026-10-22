@@ -294,7 +294,7 @@ export function MapView({ store }: { store: Store }) {
     const n = byPosition.get(p.id)?.length ?? 0;
     const reachX = Math.max(dotRadius(p), n > 0 ? ((n - 1) / 2) * PAWN_SPREAD + 14 : 0);
     if (p.kind === 'pit') {
-      // Pits name what they count down to with the time left ("Larves 4:30"), and when an up objective leaves ("part dans 7:20").
+      // Pits name what they count down to with the time left ("Larves 7:05"), and when an up objective leaves ("part dans 6:50").
       const pt = pitTimer(view, data, p.id as 'baron-pit' | 'dragon-pit', now, roundWin.end);
       if (!pt) return null;
       const x = p.x + reachX + 4;
