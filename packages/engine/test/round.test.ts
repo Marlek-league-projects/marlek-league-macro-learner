@@ -264,7 +264,7 @@ describe('resolveRound', () => {
     expect(get(state, 'blue', 'jungle').position).toBe('mid-t2-blue');
   });
 
-  test('a spawning champion who flees retreats one tower back', () => {
+  test('a spawning champion who flees goes back to its base, where its move started', () => {
     const s = setup(10, [
       ['red', 'top', 'top-lane'],
       ['red', 'mid', 'scuttle-top'],
@@ -279,7 +279,21 @@ describe('resolveRound', () => {
     ]);
     const { state } = resolveRound(s, d, o, { 'lane-top': { blue: 'flee' } });
     const after = state.champions.find((c) => c.id === bt.id)!;
-    expect([after.position, after.status]).toEqual(['top-t2-blue', 'alive']);
+    expect([after.position, after.status]).toEqual(['base-blue', 'alive']);
+  });
+
+  test('a spawn on the T1 arrives without acting in a 2-step round and acts with 4 steps (base bonus)', () => {
+    const roundWith = (steps: number): number => {
+      for (let r = 1; ; r++) if (d.rules.moves.budgetBySeconds[String(roundWindow(d.rules, r).seconds)] === steps) return r;
+    };
+    for (const [steps, acted] of [[2, false], [4, true]] as const) {
+      const s = setup(roundWith(steps), []);
+      const bt = get(s, 'blue', 'top');
+      bt.status = 'respawning';
+      bt.respawnRound = s.round;
+      const { events } = resolveRound(s, d, ordersWith(s, [{ kind: 'spawn', champion: bt.id, to: 'top-t1-blue' }]), {});
+      expect(events).toContainEqual({ type: 'moved', champion: bt.id, from: 'base-blue', to: 'top-t1-blue', acted });
+    }
   });
 
   test('a gank in lane where one side flees is won by the side that stayed: wave and trade lead', () => {

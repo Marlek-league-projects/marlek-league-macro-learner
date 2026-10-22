@@ -4,7 +4,6 @@ import type { ChampionState, GameState, Order, PlayerView, Stance } from './cont
 import { frontTower } from './lanes';
 import { roundWindow } from './time';
 
-const LANES: Lane[] = ['top', 'mid', 'bot'];
 export const HOME_LANE: Record<Exclude<Role, 'jungle'>, Lane> = { top: 'top', mid: 'mid', adc: 'bot', support: 'bot' };
 const STANCES: Stance[] = ['push', 'farm', 'trade', 'allin'];
 
@@ -14,6 +13,16 @@ export function stepBudget(rules: Rules, round: number): number {
   const budget = rules.moves.budgetBySeconds[String(seconds)];
   if (budget === undefined) throw new Error(`no step budget for ${seconds}s rounds`);
   return budget;
+}
+
+/** Steps for a `side` move starting on `from` in `round`: the round's budget, plus `moves.baseBonus` from its own base. */
+export function budgetFrom(rules: Rules, round: number, from: string, side: Side): number {
+  return stepBudget(rules, round) + (from === `base-${side}` ? rules.moves.baseBonus : 0);
+}
+
+/** Where a champion's move starts this round: its base when respawning, else where it stands. */
+export function moveStart(c: Pick<ChampionState, 'status' | 'position' | 'side'>): string {
+  return c.status === 'respawning' ? `base-${c.side}` : c.position;
 }
 
 /** An action (clear a camp, take an objective, farm the wave, recall) costs a step: it needs one left on arrival. */
@@ -29,10 +38,20 @@ function find(state: GameState, championId: string): ChampionState {
   return c;
 }
 
-/** Position to distance for everything the champion can reach this round, incl. its own position (0). */
+/** `budgetFrom` for the champion's move this round (see `moveStart`). */
+export function stepBudgetFor(state: GameState, data: GameData, championId: string): number {
+  const c = find(state, championId);
+  return budgetFrom(data.rules, state.round, moveStart(c), c.side);
+}
+
+/**
+ * Position to distance for everything the champion can reach this round, incl. where its move starts (0): its own
+ * position, or its base when respawning (see `moveStart`, `budgetFrom`).
+ */
 export function reachable(state: GameState, data: GameData, championId: string): Record<string, number> {
   const c = find(state, championId);
-  return reachableFrom(data, c.position, stepBudget(data.rules, state.round), c.side);
+  const from = moveStart(c);
+  return reachableFrom(data, from, budgetFrom(data.rules, state.round, from, c.side), c.side);
 }
 
 /** True when a step from `a` to `b` goes between two lane positions (tower or lane middle) of different lanes. */
@@ -109,31 +128,18 @@ export function route(data: GameData, from: string, to: string, side: Side): str
   return length === 0 ? [from] : [from, ...rest(from, 0)!];
 }
 
-/** Where a respawning champion may re-enter: front standing tower per lane, or own camps for the jungler. */
+/** Where a respawning champion may re-enter: anywhere its move from its base reaches (budget + `moves.baseBonus`). */
 export function spawnPoints(state: GameState, data: GameData, championId: string): string[] {
-  return spawnPointsFor({ allies: state.champions, towers: state.towers }, data, championId);
+  return spawnPointsFor({ allies: state.champions, round: state.round }, data, championId);
 }
 
-/** `spawnPoints` from what a side knows: its own champions and the tower hp. */
-export function spawnPointsFor(
-  view: Pick<PlayerView, 'allies' | 'towers'>,
-  data: GameData,
-  championId: string,
-): string[] {
+/** `spawnPoints` from what a side knows: its own champions and the round, nearest first. */
+export function spawnPointsFor(view: Pick<PlayerView, 'allies' | 'round'>, data: GameData, championId: string): string[] {
   const c = view.allies.find((x) => x.id === championId);
   if (!c) throw new Error(`${championId}: unknown champion`);
-  const { graph } = data;
-  if (c.role === 'jungle') {
-    return Object.values(graph.positions)
-      .filter((p) => p.kind === 'camp' && p.side === c.side)
-      .map((p) => p.id);
-  }
-  const out: string[] = [];
-  for (const lane of LANES) {
-    const front = graph.towers(c.side, lane).find((t) => (view.towers[t] ?? 0) > 0);
-    if (front) out.push(front);
-  }
-  return out.length > 0 ? out : [`base-${c.side}`];
+  const base = `base-${c.side}`;
+  const reach = reachableFrom(data, base, budgetFrom(data.rules, view.round, base, c.side), c.side);
+  return Object.keys(reach).sort((a, b) => reach[a]! - reach[b]! || (a < b ? -1 : a > b ? 1 : 0));
 }
 
 /**
@@ -179,7 +185,7 @@ function validateOne(state: GameState, data: GameData, c: ChampionState, o: Orde
       if (o.unward === 'to' && o.to === undefined) fail(c.id, 'recall unward at the step needs a step position');
     }
     // The recall is the action: its step leaves it a step of the budget, never into the enemy base.
-    const stepReach = reachableFrom(data, c.position, stepBudget(rules, state.round) - 1, c.side);
+    const stepReach = reachableFrom(data, c.position, budgetFrom(rules, state.round, c.position, c.side) - 1, c.side);
     if (o.to !== undefined && stepReach[o.to] === undefined) fail(c.id, `recall step to ${o.to} is out of range`);
     return;
   }
@@ -257,12 +263,12 @@ function followWave(state: GameState, data: GameData, c: ChampionState): string 
   )[0]!;
 }
 
-/** Default respawn: a laner's frontmost standing tower of its home lane, the jungler's first camp. */
+/** Default respawn: a laner's frontmost standing tower of its home lane, the jungler's nearest own camp. */
 function defaultSpawn(state: GameState, data: GameData, c: ChampionState): string {
   const points = spawnPoints(state, data, c.id);
-  if (c.role === 'jungle') return points[0]!;
+  if (c.role === 'jungle') return points.find((p) => data.graph.positions[p]!.kind === 'camp' && data.graph.positions[p]!.side === c.side) ?? points[0]!;
   const home = data.graph.towers(c.side, HOME_LANE[c.role]).find((t) => (state.towers[t] ?? 0) > 0);
-  return home ?? points[0]!;
+  return home !== undefined && points.includes(home) ? home : points[0]!;
 }
 
 /** Alive laners follow their wave, other alive champions stay put; respawning ones take their default spawn. */

@@ -2,13 +2,15 @@ import type { Contact } from '@lml/engine/contracts';
 import { playerDefault, type Store } from '../store';
 import { championImage, championName, choiceLabel, CONTACT_LABEL, positionLabel, zoneTitle } from './format';
 
-function Names({ store, ids }: { store: Store; ids: string[] }) {
+/** The contact's champions with their HP: meeting there, each side sees the other's (contact = vision). */
+function Names({ store, ids, hp }: { store: Store; ids: string[]; hp: Record<string, number> }) {
   return (
     <span class="names">
       {ids.map((id) => (
         <span key={id} class="name">
           <img class="sq" src={championImage(store.data, id)} alt="" />
           {championName(store.data, id)}
+          {hp[id] !== undefined && <span class="note"> {Math.round(hp[id]!)} PV</span>}
         </span>
       ))}
     </span>
@@ -30,8 +32,8 @@ export function ContactPrompt({ store, contact }: { store: Store; contact: Conta
         <strong>{CONTACT_LABEL[contact.kind]}</strong> · {title}
       </div>
       <div class="note">Positions : {where}</div>
-      <div class="note">Toi : <Names store={store} ids={contact.blue} /></div>
-      <div class="note">Adversaire : <Names store={store} ids={contact.red} /></div>
+      <div class="note">Toi : <Names store={store} ids={contact.blue} hp={contact.hp} /></div>
+      <div class="note">Adversaire : <Names store={store} ids={contact.red} hp={contact.hp} /></div>
       <div class="choices">
         {contact.options.blue.map((choice) => (
           <button key={choice} class={choice === chosen ? 'on' : ''} onClick={() => store.choose(contact.id, choice)}>

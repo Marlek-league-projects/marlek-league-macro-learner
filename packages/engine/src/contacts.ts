@@ -1,7 +1,7 @@
 import { mirrorId } from '@lml/data';
 import type { GameData, Side } from '@lml/data/contracts';
 import type { ChampionState, Choice, Contact, ContactChoices, ContactKind, GameState, Orders, Stance } from './contracts';
-import { canAct, HOME_LANE, reachableFrom, stepBudget } from './movement';
+import { budgetFrom, canAct, HOME_LANE, moveStart, reachableFrom } from './movement';
 import { roundWindow } from './time';
 
 const SIDES: Side[] = ['blue', 'red'];
@@ -86,7 +86,7 @@ export function fightPosition(data: GameData, arrival: Record<string, string>, b
 type Zone = { id: string; position: string; positions: string[]; blue: string[]; red: string[] };
 
 /** A prompted contact: fight or flee (plus `extra[side]`); the smaller side flees by default, otherwise it fights. */
-function build(kind: ContactKind, zone: Zone, invader: Side | null, extra: Partial<Record<Side, Choice>> = {}): Contact {
+function build(kind: ContactKind, zone: Zone, invader: Side | null, extra: Partial<Record<Side, Choice>> = {}): Omit<Contact, 'hp'> {
   const { blue, red } = zone;
   const n: Record<Side, number> = { blue: blue.length, red: red.length };
   const options = {} as Record<Side, Choice[]>;
@@ -103,7 +103,7 @@ function build(kind: ContactKind, zone: Zone, invader: Side | null, extra: Parti
 }
 
 /** A lane contact resolved without a prompt: each side's only option is `choice[side]`. */
-function buildAuto(kind: ContactKind, zone: Zone, choice: Record<Side, Choice>): Contact {
+function buildAuto(kind: ContactKind, zone: Zone, choice: Record<Side, Choice>): Omit<Contact, 'hp'> {
   const options = { blue: [choice.blue], red: [choice.red] };
   return { ...zone, kind, options, defaults: { ...choice }, invader: null, auto: true };
 }
@@ -114,7 +114,7 @@ function buildAuto(kind: ContactKind, zone: Zone, choice: Record<Side, Choice>):
  * lane this round (or spawned), else `pressure`; even, a `skirmish`. A laner coming back to its own lane is not a
  * ganker. A smaller side whose champions all arrive on their own standing tower may also stay and `farm`.
  */
-function laneContact(state: GameState, data: GameData, orders: Orders, arrival: Record<string, string>, zone: Zone): Contact {
+function laneContact(state: GameState, data: GameData, orders: Orders, arrival: Record<string, string>, zone: Zone): Omit<Contact, 'hp'> {
   const { blue, red } = zone;
   const champ = (id: string): ChampionState => state.champions.find((c) => c.id === id)!;
   const lane = data.graph.positions[zone.position]!.lane!;
@@ -162,16 +162,16 @@ export function detectContacts(state: GameState, data: GameData, orders: Orders)
     entry[c.side].push(c.id);
     zones.set(zone, entry);
   }
-  const budget = stepBudget(data.rules, state.round);
-  /** A step left on arrival (a spawn always acts, a recall never: the recall is its action), as in `resolveRound`. */
+  /** A step left on arrival (a recall never: the recall is its action), as in `resolveRound`; a spawn walks from its base. */
   const acts = (id: string): boolean => {
     const c = state.champions.find((x) => x.id === id)!;
     const kind = orders[c.side].find((o) => o.champion === id)?.kind;
-    if (kind === 'spawn') return true;
     if (kind === 'recall') return false;
-    return canAct(reachableFrom(data, c.position, budget, c.side)[arrival[id]!] ?? budget, budget);
+    const from = moveStart(c);
+    const budget = budgetFrom(data.rules, state.round, from, c.side);
+    return canAct(reachableFrom(data, from, budget, c.side)[arrival[id]!] ?? budget, budget);
   };
-  const out: Contact[] = [];
+  const out: Omit<Contact, 'hp'>[] = [];
   for (const [id, { blue, red }] of zones) {
     if (blue.length === 0 || red.length === 0) continue;
     blue.sort();
@@ -191,7 +191,9 @@ export function detectContacts(state: GameState, data: GameData, orders: Orders)
       out.push(build('skirmish', zone, null));
     }
   }
-  return out.sort((a, b) => byId(a.id, b.id));
+  const hp = (c: Omit<Contact, 'hp'>): Record<string, number> =>
+    Object.fromEntries([...c.blue, ...c.red].map((id) => [id, state.champions.find((x) => x.id === id)!.hp]));
+  return out.map((c) => ({ ...c, hp: hp(c) })).sort((a, b) => byId(a.id, b.id));
 }
 
 /** Fills missing choices with defaults. Throws if a given choice is not among the side's options. */

@@ -26,8 +26,11 @@ export interface ObjectiveRule {
 
 export interface Rules {
   phases: Phase[];
-  /** Step budget of every champion per round, by the round's length in seconds (`Phase.roundSeconds`). */
-  moves: { budgetBySeconds: Record<string, number> };
+  /**
+   * Step budget of every champion per round, by the round's length in seconds (`Phase.roundSeconds`). `baseBonus`:
+   * extra steps for a move that starts on the champion's own base (the base speed boost), respawns included.
+   */
+  moves: { budgetBySeconds: Record<string, number>; baseBonus: number };
   /** `duration`: rounds a ward gives vision, from the round after it is placed. */
   wards: { perRound: number; duration: number; unwardPerRound: number; unwardRoles: Role[] };
   towers: {

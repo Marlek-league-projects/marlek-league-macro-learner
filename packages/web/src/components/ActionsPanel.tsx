@@ -197,7 +197,7 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
     );
   }
 
-  const budget = store.stepBudget();
+  const budget = store.stepBudget(c.id);
   const move = order?.kind === 'move' ? order : null;
   const recall = order?.kind === 'recall' ? order : null;
   const ward = move?.ward ?? recall?.ward;

@@ -26,6 +26,8 @@ export interface Contact {
   invader: Side | null;
   /** Resolved from the laners' stances, with no prompt: each side's only option is its default. */
   auto: boolean;
+  /** HP of every champion in the contact: meeting there, each side sees the other's (contact = vision). */
+  hp: Record<string, number>;
 }
 
 /** Contact id to the choices given so far. */

@@ -96,7 +96,7 @@ describe('store', () => {
     const path = store.routeOf(j.id, two);
     expect(path).toHaveLength(3);
     expect([path[0], path[2]]).toEqual([j.position, two]);
-    expect(store.stepBudget()).toBe(2);
+    expect(store.stepBudget(j.id)).toBe(2);
   });
 
   test('a recall keeps a pending move as its step only when the move leaves a step for the recall', () => {
@@ -349,7 +349,7 @@ describe('store', () => {
   test('a contact offering the objective preselects it; otherwise the contact default', () => {
     const contact = (blue: Choice[]): Contact => ({
       id: 'river-bot', kind: 'objective', position: 'dragon-pit', positions: ['dragon-pit'], blue: [], red: [],
-      options: { blue, red: ['fight', 'flee'] }, defaults: { blue: 'flee', red: 'fight' }, invader: null, auto: false,
+      options: { blue, red: ['fight', 'flee'] }, defaults: { blue: 'flee', red: 'fight' }, invader: null, auto: false, hp: {},
     });
     expect(playerDefault(contact(['fight', 'flee', 'objective']))).toBe('objective');
     expect(playerDefault(contact(['fight', 'flee']))).toBe('flee');
@@ -357,8 +357,9 @@ describe('store', () => {
 
   test('round 1 budget: the engine decides who can act on arrival', () => {
     const store = started();
-    expect(store.stepBudget()).toBe(engine.stepBudget(data.rules, 1));
-    expect(store.canAct(0)).toBe(true);
-    expect(store.canAct(store.stepBudget())).toBe(false);
+    const id = store.view.value!.allies[0]!.id;
+    expect(store.stepBudget(id)).toBe(engine.stepBudget(data.rules, 1));
+    expect(store.canAct(0, id)).toBe(true);
+    expect(store.canAct(store.stepBudget(id), id)).toBe(false);
   });
 });

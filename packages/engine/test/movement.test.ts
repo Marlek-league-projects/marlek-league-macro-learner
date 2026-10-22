@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData, mirrorId } from '@lml/data';
-import { canAct, defaultOrders, newGame, reachable, reachableFrom, roundWindow, route, spawnPoints, stepBudget, validateOrders } from '@lml/engine';
+import { canAct, defaultOrders, newGame, reachable, reachableFrom, roundWindow, route, spawnPoints, stepBudget, stepBudgetFor, validateOrders } from '@lml/engine';
 import { retreatStep } from '../src/movement';
 import type { ChampionState, GameState, Order } from '@lml/engine/contracts';
 
@@ -183,22 +183,46 @@ describe('validateOrders', () => {
 });
 
 describe('spawnPoints', () => {
-  test('laner and jungler', () => {
+  test('a respawn is a move from the base with the base bonus: every T1 (arrival only at budget 2), not the lane middles', () => {
     const s = fresh();
     const top = get(s, 'blue', 'top');
     top.status = 'respawning';
-    expect(spawnPoints(s, d, top.id)).toEqual(['top-t1-blue', 'mid-t1-blue', 'bot-t1-blue']);
+    const steps = stepBudget(d.rules, s.round) + d.rules.moves.baseBonus;
+    expect(stepBudgetFor(s, d, top.id)).toBe(steps);
+    const points = spawnPoints(s, d, top.id);
+    const fromBase = reachableFrom(d, 'base-blue', steps, 'blue');
+    expect(points).toEqual(Object.keys(fromBase).sort((a, b) => fromBase[a]! - fromBase[b]! || a.localeCompare(b)));
+    expect(points[0]).toBe('base-blue');
+    for (const t of ['top-t1-blue', 'mid-t1-blue', 'bot-t1-blue']) expect(reachable(s, d, top.id)[t]).toBe(3);
+    expect(points).not.toContain('top-lane');
+    for (const camp of ['gromp-blue', 'wolves-blue', 'raptors-blue', 'krugs-blue']) expect(points).toContain(camp);
+    expect(points).not.toContain('bluebuff-blue');
+  });
+  test('the default spawn: a laner its front standing home tower, the jungler its nearest own camp', () => {
+    const s = fresh();
+    const top = get(s, 'blue', 'top');
+    const jg = get(s, 'blue', 'jungle');
+    top.status = 'respawning';
+    jg.status = 'respawning';
+    const spawnOf = (id: string) => defaultOrders(s, d, 'blue').find((o) => o.champion === id);
+    expect(spawnOf(top.id)).toEqual({ kind: 'spawn', champion: top.id, to: 'top-t1-blue' });
     s.towers['top-t1-blue'] = 0;
-    expect(spawnPoints(s, d, top.id)[0]).toBe('top-t2-blue');
-    expect(defaultOrders(s, d, 'blue').find((o) => o.champion === top.id)).toEqual({
-      kind: 'spawn', champion: top.id, to: 'top-t2-blue',
-    });
-    expect(spawnPoints(s, d, get(s, 'blue', 'jungle').id)).toHaveLength(6);
+    expect(spawnOf(top.id)).toEqual({ kind: 'spawn', champion: top.id, to: 'top-t2-blue' });
+    const camp = spawnPoints(s, d, jg.id).find((p) => d.graph.positions[p]!.kind === 'camp' && d.graph.positions[p]!.side === 'blue');
+    expect(spawnOf(jg.id)).toEqual({ kind: 'spawn', champion: jg.id, to: camp! });
+  });
+  test('an alive champion on its base gets the base bonus too; anywhere else, the round budget', () => {
+    const s = fresh();
+    const top = get(s, 'blue', 'top');
+    top.position = 'base-blue';
+    expect(stepBudgetFor(s, d, top.id)).toBe(stepBudget(d.rules, s.round) + d.rules.moves.baseBonus);
+    top.position = 'top-t3-blue';
+    expect(stepBudgetFor(s, d, top.id)).toBe(stepBudget(d.rules, s.round));
   });
 });
 
 describe('defaultOrders and spawn validation', () => {
-  test('respawning laner and jungler spawn at the first spawn point', () => {
+  test('the default spawns of a respawning laner and jungler are valid spawn points', () => {
     const s = fresh();
     const top = get(s, 'blue', 'top');
     const jg = get(s, 'blue', 'jungle');
@@ -206,9 +230,9 @@ describe('defaultOrders and spawn validation', () => {
     jg.status = 'respawning';
     const o = defaultOrders(s, d, 'blue');
     for (const c of [top, jg]) {
-      expect(o.find((x) => x.champion === c.id)).toEqual({
-        kind: 'spawn', champion: c.id, to: spawnPoints(s, d, c.id)[0]!,
-      });
+      const sp = o.find((x) => x.champion === c.id)!;
+      expect(sp.kind).toBe('spawn');
+      expect(spawnPoints(s, d, c.id)).toContain(sp.to!);
     }
     expect(() => validateOrders(s, d, 'blue', o)).not.toThrow();
   });
@@ -218,8 +242,9 @@ describe('defaultOrders and spawn validation', () => {
     const sp: Order = { kind: 'spawn', champion: top.id, to: 'top-t1-blue' };
     expect(() => validateOrders(s, d, 'blue', orders(s, [sp]))).toThrow(/spawn/);
     top.status = 'respawning';
+    // The top lane middle is 4 steps from the base: beyond the budget plus the base bonus.
     expect(() =>
-      validateOrders(s, d, 'blue', orders(s, [{ ...sp, to: 'top-t2-blue' }])),
+      validateOrders(s, d, 'blue', orders(s, [{ ...sp, to: 'top-lane' }])),
     ).toThrow(/spawn/);
   });
 });

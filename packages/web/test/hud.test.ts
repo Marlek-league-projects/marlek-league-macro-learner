@@ -318,6 +318,7 @@ describe('promptContacts', () => {
     defaults: { blue: 'farm', red: 'farm' },
     invader: null,
     auto,
+    hp: { a: 100, b: 100 },
   });
 
   test('automatic contacts are not prompted', () => {

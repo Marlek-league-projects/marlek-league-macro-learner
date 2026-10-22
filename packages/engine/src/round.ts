@@ -4,7 +4,7 @@ import { detectContacts, gankedSide, playsSafe, resolveChoice } from './contacts
 import { advanceRespawns, applyKill, changeHp, completeRecall, finishIfOver } from './economy';
 import { fightVictims, resolveFight } from './fight';
 import { updateLanes } from './lanes';
-import { canAct, reachableFrom, retreatStep, stepBudget, validateOrders } from './movement';
+import { budgetFrom, canAct, reachableFrom, retreatStep, validateOrders } from './movement';
 import { captureObjectives, clearCamps, launchHeralds, spawnObjectives } from './objectives';
 import { roundWindow } from './time';
 import { spotByWards, updateVision } from './vision';
@@ -45,20 +45,24 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
 
   // 4. moves and spawns; contacts come from the input state, where only ordered champions are on the map
   const contacts = detectContacts(state, data, orders);
-  const budget = stepBudget(data.rules, s.round);
-  /** Steps from `from` to `to` this round (`budget` when out of reach: no action left). */
-  const stepsTo = (c: ChampionState, from: string, to: string): number => reachableFrom(data, from, budget, c.side)[to] ?? budget;
+  /** Whether `c`, its move starting on `from`, has a step left on arrival at `to` (out of reach: no action left). */
+  const actsAt = (c: ChampionState, from: string, to: string): boolean => {
+    const budget = budgetFrom(data.rules, s.round, from, c.side);
+    return canAct(reachableFrom(data, from, budget, c.side)[to] ?? budget, budget);
+  };
   for (const c of s.champions) if (c.status !== 'respawning') c.previous = c.position;
   for (const { c, o } of steps) {
     if (o.stance !== undefined) c.stance = o.stance;
     if (o.kind === 'spawn') {
+      // The spawn is a move from the base, with the base's extra steps.
+      const base = `base-${c.side}`;
       c.position = o.to;
-      c.previous = o.to;
+      c.previous = base;
       c.status = 'alive';
       c.respawnRound = null;
-      events.push({ type: 'moved', champion: c.id, from: `base-${c.side}`, to: o.to, acted: true });
+      events.push({ type: 'moved', champion: c.id, from: base, to: o.to, acted: actsAt(c, base, o.to) });
     } else if (o.to !== undefined && o.to !== c.position) {
-      const acted = canAct(stepsTo(c, c.position, o.to), budget);
+      const acted = actsAt(c, c.position, o.to);
       events.push({ type: 'moved', champion: c.id, from: c.position, to: o.to, acted });
       c.position = o.to;
     }
@@ -70,7 +74,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   for (const c of s.champions) {
     if (c.status === 'respawning') continue;
     arrival[c.id] = c.position;
-    if (canAct(stepsTo(c, c.previous, c.position), budget)) arrivedActing.add(c.id);
+    if (actsAt(c, c.previous, c.position)) arrivedActing.add(c.id);
   }
 
   // 5. contacts
@@ -116,8 +120,9 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     retreat(losers);
   };
   /**
-   * Flee movement: back to the previous position, or one step toward the base for a champion who did not move (or
-   * just spawned here) and has nowhere to go back to. Dead champions stay where they are. Either way, no action.
+   * Flee movement: back to the previous position (the base for a champion who just spawned), or one step toward the
+   * base for a champion who did not move and has nowhere to go back to. Dead champions stay where they are. Either
+   * way, no action.
    */
   const retreat = (ids: string[]): void => {
     for (const id of ids) {

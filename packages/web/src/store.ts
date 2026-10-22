@@ -68,10 +68,10 @@ export interface Store {
   reset(): void;
   select(id: string | null): void;
   reachableForSelected(): Record<string, number>;
-  /** Steps every champion may take this round; arriving on the last one leaves no action. */
-  stepBudget(): number;
-  /** A position `distance` steps away lets the champion act on arrival this round. */
-  canAct(distance: number): boolean;
+  /** Steps `champion` may take this round (the base's extra steps included); arriving on the last one leaves no action. */
+  stepBudget(champion: string): number;
+  /** A position `distance` steps away lets `champion` act on arrival this round. */
+  canAct(distance: number, champion: string): boolean;
   /** The path the engine walks for an own champion's move to `to`, both ends included. */
   routeOf(champion: string, to: string): string[];
   /** A move to `to` can come before a recall: it leaves a step of the budget for the recall. */
@@ -172,11 +172,11 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     return c;
   };
 
-  const budget = (): number => engine.stepBudget(data.rules, current().round);
+  const budget = (id: string): number => engine.stepBudgetFor(current(), data, id);
 
   const recallStep = (id: string, to: string): boolean => {
     const n = engine.reachable(current(), data, id)[to];
-    return n !== undefined && n > 0 && n < budget();
+    return n !== undefined && n > 0 && n < budget(id);
   };
 
   const existingMove = (id: string): Extract<Order, { kind: 'move' }> | null => {
@@ -305,11 +305,11 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       const id = selected.value;
       if (!id || !state) return {};
       const c = state.champions.find((x) => x.id === id && x.side === PLAYER);
-      return c && c.status === 'alive' ? engine.reachable(state, data, id) : {};
+      return c && c.status !== 'dead' ? engine.reachable(state, data, id) : {};
     },
 
-    canAct(distance) {
-      return engine.canAct(distance, budget());
+    canAct(distance, id) {
+      return engine.canAct(distance, budget(id));
     },
 
     wardRoundsLeft(ward) {
@@ -457,13 +457,13 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       return engine.estimateEnemy(view.value ?? engine.viewFor(current(), data, PLAYER), data, enemy);
     },
 
-    stepBudget() {
-      return budget();
+    stepBudget(id) {
+      return budget(id);
     },
 
     routeOf(id, to) {
       const c = champion(id);
-      return engine.route(data, c.position, to, c.side);
+      return engine.route(data, c.status === 'respawning' ? `base-${c.side}` : c.position, to, c.side);
     },
 
     recallStep(id, to) {

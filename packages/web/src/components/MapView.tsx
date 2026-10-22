@@ -182,12 +182,8 @@ export function MapView({ store }: { store: Store }) {
   const selectedId = ordering ? store.selected.value : null;
   const selected = view.allies.find((c) => c.id === selectedId) ?? null;
 
-  // Positions the selected pawn can be ordered to, with the number of moves (spawn points count as 0).
-  let reach: Record<string, number> | null = null;
-  if (selected?.status === 'alive') reach = store.reachableForSelected();
-  else if (selected?.status === 'respawning') {
-    reach = Object.fromEntries(store.spawnPointsFor(selected.id).map((id) => [id, 0]));
-  }
+  // Positions the selected pawn can be ordered to, with the number of moves (a respawning one walks from its base).
+  const reach: Record<string, number> | null = selected && selected.status !== 'dead' ? store.reachableForSelected() : null;
 
   const now = store.roundWindow().start;
   const pending = store.pending.value;
@@ -198,9 +194,8 @@ export function MapView({ store }: { store: Store }) {
     store.screen.value === 'contacts' ? store.contacts.value.flatMap((c) => c.positions) : [],
   );
   const objectiveEntries = ordering ? objectivePromptEntries(view, now, store.objectivePromptsClosed.value) : [];
-  /** Act or arrival-only ring of a position for the selected token (spawn points always act). */
-  const ring = (id: string) =>
-    reach ? rangeRing(reach[id], (d) => selected?.status === 'respawning' || store.canAct(d)) : null;
+  /** Act or arrival-only ring of a position for the selected token. */
+  const ring = (id: string) => (reach && selected ? rangeRing(reach[id], (d) => store.canAct(d, selected.id)) : null);
 
   const order = (to: string) => {
     if (!selected) return;
@@ -324,7 +319,7 @@ export function MapView({ store }: { store: Store }) {
     if (!o || o.to === undefined) return [];
     const from = o.kind === 'spawn' ? `base-${c.side}` : c.position;
     if (o.to === from) return [];
-    const path = (o.kind === 'spawn' ? [from, o.to] : store.routeOf(c.id, o.to)).map((id) => positions[id]);
+    const path = store.routeOf(c.id, o.to).map((id) => positions[id]);
     if (path.length < 2 || path.some((p) => !p)) return [];
     const points = path.map((p) => `${p!.x},${p!.y}`).join(' ');
     if (o.kind !== 'recall') return [<polyline key={c.id} class="arrow" points={points} marker-end="url(#arr)" />];

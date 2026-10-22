@@ -3,7 +3,7 @@ import type { AiProfile, GameData, Lane, MistakeId, ObjectiveId, Role, Side } fr
 import type { ChampionState, Choice, Contact, EnemyInfo, GameState, Order, PlayerView, Rng, Stance } from '../contracts';
 import { fightPosition, gankedSide } from '../contacts';
 import { resolveFight } from '../fight';
-import { canAct, reachableFrom, spawnPointsFor, stepBudget } from '../movement';
+import { budgetFrom, canAct, reachableFrom, spawnPointsFor, stepBudget } from '../movement';
 import { type PitId, SCUTTLE_PIT } from '../objectives';
 import { roundWindow } from '../time';
 import { other, ourWave, PITS, pitTiming } from './evaluate';
@@ -96,6 +96,8 @@ function front(ctx: Ctx, side: Side, lane: Lane): string | null {
 
 /** Steps every champion may take in the view's round. */
 const budget = (ctx: Ctx): number => stepBudget(ctx.data.rules, ctx.view.round);
+/** `c`'s own steps this round: `budget`, plus the base's extra steps when it starts on its base. */
+const budgetOf = (ctx: Ctx, c: ChampionState): number => budgetFrom(ctx.data.rules, ctx.view.round, c.position, c.side);
 
 /**
  * Hard rule, never a mistake: an AI champion ends on a standing enemy tower only when it is that lane's front tower
@@ -109,7 +111,7 @@ export function towerAllowed(ctx: Ctx, position: string): boolean {
 
 /** Positions `c` may end on this round (`towerAllowed`), with their distance; with none, its own position. */
 function reach(ctx: Ctx, c: ChampionState): Record<string, number> {
-  const all = reachableFrom(ctx.data, c.position, budget(ctx), c.side);
+  const all = reachableFrom(ctx.data, c.position, budgetOf(ctx, c), c.side);
   const out = Object.fromEntries(Object.entries(all).filter(([p]) => towerAllowed(ctx, p)));
   return Object.keys(out).length > 0 ? out : { [c.position]: 0 };
 }
@@ -117,7 +119,7 @@ function reach(ctx: Ctx, c: ChampionState): Record<string, number> {
 /** `c` reaches `pos` this round with a step left to act there (clear, take, farm). */
 function actsOn(ctx: Ctx, c: ChampionState, pos: string): boolean {
   const d = reach(ctx, c)[pos];
-  return d !== undefined && canAct(d, budget(ctx));
+  return d !== undefined && canAct(d, budgetOf(ctx, c));
 }
 
 /**
@@ -161,7 +163,7 @@ function step(ctx: Ctx, c: ChampionState, target: string): string {
 
 /** Position closest to `target` among those passing `where` where `c` still has a step left to act, or null. */
 function actStep(ctx: Ctx, c: ChampionState, target: string, where: (pos: string) => boolean): string | null {
-  return closest(ctx, c, target, (p, steps) => canAct(steps, budget(ctx)) && where(p));
+  return closest(ctx, c, target, (p, steps) => canAct(steps, budgetOf(ctx, c)) && where(p));
 }
 
 const moveTo = (c: ChampionState, to: string): Order => ({ kind: 'move', champion: c.id, to });
@@ -203,15 +205,28 @@ function ownCamps(ctx: Ctx): [string, number][] {
   return Object.entries(ctx.view.camps).filter(([id]) => ctx.data.graph.positions[id]?.side === ctx.side);
 }
 
+/**
+ * Where `c` respawns, among the positions its move from the base reaches (nearest first): the jungler an own camp up,
+ * one it acts on first, a buff first; a laner its home lane's front standing tower, else the point nearest its lane.
+ */
 function spawnOrder(ctx: Ctx, c: ChampionState): Order {
-  const points = spawnPointsFor(ctx.view, ctx.data, c.id);
+  const { data } = ctx;
+  const points = spawnPointsFor(ctx.view, data, c.id);
+  const base = `base-${c.side}`;
+  const steps = budgetFrom(data.rules, ctx.view.round, base, c.side);
+  const from = reachableFrom(data, base, steps, c.side);
   let to: string;
   if (c.role === 'jungle') {
-    const alive = points.filter((p) => (ctx.view.camps[p] ?? Infinity) <= ctx.end);
-    to = alive.find((p) => /^(blue|red)buff-/.test(p)) ?? alive[0] ?? points[0]!;
+    const camps = points.filter((p) => data.graph.positions[p]!.kind === 'camp' && data.graph.positions[p]!.side === c.side);
+    const up = camps.filter((p) => (ctx.view.camps[p] ?? Infinity) <= ctx.end);
+    const acting = up.filter((p) => canAct(from[p]!, steps));
+    const buff = (ps: string[]): string | undefined => ps.find((p) => /^(blue|red)buff-/.test(p));
+    to = buff(acting) ?? acting[0] ?? buff(up) ?? up[0] ?? camps[0] ?? points[0]!;
   } else {
-    const mid = laneMid(ctx.data, HOME_LANE[c.role]);
-    to = [...points].sort((a, b) => dist(ctx.data, a, mid) - dist(ctx.data, b, mid))[0]!;
+    const lane = HOME_LANE[c.role];
+    const tower = front(ctx, c.side, lane);
+    const mid = laneMid(data, lane);
+    to = tower !== null && points.includes(tower) ? tower : [...points].sort((a, b) => dist(data, a, mid) - dist(data, b, mid))[0]!;
   }
   return { kind: 'spawn', champion: c.id, to };
 }
@@ -626,7 +641,7 @@ function riverUp(view: PlayerView, data: GameData, contact: Contact): boolean {
 }
 
 /**
- * Contact choice for a prompted contact, with what `view.side` knows:
+ * Contact choice for a prompted contact, with what `view.side` knows and the HP the contact shows (contact = vision):
  * - `objective` (keep taking the river objective) when there is one to take and the fight scored at
  *   `fight.objectiveFocus` of our strength is still won;
  * - otherwise `fight` when the fight is won, or when `chase` and outnumbered;
@@ -641,6 +656,8 @@ export function contactChoice(view: PlayerView, data: GameData, contact: Contact
   const options = contact.options[side];
   if (options.length === 1) return options[0]!;
   const state = stateFromView(view, data);
+  // Contact = vision: everyone in the contact is seen, at the HP the contact shows.
+  for (const c of state.champions) if (contact.hp[c.id] !== undefined) c.hp = contact.hp[c.id]!;
   const stage = roundWindow(data.rules, view.round).stage;
   const fight = (focus: Partial<Record<Side, number>> = {}) =>
     resolveFight(state, data, contact.position, contact.blue, contact.red, stage, gankedSide(contact), focus);

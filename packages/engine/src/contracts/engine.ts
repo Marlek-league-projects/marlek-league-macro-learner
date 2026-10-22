@@ -33,6 +33,8 @@ export interface GameEngine {
   route(data: GameData, from: string, to: string, side: Side): string[];
   /** Steps every champion may take in `round`; arriving on the last one leaves no action. */
   stepBudget(rules: Rules, round: number): number;
+  /** A champion's steps this round: `stepBudget`, plus `moves.baseBonus` when its move starts on its base (respawns too). */
+  stepBudgetFor(state: GameState, data: GameData, championId: string): number;
   /** A champion `distance` steps away acts on arrival (staying acts). */
   canAct(distance: number, budget: number): boolean;
   spawnPoints(state: GameState, data: GameData, championId: string): string[];

@@ -550,6 +550,30 @@ describe('aiContactChoice', () => {
     const view = viewFor(s, d, 'blue');
     expect(aiContactChoice(view, d, contact, profile('iron'), stubRng(() => 0))).toBe('fight');
     expect(aiContactChoice(view, d, contact, profile('challenger'), stubRng(() => 0.99))).toBe('flee');
+
+  });
+
+  test('contact = vision: the contact shows every champion\'s HP, and the choice uses it (unseen, the view assumes full HP)', () => {
+    const s = newGame(d, 7);
+    s.round = 10;
+    place(s, 'blue', 'jungle', 'gromp-blue');
+    place(s, 'red', 'jungle', 'raptors-red');
+    const bj = get(s, 'blue', 'jungle');
+    const rj = get(s, 'red', 'jungle');
+    bj.hp = 30;
+    rj.hp = 10;
+    const orders: Orders = {
+      blue: defaultOrders(s, d, 'blue').map((x) => (x.champion === bj.id ? { kind: 'move', champion: bj.id, to: 'scuttle-top' } : x)),
+      red: defaultOrders(s, d, 'red').map((x) => (x.champion === rj.id ? { kind: 'move', champion: rj.id, to: 'scuttle-top' } : x)),
+    };
+    const contact = detectContacts(s, d, orders).find((c) => c.id === 'river-top')!;
+    expect(contact.hp).toEqual({ [bj.id]: bj.hp, [rj.id]: 10 });
+    const view = viewFor(s, d, 'blue');
+    expect(view.enemies.find((e) => e.id === rj.id)!.hp).toBeNull();
+    const choice = (hp: number) => aiContactChoice(view, d, { ...contact, hp: { ...contact.hp, [rj.id]: hp } }, profile('challenger'), stubRng(() => 0.99));
+    // Blue at 30 HP flees a red jungler it would assume at full HP, and engages the 10 HP one the contact shows.
+    expect(choice(100)).toBe('flee');
+    expect(['fight', 'objective']).toContain(choice(10));
   });
 });
 
