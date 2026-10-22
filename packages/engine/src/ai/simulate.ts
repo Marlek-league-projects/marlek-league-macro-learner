@@ -55,6 +55,7 @@ export function stateFromView(view: PlayerView, data: GameData): GameState {
     towersDestroyed: view.towersDestroyed,
     kills: view.scoreboard.kills,
     lastSeen,
+    met: { blue: {}, red: {} },
     winner: view.winner,
   });
 }

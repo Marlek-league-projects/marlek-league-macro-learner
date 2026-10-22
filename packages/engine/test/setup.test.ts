@@ -80,3 +80,26 @@ test('each jungler has already cleared its start buff camp', () => {
     for (const c of g.champions.filter((x) => x.role !== 'jungle')) expect([c.gold, c.xp]).toEqual([0, 0]);
   }
 });
+
+test('blueJunglerStart: the jungler starts on that camp, cleared with the small-camp values', () => {
+  const base = newGame(d, 7);
+  const g = newGame(d, 7, undefined, { blueJunglerStart: 'gromp-blue' });
+  const bj = g.champions.find((c) => c.side === 'blue' && c.role === 'jungle')!;
+  expect(bj.position).toBe('gromp-blue');
+  expect(g.camps['gromp-blue']).toBe(d.rules.camps.firstSpawn + d.rules.camps.smallRespawn);
+  expect(bj.gold).toBe(d.rules.camps.smallGold);
+  const rj = (s: typeof g) => s.champions.find((c) => c.side === 'red' && c.role === 'jungle')!;
+  expect(rj(g).position).toBe(rj(base).position);
+  expect(g.champions.filter((c) => c.role !== 'jungle' || c.side === 'red')).toEqual(
+    base.champions.filter((c) => c.role !== 'jungle' || c.side === 'red'),
+  );
+});
+
+test('blueJunglerStart: no option is unchanged, invalid ids throw', () => {
+  expect(newGame(d, 7, undefined, {})).toEqual(newGame(d, 7));
+  const seeded = newGame(d, 7).champions.find((c) => c.side === 'blue' && c.role === 'jungle')!.position;
+  expect(newGame(d, 7, undefined, { blueJunglerStart: seeded }).camps).toEqual(newGame(d, 7).camps);
+  for (const bad of ['gromp-red', 'top-t1-blue', 'nope', 'bluebuff']) {
+    expect(() => newGame(d, 7, undefined, { blueJunglerStart: bad })).toThrow();
+  }
+});

@@ -6,6 +6,10 @@ import type { GameState, Rng, Ward } from './state';
 import type { Explanation } from './teaching';
 import type { EnemyEstimate, EnemyInfo, PlayerView } from './view';
 
+export interface NewGameOptions {
+  blueJunglerStart?: string;
+}
+
 export type Draft = Record<Side, Record<Role, string>>;
 
 /** Time window covered by one round. */
@@ -24,7 +28,8 @@ export interface RoundResult {
 
 /** The engine surface the web app uses. */
 export interface GameEngine {
-  newGame(data: GameData, seed: number, draft?: Draft): GameState;
+  /** `options.blueJunglerStart`: one of the 6 blue camp ids where the blue jungler starts (cleared); default: the seeded buff. Invalid ids throw. */
+  newGame(data: GameData, seed: number, draft?: Draft, options?: NewGameOptions): GameState;
   defaultOrders(state: GameState, data: GameData, side: Side): Order[];
   reachable(state: GameState, data: GameData, championId: string): Record<string, number>;
   /** True when a step between two positions changes lane (which ends the move). */

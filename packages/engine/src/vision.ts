@@ -159,6 +159,7 @@ export function viewFor(state: GameState, data: GameData, side: Side): PlayerVie
     .map((c) => {
       const last = state.lastSeen[side][c.id] ?? null;
       const seen = visible.has(c.id);
+      const met = state.met?.[side][c.id];
       return {
         id: c.id,
         role: c.role,
@@ -167,6 +168,7 @@ export function viewFor(state: GameState, data: GameData, side: Side): PlayerVie
         lastSeenRound: last?.round ?? null,
         level: seen ? level(c.xp, data.rules) : null,
         hp: seen ? c.hp : null,
+        met: !seen && met && (!last || last.round <= met.round) ? { ...met } : null,
       };
     });
   const camps: GameState['camps'] = { ...state.campsSeen[side] };

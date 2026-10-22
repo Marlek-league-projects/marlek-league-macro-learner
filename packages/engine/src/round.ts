@@ -1,7 +1,7 @@
 import type { GameData, Lane, Side } from '@lml/data/contracts';
 import type { ChampionState, ContactChoices, GameEvent, GameState, Order, Orders, RoundResult } from './contracts';
 import { detectContacts, gankedSide, playsSafe, resolveChoice } from './contacts';
-import { advanceRespawns, applyKill, changeHp, completeRecall, finishIfOver } from './economy';
+import { advanceRespawns, applyKill, changeHp, completeRecall, finishIfOver, level } from './economy';
 import { fightVictims, resolveFight } from './fight';
 import { updateLanes } from './lanes';
 import { budgetFrom, canAct, reachableFrom, retreatStep, validateOrders } from './movement';
@@ -146,6 +146,11 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     }
   };
   for (const contact of contacts) {
+    for (const side of SIDES) {
+      for (const id of contact[other(side)]) {
+        s.met[side][id] = { round: s.round, position: contact.position, level: level(byId(id).xp, data.rules), hp: contact.hp[id]! };
+      }
+    }
     const choice = resolveChoice(contact, choices);
     const lane = data.graph.positions[contact.position]!.lane ?? null;
     const ids: Record<Side, string[]> = { blue: contact.blue, red: contact.red };

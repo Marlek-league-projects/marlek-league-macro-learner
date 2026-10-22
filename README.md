@@ -60,7 +60,7 @@ Teaching mode calls out tempo directly, for example: *"You lost 2 rounds: your m
 Every round is 20 s, so a token moves the same distance all game. Values that only make sense in real time keep their duration (the death timer and the Baron buff, below); the others count in rounds. Objective timers change between patches, so they live in data files.
 
 - **Verdict.** There is no nexus to destroy for now. At the end of the game, the winner is the team with the bigger accumulated advantage: gold, objectives and towers.
-- **Starting state.** Every laner starts in lane. Each jungler has already done its first buff when round 1 starts: it stands on that buff camp, the camp is cleared, and it has the buff's gold and XP. You know which camp the enemy jungler started on.
+- **Starting state.** Every laner starts in lane. Each jungler has already done its first buff when round 1 starts: it stands on that buff camp, the camp is cleared, and it has the buff's gold and XP. You choose where your jungler starts: any of your 6 camps (default: the Blue Buff or Red Buff picked by the seed). A small camp gives its own gold, XP and respawn, not the buff's; the AI keeps the seeded buff. You know which camp the enemy jungler started on.
 - **Death and recall.** A token that dies or recalls comes back next turn at a base position on its own half of the map. On that turn it can't invade or take an objective. A death keeps the champion out for a time that grows with the game stage (`death.roundsByStage`): 1, 1, 2, 3 and 6 rounds, which is 20 s, 20 s, 40 s, 1 min and 2 min. A recall always costs 1 round.
 
 ## Fights
@@ -239,6 +239,8 @@ Enemy champions are hidden in fog of war. You see an enemy champion only if it i
 - on a position where you have a **ward**.
 
 Vision is revealed when the round resolves, so you use what you saw this round to plan the next one. The enemy jungler's starting camp is visible only during the first round.
+
+**Met enemies.** Every champion in a contact that round (lane or jungle, prompted or automatic) is met by the other side. Until you see it again, its enemy card shows the level and HP it had when you met it, with where and when (`met`). Once seen again, the live values replace it. Fog of war holds otherwise.
 
 **Camp timers.** You know a camp's respawn timer, yours or the enemy's, from the last time you saw it: with a champion or a ward on it, or by clearing it. An enemy clear you did not see leaves the camp shown as before.
 

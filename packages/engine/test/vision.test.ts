@@ -454,3 +454,41 @@ describe('lane pressure in the view', () => {
     expect(lanePressure(b.s, d, 'top')).toBe('red');
   });
 });
+
+describe('met enemies', () => {
+  test('a lane contact and a jungle contact record met for both sides', () => {
+    const s = newGame(d, 5);
+    place(s, 'blue', 'jungle', 'gromp-red');
+    place(s, 'red', 'jungle', 'gromp-red');
+    place(s, 'blue', 'top', 'top-t2-red');
+    place(s, 'red', 'top', 'top-t2-red');
+    const r = resolveRound(s, d, ordersWith(s), {});
+    const bj = get(s, 'blue', 'jungle').id;
+    const rj = get(s, 'red', 'jungle').id;
+    const rt = get(s, 'red', 'top').id;
+    const bt = get(s, 'blue', 'top').id;
+    expect(r.state.met.blue[rj]).toMatchObject({ round: 1, position: 'gromp-red' });
+    expect(r.state.met.red[bj]).toMatchObject({ round: 1, position: 'gromp-red' });
+    expect(r.state.met.blue[rt]!.round).toBe(1);
+    expect(r.state.met.red[bt]!.hp).toBeGreaterThan(0);
+    expect(r.state.met.blue[rt]!.level).toBeGreaterThanOrEqual(1);
+  });
+
+  test('EnemyInfo.met shows the record while unseen, null once seen again', () => {
+    const s = newGame(d, 5);
+    const rj = get(s, 'red', 'jungle');
+    s.met.blue[rj.id] = { round: 3, position: 'wolves-red', level: 4, hp: 60 };
+    s.round = 5;
+    s.lastSeen.blue[rj.id] = { position: 'wolves-red', round: 3 };
+    let e = viewFor(s, d, 'blue').enemies.find((x) => x.id === rj.id)!;
+    expect(e.visible).toBe(false);
+    expect(e.met).toEqual({ round: 3, position: 'wolves-red', level: 4, hp: 60 });
+    s.lastSeen.blue[rj.id] = { position: 'raptors-red', round: 4 };
+    e = viewFor(s, d, 'blue').enemies.find((x) => x.id === rj.id)!;
+    expect(e.visible).toBe(true);
+    expect(e.met).toBeNull();
+    s.lastSeen.blue[rj.id] = { position: 'raptors-red', round: 2 };
+    s.met.blue[rj.id]!.round = 1;
+    expect(viewFor(s, d, 'blue').enemies.find((x) => x.id === rj.id)!.met).toBeNull();
+  });
+});

@@ -1,5 +1,5 @@
 import type { GameData, Role, Side } from '@lml/data/contracts';
-import type { ChampionState, Draft, GameState, PitState, Rng } from './contracts';
+import type { ChampionState, Draft, NewGameOptions, GameState, PitState, Rng } from './contracts';
 import { grant } from './lanes';
 import { createRng } from './rng';
 
@@ -27,16 +27,21 @@ function laneStart(side: Side, role: Role): string {
   return `${lane}-t1-${side}`;
 }
 
-export function newGame(data: GameData, seed: number, draft?: Draft): GameState {
+export function newGame(data: GameData, seed: number, draft?: Draft, options?: NewGameOptions): GameState {
   const { rules, graph } = data;
   const rng = createRng(seed);
+  const start = options?.blueJunglerStart;
+  if (start !== undefined) {
+    const p = data.graph.positions[start];
+    if (!p || p.kind !== 'camp' || !start.endsWith('-blue')) throw new Error(`Invalid jungler start camp: ${start}`);
+  }
   const picks = draft ?? randomDraft(data, rng);
 
   const champions: ChampionState[] = [];
   for (const side of SIDES) {
     for (const role of ROLES) {
-      const position =
-        role === 'jungle' ? `${rng.pick(JUNGLE_START_CAMPS)}-${side}` : laneStart(side, role);
+      const seeded = role === 'jungle' ? `${rng.pick(JUNGLE_START_CAMPS)}-${side}` : null;
+      const position = seeded === null ? laneStart(side, role) : side === 'blue' && start !== undefined ? start : seeded;
       champions.push({
         id: picks[side][role], side, role, position, previous: position,
         status: 'alive', respawnRound: null, xp: 0, gold: 0, items: 0, bonusLead: 0, goldEarned: 0, hasHerald: false,
@@ -54,8 +59,9 @@ export function newGame(data: GameData, seed: number, draft?: Draft): GameState 
 
   // Each jungler has already cleared its start buff camp.
   for (const j of champions.filter((c) => c.role === 'jungle')) {
-    camps[j.position] = rules.camps.firstSpawn + rules.camps.buffRespawn;
-    grant(j, rules.camps.buffGold, rules.camps.buffXp);
+    const buff = JUNGLE_START_CAMPS.includes(graph.positions[j.position]!.camp!);
+    camps[j.position] = rules.camps.firstSpawn + (buff ? rules.camps.buffRespawn : rules.camps.smallRespawn);
+    grant(j, buff ? rules.camps.buffGold : rules.camps.smallGold, buff ? rules.camps.buffXp : rules.camps.smallXp);
   }
 
   const scuttleSpawn = rules.objectives.scuttle.firstSpawn;
@@ -96,6 +102,7 @@ export function newGame(data: GameData, seed: number, draft?: Draft): GameState 
     towersDestroyed: { blue: 0, red: 0 },
     kills: { blue: 0, red: 0 },
     lastSeen,
+    met: { blue: {}, red: {} },
     winner: null,
   };
 }

@@ -1,5 +1,5 @@
 import type { Lane, Role, Side } from '@lml/data/contracts';
-import type { ChampionState, GameState, Ward } from './state';
+import type { ChampionState, GameState, MetRecord, Ward } from './state';
 
 /** What a side knows about one enemy champion. */
 export interface EnemyInfo {
@@ -14,6 +14,8 @@ export interface EnemyInfo {
   level: number | null;
   /** Health, only known while visible. */
   hp: number | null;
+  /** What the side learned meeting it in a contact, while it has not been seen since; null otherwise. */
+  met: MetRecord | null;
 }
 
 /** What a side assumes an enemy has (fog of war: never its true lead), as the AI and lane pressure estimate it. */

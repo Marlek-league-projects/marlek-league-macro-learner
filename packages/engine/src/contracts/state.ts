@@ -51,6 +51,14 @@ export interface PitState {
   capture: { side: Side; startedRound: number } | null;
 }
 
+/** What a side learned of an enemy champion meeting it in a contact. */
+export interface MetRecord {
+  round: number;
+  position: string;
+  level: number;
+  hp: number;
+}
+
 export interface GameState {
   seed: number;
   rngState: number;
@@ -82,5 +90,10 @@ export interface GameState {
    * where it ended it (so not shown as visible).
    */
   lastSeen: Record<Side, Record<string, { position: string; round: number; spotted?: boolean } | null>>;
+  /**
+   * Per side, enemy champion id to what that side learned meeting it in a contact (lane or jungle): the round,
+   * where, and its level and HP at contact time.
+   */
+  met: Record<Side, Record<string, MetRecord>>;
   winner: Side | 'draw' | null;
 }
