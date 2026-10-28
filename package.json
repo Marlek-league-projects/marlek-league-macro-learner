@@ -10,7 +10,8 @@
     "build": "bun run --filter @lml/web build",
     "dev": "bun run --filter @lml/web dev",
     "fetch-data": "bun packages/data/scripts/fetch-champions.ts",
-    "movement-map": "bun packages/engine/scripts/movement-map.ts"
+    "movement-map": "bun packages/engine/scripts/movement-map.ts",
+    "xp-curve": "bun packages/engine/scripts/xp-curve.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

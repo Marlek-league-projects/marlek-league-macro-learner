@@ -153,6 +153,7 @@ Game stages for matchups, skirmish and teamfight: *really early, early, mid, mid
 - When one side gets more champions in the lane, the wave is pushed.
 - When a laner leaves their lane, their wave pushes toward their tower and the enemy laner gains lead. If that enemy also had matchup pressure, the tower loses some HP.
 - *(design call)* "Near the tower" always means the side's **frontmost standing tower** in that lane. When a T1 falls, the wave fights at the T2.
+- **The wave feeds the laners only.** A jungler standing in a lane takes no wave farm (gold or XP), and the laners there farm as if it were not there. A gank pays only through its kills (and assists) and its lane effect (the wave to the tower, or a plate); a failed gank is a round of camps lost.
 
 **Towers.** Each tower has **5 HP**, and one HP is one plate.
 

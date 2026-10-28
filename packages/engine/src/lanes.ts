@@ -181,7 +181,8 @@ export function updateLanes(
     const pressured: Side | null = underPressure ? (nb < nr ? 'blue' : 'red') : null;
     for (const side of ['blue', 'red'] as Side[]) {
       const standing = present[side];
-      const here = standing.filter((c) => acting.has(c.id));
+      // A jungler takes no wave farm: a gank pays only through kills and its lane effect.
+      const here = standing.filter((c) => acting.has(c.id) && c.role !== 'jungle');
       const carries = here.filter((c) => c.role !== 'support');
       const share = side === pressured ? rules.economy.pressureFarmShare : 1;
       const gold = (rules.economy.farmGoldPerMin * win.seconds * share) / 60;

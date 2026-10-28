@@ -109,10 +109,10 @@ describe('towers', () => {
     expect(b.towersDestroyed.blue).toBe(1);
     expect(frontTower(b, d, 'red', 'top')).toBe('top-t2-red');
   });
-  /** Gold a pusher earns from farm + passive in `round`, with 3 non-support pushers. */
+  /** Gold a laner pusher earns from farm + passive in `round`: 2 laners share the wave (the jungler takes none). */
   const base = (round: number): number => {
     const sec = roundWindow(d.rules, round).seconds;
-    return (d.rules.economy.farmGoldPerMin * sec) / 60 / 3 + (d.rules.economy.passiveGoldPerMin * sec) / 60;
+    return (d.rules.economy.farmGoldPerMin * sec) / 60 / 2 + (d.rules.economy.passiveGoldPerMin * sec) / 60;
   };
   test('plate gold is split among attackers before 14:00', () => {
     const s = push3(1);
@@ -159,6 +159,18 @@ describe('farming', () => {
     // With a non-bot carry, the support and the carry farm as if no duo.
     expect(get(s, 'red', 'support').xp).toBeCloseTo(soloXp * d.rules.economy.supportShare, 6);
     expect(get(s, 'red', 'top').xp).toBeCloseTo(soloXp, 6);
+  });
+  test('a jungler in lane takes no wave farm and leaves the laner its full share', () => {
+    const s = fresh();
+    get(s, 'blue', 'top').position = 'top-lane';
+    get(s, 'blue', 'jungle').position = 'top-lane';
+    run(s);
+    const passive = (d.rules.economy.passiveGoldPerMin * 20) / 60;
+    const solo = { gold: (d.rules.economy.farmGoldPerMin * 20) / 60, xp: (d.rules.economy.farmXpPerMin * 20) / 60 };
+    expect(get(s, 'blue', 'jungle').gold).toBeCloseTo(passive, 6);
+    expect(get(s, 'blue', 'jungle').xp).toBe(0);
+    expect(get(s, 'blue', 'top').gold - passive).toBeCloseTo(solo.gold, 6);
+    expect(get(s, 'blue', 'top').xp).toBeCloseTo(solo.xp, 6);
   });
   test('under lane pressure the smaller side farms at pressureFarmShare; not in a lane without pressure', () => {
     const farmed = (ganked: Set<Lane>): { gold: number; xp: number } => {

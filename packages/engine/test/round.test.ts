@@ -769,19 +769,19 @@ describe('HP losses are visible', () => {
 });
 
 describe('acting after a lane pull-in', () => {
-  /** Round 1 (budget 2): a top skirmish at top-lane, blue winning; the blue jungler goes `from` → `to`, pulled to top-lane. */
+  /** Round 1 (budget 2): a top skirmish at top-lane, blue winning; the blue mid goes `from` → `to`, pulled to top-lane. */
   function pulled(from: string, to: string): { r: ReturnType<typeof resolveRound>; bj: string; xpBefore: number } {
     const s = setup(1, [
       ['blue', 'top', 'top-lane'],
-      ['blue', 'jungle', from],
+      ['blue', 'mid', from],
       ['red', 'top', 'top-lane'],
       ['red', 'jungle', 'top-lane'],
     ]);
-    for (const role of ['top', 'jungle']) get(s, 'blue', role).bonusLead += 100_000;
-    const bj = get(s, 'blue', 'jungle').id;
+    for (const role of ['top', 'mid']) get(s, 'blue', role).bonusLead += 100_000;
+    const bj = get(s, 'blue', 'mid').id;
     const stay = (side: string, role: string): Order => ({ kind: 'move', champion: get(s, side, role).id, to: get(s, side, role).position });
     const o = ordersWith(s, [stay('blue', 'top'), stay('red', 'top'), stay('red', 'jungle'), { kind: 'move', champion: bj, to }]);
-    const xpBefore = get(s, 'blue', 'jungle').xp;
+    const xpBefore = get(s, 'blue', 'mid').xp;
     return { r: resolveRound(s, d, o, { 'lane-top': { blue: 'fight', red: 'fight' } }), bj, xpBefore };
   }
   const killXpShare = (events: GameEvent[]): number =>
@@ -790,16 +790,16 @@ describe('acting after a lane pull-in', () => {
   test('an arrival-only champion pulled back to the fight gains no action and does not farm', () => {
     const { r, bj, xpBefore } = pulled('top-t1-blue', 'top-t1-red');
     expect(r.events.some((e) => e.type === 'fight' && e.winner === 'blue')).toBe(true);
-    expect(get(r.state, 'blue', 'jungle').position).toBe('top-lane');
+    expect(get(r.state, 'blue', 'mid').position).toBe('top-lane');
     expect(r.events.filter((e) => e.type === 'moved' && e.champion === bj).every((e) => e.type === 'moved' && !e.acted)).toBe(true);
-    expect(get(r.state, 'blue', 'jungle').xp - xpBefore).toBeCloseTo(killXpShare(r.events), 9);
+    expect(get(r.state, 'blue', 'mid').xp - xpBefore).toBeCloseTo(killXpShare(r.events), 9);
   });
 
   test('an acting champion pulled away keeps its action and farms', () => {
     const { r, bj, xpBefore } = pulled('top-t2-red', 'top-t1-red');
-    expect(get(r.state, 'blue', 'jungle').position).toBe('top-lane');
+    expect(get(r.state, 'blue', 'mid').position).toBe('top-lane');
     expect(r.events.filter((e) => e.type === 'moved' && e.champion === bj).every((e) => e.type === 'moved' && e.acted)).toBe(true);
-    expect(get(r.state, 'blue', 'jungle').xp - xpBefore).toBeGreaterThan(killXpShare(r.events) + 1e-9);
+    expect(get(r.state, 'blue', 'mid').xp - xpBefore).toBeGreaterThan(killXpShare(r.events) + 1e-9);
   });
 });
 
