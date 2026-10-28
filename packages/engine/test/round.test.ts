@@ -58,7 +58,7 @@ describe('resolveRound', () => {
     expect(events.some((e) => e.type === 'fight')).toBe(false);
   });
 
-  test('scuttle 1v2: a flee step not allowed throws (a contact position, where an enemy came from, too far)', () => {
+  test('scuttle 1v2: a flee step not allowed throws (a contact position, toward the enemy base, too far)', () => {
     const { s, o } = scuttleScenario();
     const bj = get(s, 'blue', 'jungle').id;
     for (const to of ['scuttle-bot', 'mid-t1-red', 'top-lane']) {

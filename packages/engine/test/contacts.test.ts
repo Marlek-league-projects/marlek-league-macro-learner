@@ -262,12 +262,16 @@ describe('fleeSteps', () => {
     expect(c.arrivals).toEqual(Object.fromEntries([...c.blue, ...c.red].map((id) => [id, 'scuttle-bot'])));
   });
 
-  test("the neighbours of the retreat spot, minus the contact's positions, the enemy base and where an enemy came from", () => {
+  test("the neighbours of the retreat spot, minus the contact's positions, the enemy base and those closer to the enemy base", () => {
     const { s, o } = scuttle1v2();
     const c = detectContacts(s, d, o).find((x) => x.id === 'river-bot')!;
     const steps = fleeSteps(s, d, c, get(s, 'blue', 'jungle').id);
-    const expected = d.graph.adj['scuttle-bot']!.filter((p) => p !== 'mid-t1-red');
+    const toRed = (p: string): number => d.graph.distance(p, 'base-red');
+    const expected = d.graph.adj['scuttle-bot']!.filter((p) => toRed(p) >= toRed('scuttle-bot'));
     expect([...steps].sort()).toEqual([...expected].sort());
+    expect(steps).not.toContain('mid-t1-red');
+    expect(steps).not.toContain('bot-t1-red');
+    expect(steps).toContain('dragon-pit');
     expect(steps).toContain(retreatStep(d, 'blue', 'scuttle-bot'));
   });
 
@@ -277,14 +281,14 @@ describe('fleeSteps', () => {
     expect(fleeSteps(s, d, c, get(s, 'blue', 'jungle').id)[0]).toBe(retreatStep(d, 'blue', 'scuttle-bot'));
   });
 
-  test('the automatic step is allowed even onto an excluded position', () => {
-    // Blue top on the lane middle, ganked by the red jungler coming from the blue T1 (the automatic step).
+  test('in lane: the own tower (automatic) and the river, never the enemy tower', () => {
+    // Blue top on the lane middle, ganked by the red jungler coming from the blue T1 (where it came from is not used).
     const s = setup([['blue', 'top', 'top-lane'], ['red', 'top', 'top-lane'], ['red', 'jungle', 'top-t1-blue']]);
     const o = stay(s, [{ kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'top-lane' }]);
     const c = detectContacts(s, d, o).find((x) => x.id === 'lane-top')!;
     const steps = fleeSteps(s, d, c, get(s, 'blue', 'top').id);
     expect(retreatStep(d, 'blue', 'top-lane')).toBe('top-t1-blue');
-    expect(steps).toEqual(['top-t1-blue', 'top-t1-red', 'scuttle-top', 'baron-pit']);
+    expect(steps).toEqual(['top-t1-blue', 'scuttle-top', 'baron-pit']);
   });
 
   test('a champion outside the contact has no flee step', () => {

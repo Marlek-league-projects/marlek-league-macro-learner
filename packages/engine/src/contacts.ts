@@ -286,8 +286,9 @@ export function fleeSpot(data: GameData, side: Side, position: string, arrival: 
 
 /**
  * The positions a champion of `contact` (`state`: the round's input state, as for `detectContacts`) may flee to: the
- * neighbours of its `fleeSpot`, minus the contact's positions, the enemy base and every position an enemy of the
- * contact came from this round. The automatic step (`retreatStep`) comes first and is always allowed (when the
+ * neighbours of its `fleeSpot`, minus the contact's positions, the enemy base and every neighbour strictly closer to
+ * the enemy base than the spot (a flee never heads into enemy ground; only the map and the contact are used, so the
+ * fog holds). The automatic step (`retreatStep`) comes first and is always allowed (when the
  * champion has none, it stays without a pick); the others follow in graph order. Empty for a champion outside the
  * contact.
  */
@@ -297,11 +298,10 @@ export function fleeSteps(state: GameState, data: GameData, contact: Contact, ch
   if (arrival === undefined || !c) return [];
   const spot = fleeSpot(data, c.side, contact.position, arrival);
   const auto = retreatStep(data, c.side, spot);
-  const enemies = c.side === 'blue' ? contact.red : contact.blue;
-  /** A spawned enemy came from its base (excluded anyway). */
-  const cameFrom = new Set(enemies.map((id) => moveStart(state.champions.find((x) => x.id === id)!)));
+  const enemyBase = `base-${other(c.side)}`;
+  const toEnemy = (p: string): number => data.graph.distance(p, enemyBase);
   const others = (data.graph.adj[spot] ?? []).filter(
-    (p) => p !== auto && p !== `base-${other(c.side)}` && !contact.positions.includes(p) && !cameFrom.has(p),
+    (p) => p !== auto && p !== enemyBase && !contact.positions.includes(p) && toEnemy(p) >= toEnemy(spot),
   );
   return auto === spot ? others : [auto, ...others];
 }
