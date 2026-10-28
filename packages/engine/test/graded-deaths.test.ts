@@ -67,6 +67,18 @@ describe('graded deaths in a 2v2 All-in', () => {
     }
   });
 
+  test('a decided fight costs the winners winnerLoss HP; a tied fight costs everyone tieLoss HP', () => {
+    const { s, blue, red } = duo();
+    setGap(s, get(s, 'blue', 'adc'), 'bot-lane', blue, red, W.deathGap * 0.5);
+    const won = resolveRound(s, d, ordersWith(s), {});
+    for (const id of blue) expect(byId(won.state, id).hp).toBe(H.max - W.winnerLoss);
+    const t = duo();
+    setGap(t.s, get(t.s, 'blue', 'adc'), 'bot-lane', t.blue, t.red, 0);
+    const tied = resolveRound(t.s, d, ordersWith(t.s), {});
+    expect(tied.events.some((e) => e.type === 'fight' && e.winner === null)).toBe(true);
+    for (const id of [...t.blue, ...t.red]) expect(byId(tied.state, id).hp).toBe(H.max - W.tieLoss);
+  });
+
   test('a medium gap kills one of two, the survivor loses HP; kill rewards per victim', () => {
     const { s, blue, red } = duo();
     setGap(s, get(s, 'blue', 'adc'), 'bot-lane', blue, red, W.deathGap * 1.5);
@@ -180,6 +192,7 @@ describe('ganks and lane position', () => {
     expect(events.some((e) => e.type === 'fight' && e.winner === 'red')).toBe(true);
     expect(events.some((e) => e.type === 'death')).toBe(false);
     expect(get(state, 'blue', 'top').hp).toBe(H.max - W.gankHpLoss);
+    for (const id of red) expect(byId(state, id).hp).toBe(H.max - W.winnerLoss);
   });
 
   test('a gank with no kill costs the ganked 50 HP and sends the wave to its tower; with a kill it behaves as before', () => {

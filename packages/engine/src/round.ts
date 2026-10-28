@@ -113,20 +113,26 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   };
   /** Where the contact being resolved happens (`contact.position`). */
   let here = '';
-  /** A tied fight: everyone is at the fight position (a river contact's other tile included), with no action. */
-  const stay = (ids: string[]): void => {
+  /**
+   * A tied fight: everyone is at the fight position (a river contact's other tile included), with no action. Each
+   * loses `fight.tieLoss` HP, a ganked side `fight.gankHpLoss` instead (never both).
+   */
+  const stay = (ids: string[], ganked: Side | null): void => {
     pullIn(ids, here);
     for (const id of ids) forfeited.add(id);
+    for (const id of ids) loseHp(id, ganked && byId(id).side === ganked ? F.gankHpLoss : F.tieLoss, ids.filter((o) => byId(o).side !== byId(id).side));
   };
   /**
    * A decided fight: graded deaths among the `eligible` losers, then every losing survivor loses `fight.survivorLoss`
-   * HP. In a gank, every surviving ganked champion loses `fight.gankHpLoss` instead (win or lose, never both).
+   * HP and every winner `fight.winnerLoss`. In a gank, every surviving ganked champion loses `fight.gankHpLoss`
+   * instead (win or lose, never both).
    */
   const settle = (winner: Side, losers: string[], eligible: string[], gap: number, winners: string[], ganked: Side | null, lane: Lane | null): void => {
     const victims = fightVictims(s, data, eligible, gap);
     for (const id of losers) {
       if (!victims.includes(id) && other(winner) !== ganked) loseHp(id, F.survivorLoss, winners);
     }
+    if (winner !== ganked) for (const id of winners) loseHp(id, F.winnerLoss, losers);
     if (ganked) {
       const gankedIds = ganked === winner ? winners : losers;
       for (const id of gankedIds) {
@@ -261,7 +267,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     events.push({ type: 'fight', position: contact.position, blue: contact.blue, red: contact.red, winner, scores });
     for (const id of [...contact.blue, ...contact.red]) fighters.add(id);
     if (winner === null) {
-      stay([...contact.blue, ...contact.red]);
+      stay([...contact.blue, ...contact.red], defender);
     } else {
       // Farm and Push are per champion: in an even lane, a loser playing safe is never a victim (it only loses HP as
       // a survivor).

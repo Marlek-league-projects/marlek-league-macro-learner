@@ -87,6 +87,10 @@ export interface Rules {
     deathGap: number;
     /** HP lost by each surviving champion on a fight's losing side. */
     survivorLoss: number;
+    /** HP lost by each surviving champion on a fight's winning side (a won gank's ganked side pays `gankHpLoss` instead). */
+    winnerLoss: number;
+    /** HP lost by each champion in a tied fight (a ganked side pays `gankHpLoss` instead). */
+    tieLoss: number;
     /** Fight-score penalty of a ganked side whose lane wave is pushed toward the enemy tower. */
     gankExposed: number;
     /**
