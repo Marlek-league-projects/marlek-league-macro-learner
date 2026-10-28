@@ -115,12 +115,12 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   let here = '';
   /**
    * A tied fight: everyone is at the fight position (a river contact's other tile included), with no action. Each
-   * loses `fight.tieLoss` HP, a ganked side `fight.gankHpLoss` instead (never both).
+   * loses `fight.tieLoss` HP, a ganked side included (`fight.gankHpLoss` is for decided fights only).
    */
-  const stay = (ids: string[], ganked: Side | null): void => {
+  const stay = (ids: string[]): void => {
     pullIn(ids, here);
     for (const id of ids) forfeited.add(id);
-    for (const id of ids) loseHp(id, ganked && byId(id).side === ganked ? F.gankHpLoss : F.tieLoss, ids.filter((o) => byId(o).side !== byId(id).side));
+    for (const id of ids) loseHp(id, F.tieLoss, ids.filter((o) => byId(o).side !== byId(id).side));
   };
   /**
    * A decided fight: graded deaths among the `eligible` losers, then every losing survivor loses `fight.survivorLoss`
@@ -267,7 +267,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     events.push({ type: 'fight', position: contact.position, blue: contact.blue, red: contact.red, winner, scores });
     for (const id of [...contact.blue, ...contact.red]) fighters.add(id);
     if (winner === null) {
-      stay([...contact.blue, ...contact.red], defender);
+      stay([...contact.blue, ...contact.red]);
     } else {
       // Farm and Push are per champion: in an even lane, a loser playing safe is never a victim (it only loses HP as
       // a survivor).

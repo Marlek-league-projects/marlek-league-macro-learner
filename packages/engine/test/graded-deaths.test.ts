@@ -143,6 +143,14 @@ describe('ganks and lane position', () => {
   }
   const fight: ContactChoices = { 'lane-top': { blue: 'fight' } };
 
+  test('a tied gank costs both sides tieLoss (not gankHpLoss)', () => {
+    const { s, o, blue, red } = gank(0);
+    setGap(s, get(s, 'blue', 'top'), 'top-lane', blue, red, 0, 'blue');
+    const { state, events } = resolveRound(s, d, o, fight);
+    expect(events.some((e) => e.type === 'fight' && e.winner === null)).toBe(true);
+    for (const id of [...blue, ...red]) expect(byId(state, id).hp).toBe(H.max - W.tieLoss);
+  });
+
   test('a ganked side pushed toward the enemy tower is exposed; middle and own tower are neutral', () => {
     const score = (wave: -1 | 0 | 1) => {
       const { s, blue, red } = gank(wave);
