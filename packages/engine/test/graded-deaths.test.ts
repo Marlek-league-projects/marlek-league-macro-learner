@@ -89,6 +89,38 @@ describe('graded deaths in a 2v2 All-in', () => {
     expect(byId(state, survivor).hp).toBe(H.max - W.survivorLoss);
   });
 
+  test('winners dying of winnerLoss: the victim still counts, and kills pay only champions still alive', () => {
+    const { s, blue, red } = duo();
+    for (const id of blue) byId(s, id).hp = W.winnerLoss;
+    setGap(s, get(s, 'blue', 'adc'), 'bot-lane', blue, red, W.deathGap * 1.5);
+    const { state, events } = resolveRound(s, d, ordersWith(s), {});
+    const dead = deaths(events).map((e) => e.champion);
+    const victim = red.find((id) => dead.includes(id))!;
+    const survivor = red.find((id) => id !== victim)!;
+    expect(dead.sort()).toEqual([...blue, victim].sort());
+    expect(state.kills.blue - s.kills.blue).toBe(1);
+    expect(state.kills.red - s.kills.red).toBe(2);
+    // The dead victim is not paid for the winners it did not live to see die; the surviving loser is.
+    expect(byId(state, victim).xp).toBe(0);
+    expect(byId(state, survivor).xp).toBeGreaterThan(0);
+  });
+
+  test('a lone winner dying of winnerLoss leaves its partner paid, and the dead victim unpaid', () => {
+    const { s, blue, red } = duo();
+    const adc = get(s, 'blue', 'adc');
+    byId(s, adc.id).hp = W.winnerLoss;
+    setGap(s, adc, 'bot-lane', blue, red, W.deathGap * 1.5);
+    const { state, events } = resolveRound(s, d, ordersWith(s), {});
+    const support = get(state, 'blue', 'support');
+    const dead = deaths(events).map((e) => e.champion);
+    expect(dead).toContain(adc.id);
+    expect(dead).not.toContain(support.id);
+    const victim = red.find((id) => dead.includes(id))!;
+    expect(victim).toBeDefined();
+    expect(byId(state, victim).xp).toBe(0);
+    expect(support.xp).toBeGreaterThan(0);
+  });
+
   test('a large gap kills every loser', () => {
     const { s, blue, red } = duo();
     setGap(s, get(s, 'blue', 'adc'), 'bot-lane', blue, red, W.deathGap * 2.5);

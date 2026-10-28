@@ -107,7 +107,6 @@ describe('round 0 placement', () => {
     };
     /** A position at least 2 steps from `from` that the champion can reach. */
     const farAway = (g: GameState, id: string, from: string) => {
-      const c = g.champions.find((x) => x.id === id)!;
       const reach = reachableFrom(d, from, stepBudget(d.rules, g.round), 'blue');
       return Object.entries(reach).find(([, cost]) => cost >= 2)![0];
     };
@@ -134,6 +133,9 @@ describe('round 0 placement', () => {
       expect(events).toContainEqual(expect.objectContaining({ type: 'moved', champion: top.id, acted: false }));
       expect(state.camps['gromp-blue']).toBeGreaterThan(d.rules.camps.firstSpawnByCamp.gromp);
       expect(lone.camps['gromp-blue']).toBe(d.rules.camps.firstSpawnByCamp.gromp);
+      // The camp pays instead of the wave: less than the same laner farming its lane in round 1.
+      expect(of(state, 'blue', 'top').gold).toBeLessThan(of(lone, 'blue', 'top').gold);
+      expect(of(state, 'blue', 'top').xp).toBeLessThan(of(lone, 'blue', 'top').xp);
     });
 
     test('an enemy arriving on the camp finds it cleared; later rounds do not clear on departure', () => {

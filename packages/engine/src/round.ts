@@ -122,7 +122,19 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   const stay = (ids: string[]): void => {
     pullIn(ids, here);
     for (const id of ids) forfeited.add(id);
-    for (const id of ids) loseHp(id, F.tieLoss, ids.filter((o) => byId(o).side !== byId(id).side));
+    // Every loss lands before any kill, so a death is credited only to the opponents who survive the tie.
+    for (const id of ids) {
+      const c = byId(id);
+      const before = c.hp;
+      changeHp(c, data.rules, -F.tieLoss);
+      hurt.add(id);
+      if (before > c.hp) events.push({ type: 'hpLost', champion: id, amount: before - c.hp });
+    }
+    const alive = (id: string): boolean => byId(id).hp > 0;
+    for (const id of ids) {
+      if (alive(id) || byId(id).status !== 'alive') continue;
+      applyKill(s, data, [id], ids.filter((o) => alive(o) && byId(o).side !== byId(id).side), events);
+    }
   };
   /**
    * A decided fight: graded deaths among the `eligible` losers, then every losing survivor loses `fight.survivorLoss`
@@ -134,7 +146,6 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     for (const id of losers) {
       if (!victims.includes(id) && other(winner) !== ganked) loseHp(id, F.survivorLoss, winners);
     }
-    if (winner !== ganked) for (const id of winners) loseHp(id, F.winnerLoss, losers);
     if (ganked) {
       const gankedIds = ganked === winner ? winners : losers;
       for (const id of gankedIds) {
@@ -143,6 +154,8 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     }
     if (ganked && lane && winner !== ganked && victims.length === 0) gankWins[lane] = winner;
     applyKill(s, data, victims, winners, events);
+    // The winners pay after the victims' kills, so only a surviving loser is credited if one dies of it.
+    if (winner !== ganked) for (const id of winners) loseHp(id, F.winnerLoss, losers.filter((l) => byId(l).status === 'alive'));
     // Surviving losers leave the spot to the winners, like a flee.
     retreat(losers);
   };
