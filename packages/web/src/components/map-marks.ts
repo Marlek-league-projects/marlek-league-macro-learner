@@ -115,6 +115,24 @@ export function dotRadius(p: Position): number {
   return p.kind === 'pit' ? 12 : 8;
 }
 
+/** How far right of its centre a position's `pawns` (side by side, with their HUDs) or else its dot reach. */
+function besideX(p: Position, pawns: number): number {
+  return p.x + Math.max(dotRadius(p), pawns > 0 ? ((pawns - 1) / 2) * PAWN_SPREAD + 14 : 0);
+}
+
+/** Room a ward's eye (and its rounds-left badge) takes on a position's line, between its pawns and its timer. */
+const WARD_SLOT = 22;
+
+/** Centre of a ward's eye: right of the position's pawns, clear of their tokens and HUDs, on the timer's line. */
+export function wardEyePoint(p: Position, pawns: number): Point {
+  return { x: besideX(p, pawns) + 10, y: p.y };
+}
+
+/** Left of a position's timer text: right of its pawns, and of its ward's eye when `warded`. */
+export function timerX(p: Position, pawns: number, warded: boolean): number {
+  return besideX(p, pawns) + 4 + (warded ? WARD_SLOT : 0);
+}
+
 /** Radius of a position's invisible click circle: twice its dot (bases are already large). */
 export function hitRadius(p: Position): number {
   return p.kind === 'base' ? dotRadius(p) : 2 * dotRadius(p);

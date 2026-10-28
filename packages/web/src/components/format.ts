@@ -190,8 +190,11 @@ export function eventText(e: GameEvent, data: GameData): string {
         : `${at(e.tower)} : −${dec(e.damage)} PV (reste ${dec(e.hp)})`;
     case 'objectiveStarted':
       return `${SIDE_LABEL[e.side]} commence ${objectiveWithArticle(e.objective)} (${names(e.champions)})`;
-    case 'objectiveTaken':
-      return `${SIDE_LABEL[e.side]} prend ${objectiveWithArticle(e.objective)} à ${at(e.position)}`;
+    case 'objectiveTaken': {
+      // Taking the Scuttle also puts down its ward (shown as an eye on the Scuttle).
+      const ward = e.objective === 'scuttle' ? ' · Ward du Carapateur posée' : '';
+      return `${SIDE_LABEL[e.side]} prend ${objectiveWithArticle(e.objective)} à ${at(e.position)}${ward}`;
+    }
     case 'campCleared':
       return `Camp nettoyé : ${at(e.camp)} par ${name(e.champion)}`;
     case 'wardPlaced':

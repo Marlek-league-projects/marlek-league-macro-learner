@@ -88,6 +88,12 @@ describe('objective log lines', () => {
     expect(taken('dragon', 'dragon-pit')).toBe(`Rouge prend le Dragon à ${data.graph.positions['dragon-pit']!.label}`);
     expect(objectiveWithArticle('scuttle')).toBe('le Carapateur');
   });
+
+  test("taking the Scuttle says its ward is down", () => {
+    const at = data.graph.positions['scuttle-bot']!.label;
+    expect(eventText({ type: 'objectiveTaken', objective: 'scuttle', side: 'blue', position: 'scuttle-bot', champions: [] }, data))
+      .toBe(`Bleu prend le Carapateur à ${at} · Ward du Carapateur posée`);
+  });
 });
 
 describe('score bar', () => {

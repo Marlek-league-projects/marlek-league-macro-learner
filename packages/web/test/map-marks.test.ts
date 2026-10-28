@@ -7,8 +7,11 @@ import {
   hitRadius,
   objectivePromptEntries,
   rangeRing,
+  PAWN_SPREAD,
   spawnCountdown,
+  timerX,
   WAVE_NEAR_TOWER,
+  wardEyePoint,
   wavePoint,
 } from '../src/components/map-marks';
 import { createStore } from '../src/store';
@@ -181,5 +184,28 @@ describe('objective prompt entries', () => {
     const dead = onPit('dragon-pit', 'dragon');
     dead.j.status = 'dead';
     expect(objectivePromptEntries(dead.v, data, win(300), [])).toEqual([]);
+  });
+});
+
+describe('ward eye placement', () => {
+  const scuttle = positions['scuttle-bot']!;
+  /** Right edge of the pawns standing on `p` (body radius 13, HUD half-width 14). */
+  const pawnsRight = (n: number) => scuttle.x + ((n - 1) / 2) * PAWN_SPREAD + 14;
+
+  test('the eye sits right of every pawn on its position, clear of their body and HUD', () => {
+    for (const n of [1, 2, 3]) {
+      const eye = wardEyePoint(scuttle, n);
+      expect(eye.x - 6.5).toBeGreaterThan(pawnsRight(n));
+      expect(eye.y).toBe(scuttle.y);
+    }
+    expect(wardEyePoint(scuttle, 0).x - 6.5).toBeGreaterThan(scuttle.x + dotRadius(scuttle));
+  });
+
+  test("a warded position's timer moves right of the eye and its rounds-left badge", () => {
+    for (const n of [0, 1, 3]) {
+      const eye = wardEyePoint(scuttle, n);
+      expect(timerX(scuttle, n, true)).toBeGreaterThan(eye.x + 7 + 4.5);
+      expect(timerX(scuttle, n, false)).toBeLessThan(timerX(scuttle, n, true));
+    }
   });
 });

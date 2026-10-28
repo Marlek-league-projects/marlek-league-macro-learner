@@ -18,6 +18,8 @@ import {
   rangeRing,
   pitTimer,
   spawnCountdown,
+  timerX,
+  wardEyePoint,
   wavePoint,
 } from './map-marks';
 import { hpColor, type Hud, hudText, hudTop, hudValues } from './hud';
@@ -299,15 +301,14 @@ export function MapView({ store }: { store: Store }) {
   const byPosition = new Map<string, Pawn[]>();
   for (const pawn of pawns) byPosition.set(pawn.position, [...(byPosition.get(pawn.position) ?? []), pawn]);
 
-  // Countdown before each pit, scuttle and own camp spawns, or that it is up (drawn right of any pawns there).
+  const warded = new Set(view.wards.map((w) => w.position));
+  // Countdown before each pit, scuttle and own camp spawns, or that it is up (drawn right of any pawns and ward there).
   const timers = Object.values(positions).map((p) => {
-    const n = byPosition.get(p.id)?.length ?? 0;
-    const reachX = Math.max(dotRadius(p), n > 0 ? ((n - 1) / 2) * PAWN_SPREAD + 14 : 0);
+    const x = timerX(p, byPosition.get(p.id)?.length ?? 0, warded.has(p.id));
     if (p.kind === 'pit') {
       // Pits name what they count down to with the time left ("Larves 7:05"), and when an up objective leaves ("part dans 6:50").
       const pt = pitTimer(view, data, p.id as 'baron-pit' | 'dragon-pit', now, roundWin.end);
       if (!pt) return null;
-      const x = p.x + reachX + 4;
       return (
         <text key={p.id} class={`timer${pt.live ? ' live' : ''}`} x={x} y={pt.until ? p.y - 1 : p.y + 4} text-anchor="start">
           <title>{pt.title}</title>
@@ -320,7 +321,7 @@ export function MapView({ store }: { store: Store }) {
     if (left === null) return null;
     const text = left !== 'up' ? clock(left) : 'en vie';
     return (
-      <text key={p.id} class={`timer${left === 'up' ? ' live' : ''}`} x={p.x + reachX + 4} y={p.y + 4} text-anchor="start">
+      <text key={p.id} class={`timer${left === 'up' ? ' live' : ''}`} x={x} y={p.y + 4} text-anchor="start">
         {text}
       </text>
     );
@@ -456,14 +457,6 @@ export function MapView({ store }: { store: Store }) {
         {base('red') && <Nexus p={base('red')!} side="red" />}
         <g pointer-events="none">{waves}</g>
         <g>{nodes}</g>
-        <g>
-          {view.wards.map((w, i) => {
-            const p = positions[w.position];
-            if (!p) return null;
-            const left = store.wardRoundsLeft(w);
-            return <Eye key={`${w.position}-${i}`} x={p.x + 11} y={p.y - 11} left={left} tip={wardTooltip(w, left, view.round)} />;
-          })}
-        </g>
         <g pointer-events="none">
           {[...contactAt].map((id) => {
             const p = positions[id];
@@ -473,6 +466,16 @@ export function MapView({ store }: { store: Store }) {
         <g pointer-events="none">{arrows}</g>
         {replaying ? <ReplayLayer key={store.replayRun.value} store={store} /> : <g>{pawnNodes}</g>}
         {!replaying && <g pointer-events="none">{recallsInPlace}</g>}
+        {/* Ward eyes above the pawns, right of those on their position (the Scuttle's ward included). */}
+        <g>
+          {view.wards.map((w, i) => {
+            const p = positions[w.position];
+            if (!p) return null;
+            const left = store.wardRoundsLeft(w);
+            const at = wardEyePoint(p, byPosition.get(p.id)?.length ?? 0);
+            return <Eye key={`${w.position}-${i}`} x={at.x} y={at.y} left={left} tip={wardTooltip(w, left, view.round)} />;
+          })}
+        </g>
         <g pointer-events="none">{timers}</g>
       </svg>
       {ordering && !placing && anchor && (
