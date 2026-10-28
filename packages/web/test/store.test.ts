@@ -399,4 +399,18 @@ describe('store', () => {
     expect(store.canAct(0, id)).toBe(true);
     expect(store.canAct(store.stepBudget(id), id)).toBe(false);
   });
+
+  test('round 1: a champion placed on a camp clears it first, so no move of it acts on arrival (staying still does)', () => {
+    const store = started();
+    const jungler = blue(store, 'jungle');
+    expect(data.graph.positions[jungler.position]!.kind).toBe('camp');
+    store.select(jungler.id);
+    const to = Object.entries(store.reachableForSelected()).find(([, d]) => d === 1)![0];
+    expect(store.canAct(0, jungler.id)).toBe(true);
+    expect(store.canAct(1, jungler.id)).toBe(false);
+    store.setMove(jungler.id, to);
+    expect(store.pendingMoveActs(jungler.id)).toBe(false);
+    const laner = blue(store, 'top');
+    expect(store.canAct(1, laner.id)).toBe(true);
+  });
 });

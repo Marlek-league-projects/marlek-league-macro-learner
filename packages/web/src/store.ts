@@ -250,6 +250,12 @@ export function createStore(data: GameData, engine: GameEngine): Store {
   };
 
   const budget = (id: string): number => engine.stepBudgetFor(current(), data, id);
+  /** Acts on arrival `distance` steps away; in round 1 a champion on its start camp clears it first, so a move never acts. */
+  const actsAfter = (distance: number, id: string): boolean => {
+    const s = current();
+    const startCamp = s.round === 1 && data.graph.positions[champion(id).position]?.kind === 'camp';
+    return engine.canAct(distance, budget(id)) && !(startCamp && distance > 0);
+  };
 
   const recallStep = (id: string, to: string): boolean => {
     const n = engine.reachable(current(), data, id)[to];
@@ -457,14 +463,14 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     },
 
     canAct(distance, id) {
-      return engine.canAct(distance, budget(id));
+      return actsAfter(distance, id);
     },
 
     pendingMoveActs(id) {
       const o = pending.value[id];
       if (o?.kind !== 'move' || !state) return null;
       const d = engine.reachable(state, data, id)[o.to];
-      return d !== undefined && engine.canAct(d, budget(id));
+      return d !== undefined && actsAfter(d, id);
     },
 
     wardRoundsLeft(ward) {
