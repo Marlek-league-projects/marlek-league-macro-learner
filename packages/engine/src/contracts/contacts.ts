@@ -26,6 +26,8 @@ export interface Contact {
   invader: Side | null;
   /** Resolved from the laners' stances, with no prompt: each side's only option is its default. */
   auto: boolean;
+  /** Where each champion of the contact arrived (one of `positions`). */
+  arrivals: Record<string, string>;
   /** HP of every champion in the contact: meeting there, each side sees the other's (contact = vision). */
   hp: Record<string, number>;
   /**
@@ -38,9 +40,13 @@ export interface Contact {
 
 /**
  * A contact's answers: each side's choice, plus, per side, the `nearby` champions who join it ("Rejoindre le
- * combat"; absent: "Rester").
+ * combat"; absent: "Rester"), and where fleeing champions go (champion id → one of its `fleeSteps`; absent: the
+ * automatic step toward the own base). `fleeTo` applies only when the champion's side flees.
  */
-export type ContactChoice = Partial<Record<Side, Choice>> & { joins?: Partial<Record<Side, string[]>> };
+export type ContactChoice = Partial<Record<Side, Choice>> & {
+  joins?: Partial<Record<Side, string[]>>;
+  fleeTo?: Record<string, string>;
+};
 
 /** Contact id to the choices given so far. */
 export type ContactChoices = Record<string, ContactChoice>;

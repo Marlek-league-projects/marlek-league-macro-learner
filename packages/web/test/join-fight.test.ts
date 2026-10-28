@@ -50,7 +50,7 @@ function rigged(build: (ids: Record<string, string>) => Contact[]) {
 const contact = (id: string, ids: Record<string, string>): Contact => ({
   id, position: 'scuttle-bot', positions: ['scuttle-bot'], kind: 'objective', blue: [ids.bj!], red: [ids.rj!],
   options: { blue: ['fight', 'flee'], red: ['fight', 'flee'] }, defaults: { blue: 'fight', red: 'fight' },
-  invader: null, auto: false, hp: { [ids.bj!]: 100, [ids.rj!]: 100 }, nearby: { blue: [ids.bm!], red: [ids.rm!] },
+  invader: null, auto: false, arrivals: { [ids.bj!]: 'scuttle-bot', [ids.rj!]: 'scuttle-bot' }, hp: { [ids.bj!]: 100, [ids.rj!]: 100 }, nearby: { blue: [ids.bm!], red: [ids.rm!] },
 });
 
 describe('joining a fight 1 step away (web)', () => {

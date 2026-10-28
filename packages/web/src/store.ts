@@ -59,6 +59,8 @@ export interface Store {
    */
   contacts: Signal<Contact[]>;
   choices: Signal<ContactChoices>;
+  /** The own fleeing champion whose flee step the map is waiting for (a click on one of its `fleeSteps`); null otherwise. */
+  fleePick: Signal<{ contact: string; champion: string } | null>;
   lastEvents: Signal<GameEvent[]>;
   explanations: Signal<Explanation[]>;
   settings: Signal<Settings>;
@@ -130,6 +132,17 @@ export interface Store {
   setJoin(contactId: string, champion: string, join: boolean): void;
   /** Own champions joining `contactId`. */
   joinsOf(contactId: string): string[];
+  /** Where an own champion of `contactId` may flee (engine.fleeSteps): the automatic step first, when it has one. */
+  fleeSteps(contactId: string, champion: string): string[];
+  /** Waits for a map click on where `champion` flees (null: stops waiting). */
+  pickFlee(contactId: string, champion: string | null): void;
+  /**
+   * Flees `champion` to `to` (one of its `fleeSteps`; throws otherwise), null: back to the automatic step. Stops
+   * waiting for a click.
+   */
+  setFleeTo(contactId: string, champion: string, to: string | null): void;
+  /** The step picked for `champion`, null for the automatic one. */
+  fleeToOf(contactId: string, champion: string): string | null;
   confirmContacts(): void;
   next(): void;
   /** Restarts the round replay (review and game over screens). */
@@ -175,6 +188,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
   const pending = signal<Record<string, Order>>({});
   const contacts = signal<Contact[]>([]);
   const choices = signal<ContactChoices>({});
+  const fleePick = signal<{ contact: string; champion: string } | null>(null);
   const lastEvents = signal<GameEvent[]>([]);
   const explanations = signal<Explanation[]>([]);
   const settings = signal<Settings>({ rank: 'gold', teaching: true, seed: 1 });
@@ -193,6 +207,12 @@ export function createStore(data: GameData, engine: GameEngine): Store {
   let redChoices: ContactChoices = {};
   /** The AI's round 0 placement, applied on "Valider le placement". */
   let redPlacements: Record<string, string> = {};
+
+  const contactOf = (id: string): Contact => {
+    const c = contacts.value.find((x) => x.id === id);
+    if (!c) throw new Error(`${id}: unknown contact`);
+    return c;
+  };
 
   const current = (): GameState => {
     if (!state) throw new Error('game not started');
@@ -308,6 +328,8 @@ export function createStore(data: GameData, engine: GameEngine): Store {
         red: redChoices[c.id]?.red ?? c.defaults.red,
         joins: { blue: choices.value[c.id]?.joins?.blue ?? [], red: redChoices[c.id]?.joins?.red ?? [] },
       };
+      const fleeTo = choices.value[c.id]?.fleeTo;
+      if (fleeTo && Object.keys(fleeTo).length > 0) full[c.id]!.fleeTo = fleeTo;
     }
     const result = engine.resolveRound(before, data, orders, full);
     state = result.state;
@@ -349,7 +371,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
   };
 
   return {
-    data, screen, view, previousView, replaying, replayRun, selected, pending, contacts, choices, lastEvents, explanations, settings, recalled,
+    data, screen, view, previousView, replaying, replayRun, selected, pending, contacts, choices, fleePick, lastEvents, explanations, settings, recalled,
     panelAt, panelDragging, objectivePromptsClosed, recallReplaced, quitAsked,
 
     start(s) {
@@ -366,6 +388,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       pending.value = {};
       contacts.value = [];
       choices.value = {};
+      fleePick.value = null;
       lastEvents.value = [];
       explanations.value = [];
       recalled.value = [];
@@ -408,6 +431,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       pending.value = {};
       contacts.value = [];
       choices.value = {};
+      fleePick.value = null;
       lastEvents.value = [];
       explanations.value = [];
       recalled.value = [];
@@ -541,20 +565,24 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       redChoices = engine.aiAnswers(redView, data, involving, profile!, aiRng!);
       contacts.value = involving.map((c) => ({ ...c, nearby: { blue: c.nearby.blue, red: [] } }));
       choices.value = {};
+      fleePick.value = null;
       if (involving.length === 0) resolve();
       else screen.value = 'contacts';
     },
 
     choose(contactId, choice) {
-      const c = contacts.value.find((x) => x.id === contactId);
-      if (!c) throw new Error(`${contactId}: unknown contact`);
+      const c = contactOf(contactId);
       if (!c.options.blue.includes(choice)) throw new Error(`${contactId}: ${choice} is not an option`);
-      choices.value = { ...choices.value, [contactId]: { ...choices.value[contactId], blue: choice } };
+      // Fleeing waits for a click on where the first own champion goes; another reaction drops the picked steps.
+      const next = { ...choices.value[contactId], blue: choice };
+      if (choice !== 'flee') delete next.fleeTo;
+      choices.value = { ...choices.value, [contactId]: next };
+      if (choice === 'flee') fleePick.value = { contact: contactId, champion: c.blue[0]! };
+      else if (fleePick.value?.contact === contactId) fleePick.value = null;
     },
 
     setJoin(contactId, id, join) {
-      const c = contacts.value.find((x) => x.id === contactId);
-      if (!c) throw new Error(`${contactId}: unknown contact`);
+      const c = contactOf(contactId);
       if (!c.nearby.blue.includes(id)) throw new Error(`${id}: cannot join ${contactId}`);
       const next: ContactChoices = {};
       for (const x of contacts.value) {
@@ -570,6 +598,27 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       return choices.value[contactId]?.joins?.blue ?? [];
     },
 
+    fleeSteps(contactId, id) {
+      return engine.fleeSteps(current(), data, contactOf(contactId), id);
+    },
+
+    pickFlee(contactId, id) {
+      fleePick.value = id === null ? null : { contact: contactId, champion: id };
+    },
+
+    setFleeTo(contactId, id, to) {
+      const c = contactOf(contactId);
+      if (to !== null && !engine.fleeSteps(current(), data, c, id).includes(to)) throw new Error(`${id}: cannot flee to ${to}`);
+      const { [id]: _old, ...rest } = choices.value[contactId]?.fleeTo ?? {};
+      const fleeTo = to === null ? rest : { ...rest, [id]: to };
+      choices.value = { ...choices.value, [contactId]: { ...choices.value[contactId], fleeTo } };
+      fleePick.value = null;
+    },
+
+    fleeToOf(contactId, id) {
+      return choices.value[contactId]?.fleeTo?.[id] ?? null;
+    },
+
     confirmContacts() {
       if (screen.value !== 'contacts') return;
       panelDragging.value = false;
@@ -582,6 +631,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
       selected.value = null;
       contacts.value = [];
       choices.value = {};
+      fleePick.value = null;
       objectivePromptsClosed.value = [];
       recallReplaced.value = [];
       previousView.value = null;

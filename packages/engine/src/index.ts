@@ -3,7 +3,7 @@ import { roundWindow, totalRounds } from './time';
 import { level, teamScore } from './economy';
 import { aiAnswers, aiContactChoice, aiJoins, aiOrders } from './ai';
 import type { GameEngine } from './contracts';
-import { detectContacts } from './contacts';
+import { detectContacts, fleeSteps } from './contacts';
 import { canAct, defaultOrders, followsWave, isLaneChange, reachable, route, spawnPoints, stepBudget, stepBudgetFor, validateOrders } from './movement';
 import { resolveRound } from './round';
 import { newGame } from './setup';
@@ -19,7 +19,7 @@ export type { RoundWindow } from './time';
 export { randomDraft, newGame } from './setup';
 export { aiPlacements, placeChampions, placementPositions } from './placement';
 export { budgetFrom, canAct, isLaneChange, moveStart, reachable, reachableFrom, route, spawnPoints, spawnPointsFor, stepBudget, stepBudgetFor, validateOrders, defaultOrders, followsWave } from './movement';
-export { arrivalPositions, detectContacts, resolveChoice, resolveJoins, withJoiners } from './contacts';
+export { arrivalPositions, detectContacts, fleeSteps, resolveChoice, resolveFleeTo, resolveJoins, withJoiners } from './contacts';
 export { lead, fightScore, resolveFight, gankModifier, fightVictims } from './fight';
 export { damageTower, frontTower, laneExposure, lanePressure, towerMultiplier, updateLanes } from './lanes';
 export { spawnObjectives, clearCamps, captureObjectives, launchHeralds } from './objectives';
@@ -32,7 +32,7 @@ export { aiOrders, aiContactChoice, aiJoins, aiAnswers, evaluate } from './ai';
 
 export function createEngine(): GameEngine {
   return {
-    newGame, placementPositions, placeChampions, aiPlacements, defaultOrders, followsWave, reachable, route, stepBudget, stepBudgetFor, canAct, isLaneChange, spawnPoints, validateOrders, detectContacts, resolveRound, viewFor, eventsFor, wardRoundsLeft, estimateEnemy,
+    newGame, placementPositions, placeChampions, aiPlacements, defaultOrders, followsWave, reachable, route, stepBudget, stepBudgetFor, canAct, isLaneChange, spawnPoints, validateOrders, detectContacts, fleeSteps, resolveRound, viewFor, eventsFor, wardRoundsLeft, estimateEnemy,
     aiOrders, aiContactChoice, aiJoins, aiAnswers, explainRound, createRng, roundWindow, totalRounds, level, teamScore,
   };
 }

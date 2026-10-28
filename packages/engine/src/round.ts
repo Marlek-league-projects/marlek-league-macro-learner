@@ -1,6 +1,6 @@
 import type { GameData, Lane, Side } from '@lml/data/contracts';
 import type { ChampionState, ContactChoices, GameEvent, GameState, Order, Orders, RoundResult } from './contracts';
-import { detectContacts, gankedSide, playsSafe, resolveChoice, resolveJoins, withJoiners } from './contacts';
+import { detectContacts, fleeSpot, gankedSide, playsSafe, resolveChoice, resolveFleeTo, resolveJoins, withJoiners } from './contacts';
 import { advanceRespawns, applyKill, changeHp, completeRecall, finishIfOver, level } from './economy';
 import { fightVictims, resolveFight } from './fight';
 import { updateLanes } from './lanes';
@@ -147,18 +147,15 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
     retreat(losers);
   };
   /**
-   * Flee movement: one step toward the own base from where the contact happened (`retreatStep`). Dead champions
-   * stay where they are. No action.
+   * Flee movement: one step toward the own base from where the contact happened (`retreatStep` from `fleeSpot`), or
+   * to the step picked in `fleeTo` (validated by `resolveFleeTo`). Dead champions stay where they are. No action.
    */
-  const retreat = (ids: string[]): void => {
+  const retreat = (ids: string[], fleeTo: Record<string, string> = {}): void => {
     for (const id of ids) {
       const c = byId(id);
       if (c.status !== 'alive') continue;
       forfeited.add(id);
-      // Step from the spot nearer the own base: a champion standing behind the contact never walks toward it.
-      const base = `base-${c.side}`;
-      if (data.graph.distance(here, base) <= data.graph.distance(c.position, base)) c.position = here;
-      c.position = retreatStep(data, c.side, c.position);
+      c.position = fleeTo[id] ?? retreatStep(data, c.side, fleeSpot(data, c.side, here, c.position));
       events.push({ type: 'fled', champion: id, to: c.position });
     }
   };
@@ -171,9 +168,11 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
       c.position = position;
     }
   };
-  for (const contact of contacts) {
+  for (const [i, contact] of contacts.entries()) {
     here = contact.position;
     const choice = resolveChoice(contact, choices);
+    // Picked flee steps, checked against the contact as prompted (before joiners).
+    const fleeTo = resolveFleeTo(state, data, detected[i]!, choices);
     // A joiner walks its 1 step into the contact and forfeits its own action (no camp, no farm, no objective
     // elsewhere): onto the fight position when it is 1 step away, else onto the first contact position (id order) that
     // is. A prompted lane fight then pulls it in like everyone else.
@@ -219,7 +218,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
         }
       }
       // Losses (and a death at 0 HP) happen at the contact; the survivors then leave it.
-      for (const side of fleeing) retreat(ids[side]);
+      for (const side of fleeing) retreat(ids[side], fleeTo);
       continue;
     }
     if (!contact.auto && smaller && choice[smaller] === 'farm') {

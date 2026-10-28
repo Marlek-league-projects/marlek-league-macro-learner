@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData, mirrorId } from '@lml/data';
-import { defaultOrders, detectContacts, fightScore, newGame, resolveChoice, resolveRound } from '@lml/engine';
+import { defaultOrders, detectContacts, fightScore, fleeSteps, newGame, resolveChoice, resolveRound } from '@lml/engine';
+import { retreatStep } from '../src/movement';
 import type { ChampionState, GameState, Order, Orders } from '@lml/engine/contracts';
 
 const d = loadGameData();
@@ -240,5 +241,55 @@ describe('river objective option', () => {
     expect(river(Infinity, 0, Infinity).options).toEqual({ blue: ['fight', 'flee', 'objective'], red: ['fight', 'flee'] });
     // Up again, but only blue saw it respawn.
     expect(river(0, 0, Infinity).options).toEqual({ blue: ['fight', 'flee', 'objective'], red: ['fight', 'flee'] });
+  });
+});
+
+describe('fleeSteps', () => {
+  /** Blue jungler alone on the bot Scuttle against the red mid (from its T1) and the red jungler (from raptors). */
+  function scuttle1v2(): { s: GameState; o: Orders } {
+    const s = setup([['blue', 'jungle', 'raptors-blue'], ['red', 'mid', 'mid-t1-red'], ['red', 'jungle', 'raptors-red']]);
+    const o = stay(s, [
+      { kind: 'move', champion: get(s, 'blue', 'jungle').id, to: 'scuttle-bot' },
+      { kind: 'move', champion: get(s, 'red', 'mid').id, to: 'scuttle-bot' },
+      { kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'scuttle-bot' },
+    ]);
+    return { s, o };
+  }
+
+  test('a contact lists where each of its champions arrived', () => {
+    const { s, o } = scuttle1v2();
+    const c = detectContacts(s, d, o).find((x) => x.id === 'river-bot')!;
+    expect(c.arrivals).toEqual(Object.fromEntries([...c.blue, ...c.red].map((id) => [id, 'scuttle-bot'])));
+  });
+
+  test("the neighbours of the retreat spot, minus the contact's positions, the enemy base and where an enemy came from", () => {
+    const { s, o } = scuttle1v2();
+    const c = detectContacts(s, d, o).find((x) => x.id === 'river-bot')!;
+    const steps = fleeSteps(s, d, c, get(s, 'blue', 'jungle').id);
+    const expected = d.graph.adj['scuttle-bot']!.filter((p) => p !== 'mid-t1-red');
+    expect([...steps].sort()).toEqual([...expected].sort());
+    expect(steps).toContain(retreatStep(d, 'blue', 'scuttle-bot'));
+  });
+
+  test('the automatic step comes first', () => {
+    const { s, o } = scuttle1v2();
+    const c = detectContacts(s, d, o).find((x) => x.id === 'river-bot')!;
+    expect(fleeSteps(s, d, c, get(s, 'blue', 'jungle').id)[0]).toBe(retreatStep(d, 'blue', 'scuttle-bot'));
+  });
+
+  test('the automatic step is allowed even onto an excluded position', () => {
+    // Blue top on the lane middle, ganked by the red jungler coming from the blue T1 (the automatic step).
+    const s = setup([['blue', 'top', 'top-lane'], ['red', 'top', 'top-lane'], ['red', 'jungle', 'top-t1-blue']]);
+    const o = stay(s, [{ kind: 'move', champion: get(s, 'red', 'jungle').id, to: 'top-lane' }]);
+    const c = detectContacts(s, d, o).find((x) => x.id === 'lane-top')!;
+    const steps = fleeSteps(s, d, c, get(s, 'blue', 'top').id);
+    expect(retreatStep(d, 'blue', 'top-lane')).toBe('top-t1-blue');
+    expect(steps).toEqual(['top-t1-blue', 'top-t1-red', 'scuttle-top', 'baron-pit']);
+  });
+
+  test('a champion outside the contact has no flee step', () => {
+    const { s, o } = scuttle1v2();
+    const c = detectContacts(s, d, o).find((x) => x.id === 'river-bot')!;
+    expect(fleeSteps(s, d, c, get(s, 'blue', 'top').id)).toEqual([]);
   });
 });

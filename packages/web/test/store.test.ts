@@ -386,7 +386,7 @@ describe('store', () => {
   test('a contact offering the objective preselects it; otherwise the contact default', () => {
     const contact = (blue: Choice[]): Contact => ({
       id: 'river-bot', kind: 'objective', position: 'dragon-pit', positions: ['dragon-pit'], blue: [], red: [],
-      options: { blue, red: ['fight', 'flee'] }, defaults: { blue: 'flee', red: 'fight' }, invader: null, auto: false, hp: {}, nearby: { blue: [], red: [] },
+      options: { blue, red: ['fight', 'flee'] }, defaults: { blue: 'flee', red: 'fight' }, invader: null, auto: false, arrivals: {}, hp: {}, nearby: { blue: [], red: [] },
     });
     expect(playerDefault(contact(['fight', 'flee', 'objective']))).toBe('objective');
     expect(playerDefault(contact(['fight', 'flee']))).toBe('flee');

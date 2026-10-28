@@ -1,7 +1,7 @@
 import { mirrorId } from '@lml/data';
 import type { GameData, Lane, Side } from '@lml/data/contracts';
 import type { ChampionState, Choice, Contact, ContactChoices, ContactKind, GameState, Orders, Stance } from './contracts';
-import { budgetFrom, canAct, HOME_LANE, moveStart, reachableFrom } from './movement';
+import { budgetFrom, canAct, HOME_LANE, moveStart, reachableFrom, retreatStep } from './movement';
 import { roundWindow } from './time';
 
 const SIDES: Side[] = ['blue', 'red'];
@@ -86,7 +86,7 @@ export function fightPosition(data: GameData, arrival: Record<string, string>, b
 type Zone = { id: string; position: string; positions: string[]; blue: string[]; red: string[] };
 
 /** A prompted contact: fight or flee (plus `extra[side]`); the smaller side flees by default, otherwise it fights. */
-function build(kind: ContactKind, zone: Zone, invader: Side | null, extra: Partial<Record<Side, Choice>> = {}): Omit<Contact, 'hp' | 'nearby'> {
+function build(kind: ContactKind, zone: Zone, invader: Side | null, extra: Partial<Record<Side, Choice>> = {}): Omit<Contact, 'hp' | 'nearby' | 'arrivals'> {
   const { blue, red } = zone;
   const n: Record<Side, number> = { blue: blue.length, red: red.length };
   const options = {} as Record<Side, Choice[]>;
@@ -103,7 +103,7 @@ function build(kind: ContactKind, zone: Zone, invader: Side | null, extra: Parti
 }
 
 /** A lane contact resolved without a prompt: each side's only option is `choice[side]`. */
-function buildAuto(kind: ContactKind, zone: Zone, choice: Record<Side, Choice>): Omit<Contact, 'hp' | 'nearby'> {
+function buildAuto(kind: ContactKind, zone: Zone, choice: Record<Side, Choice>): Omit<Contact, 'hp' | 'nearby' | 'arrivals'> {
   const options = { blue: [choice.blue], red: [choice.red] };
   return { ...zone, kind, options, defaults: { ...choice }, invader: null, auto: true };
 }
@@ -131,7 +131,7 @@ function promptedLaneKind(state: GameState, data: GameData, lane: Lane, sides: R
  * lane this round (or spawned), else `pressure`; even, a `skirmish`. A laner coming back to its own lane is not a
  * ganker. A smaller side whose champions all arrive on their own standing tower may also stay and `farm`.
  */
-function laneContact(state: GameState, data: GameData, orders: Orders, arrival: Record<string, string>, zone: Zone): Omit<Contact, 'hp' | 'nearby'> {
+function laneContact(state: GameState, data: GameData, orders: Orders, arrival: Record<string, string>, zone: Zone): Omit<Contact, 'hp' | 'nearby' | 'arrivals'> {
   const { blue, red } = zone;
   const champ = (id: string): ChampionState => state.champions.find((c) => c.id === id)!;
   const lane = data.graph.positions[zone.position]!.lane!;
@@ -185,7 +185,7 @@ export function detectContacts(state: GameState, data: GameData, orders: Orders)
     const budget = budgetFrom(data.rules, state.round, from, c.side);
     return canAct(reachableFrom(data, from, budget, c.side)[arrival[id]!] ?? budget, budget);
   };
-  const out: Omit<Contact, 'hp' | 'nearby'>[] = [];
+  const out: Omit<Contact, 'hp' | 'nearby' | 'arrivals'>[] = [];
   for (const [id, { blue, red }] of zones) {
     if (blue.length === 0 || red.length === 0) continue;
     blue.sort();
@@ -205,11 +205,11 @@ export function detectContacts(state: GameState, data: GameData, orders: Orders)
       out.push(build('skirmish', zone, null));
     }
   }
-  const hp = (c: Omit<Contact, 'hp' | 'nearby'>): Record<string, number> =>
+  const hp = (c: Omit<Contact, 'hp' | 'nearby' | 'arrivals'>): Record<string, number> =>
     Object.fromEntries([...c.blue, ...c.red].map((id) => [id, state.champions.find((x) => x.id === id)!.hp]));
   const inContact = new Set(out.flatMap((c) => [...c.blue, ...c.red]));
   /** Alive, in no contact, not recalling (a spawn is not alive yet), arrived 1 step from one of `c.positions`, not from another lane. */
-  const nearby = (c: Omit<Contact, 'hp' | 'nearby'>): Record<Side, string[]> => {
+  const nearby = (c: Omit<Contact, 'hp' | 'nearby' | 'arrivals'>): Record<Side, string[]> => {
     const near: Record<Side, string[]> = { blue: [], red: [] };
     if (c.auto) return near;
     const contactLane = c.id.startsWith('lane-') ? data.graph.positions[c.position]?.lane : undefined;
@@ -226,7 +226,9 @@ export function detectContacts(state: GameState, data: GameData, orders: Orders)
     near.red.sort();
     return near;
   };
-  return out.map((c) => ({ ...c, hp: hp(c), nearby: nearby(c) })).sort((a, b) => byId(a.id, b.id));
+  const arrivals = (c: Omit<Contact, 'hp' | 'nearby' | 'arrivals'>): Record<string, string> =>
+    Object.fromEntries([...c.blue, ...c.red].map((id) => [id, arrival[id]!]));
+  return out.map((c) => ({ ...c, arrivals: arrivals(c), hp: hp(c), nearby: nearby(c) })).sort((a, b) => byId(a.id, b.id));
 }
 
 /**
@@ -271,4 +273,47 @@ export function resolveChoice(contact: Contact, choices: ContactChoices): Record
     out[s] = c;
   }
   return out;
+}
+
+/**
+ * Where a fleeing champion steps from: the contact's fight position when it is nearer the own base than where the
+ * champion arrived, else its arrival (a champion standing behind the contact never walks toward it).
+ */
+export function fleeSpot(data: GameData, side: Side, position: string, arrival: string): string {
+  const base = `base-${side}`;
+  return data.graph.distance(position, base) <= data.graph.distance(arrival, base) ? position : arrival;
+}
+
+/**
+ * The positions a champion of `contact` (`state`: the round's input state, as for `detectContacts`) may flee to: the
+ * neighbours of its `fleeSpot`, minus the contact's positions, the enemy base and every position an enemy of the
+ * contact came from this round. The automatic step (`retreatStep`) comes first and is always allowed (when the
+ * champion has none, it stays without a pick); the others follow in graph order. Empty for a champion outside the
+ * contact.
+ */
+export function fleeSteps(state: GameState, data: GameData, contact: Contact, championId: string): string[] {
+  const arrival = contact.arrivals[championId];
+  const c = state.champions.find((x) => x.id === championId);
+  if (arrival === undefined || !c) return [];
+  const spot = fleeSpot(data, c.side, contact.position, arrival);
+  const auto = retreatStep(data, c.side, spot);
+  const enemies = c.side === 'blue' ? contact.red : contact.blue;
+  /** A spawned enemy came from its base (excluded anyway). */
+  const cameFrom = new Set(enemies.map((id) => moveStart(state.champions.find((x) => x.id === id)!)));
+  const others = (data.graph.adj[spot] ?? []).filter(
+    (p) => p !== auto && p !== `base-${other(c.side)}` && !contact.positions.includes(p) && !cameFrom.has(p),
+  );
+  return auto === spot ? others : [auto, ...others];
+}
+
+/**
+ * The flee steps given in `choices` for `contact` (champion id → position), validated against `fleeSteps`; throws on
+ * a step not allowed. Applied only to champions whose side flees.
+ */
+export function resolveFleeTo(state: GameState, data: GameData, contact: Contact, choices: ContactChoices): Record<string, string> {
+  const given = choices[contact.id]?.fleeTo ?? {};
+  for (const [id, to] of Object.entries(given)) {
+    if (!fleeSteps(state, data, contact, id).includes(to)) throw new Error(`${id}: cannot flee to ${to} from ${contact.id}`);
+  }
+  return given;
 }

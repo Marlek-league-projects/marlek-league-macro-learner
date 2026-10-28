@@ -48,6 +48,34 @@ function Joiners({ store, contact }: { store: Store; contact: Contact }) {
 }
 
 /**
+ * After "Fuir": where each own champion of the contact flees, the automatic step toward the base unless a step was
+ * clicked on the map ("Choisir sur la carte" waits for that click; the map highlights the allowed steps).
+ */
+function FleeSteps({ store, contact }: { store: Store; contact: Contact }) {
+  const picking = store.fleePick.value;
+  return (
+    <div class="joiners">
+      {contact.blue.map((id) => {
+        const to = store.fleeToOf(contact.id, id);
+        const waiting = picking?.contact === contact.id && picking.champion === id;
+        return (
+          <div key={id} class="joiner">
+            <Names store={store} ids={[id]} hp={contact.hp} />
+            <span class="note">
+              {waiting ? 'Clique une case pour choisir où fuir' : to ? `Fuite vers ${positionLabel(store.data, to)}` : 'Fuite : 1 pas vers ta base (auto)'}
+            </span>
+            <span class="choices">
+              <button class={waiting ? 'on' : ''} onClick={() => store.pickFlee(contact.id, waiting ? null : id)}>Choisir sur la carte</button>
+              {to && <button onClick={() => store.setFleeTo(contact.id, id, null)}>Fuite auto</button>}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
  * One contact of the round: its zone and positions, who, and the player's choice (preselected: keep on the objective
  * when offered, otherwise the default).
  */
@@ -71,6 +99,7 @@ export function ContactPrompt({ store, contact }: { store: Store; contact: Conta
           </button>
         ))}
       </div>
+      {chosen === 'flee' && <FleeSteps store={store} contact={contact} />}
       <Joiners store={store} contact={contact} />
     </div>
   );

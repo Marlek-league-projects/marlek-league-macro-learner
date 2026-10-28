@@ -186,8 +186,12 @@ export function MapView({ store }: { store: Store }) {
   const selectedId = ordering ? store.selected.value : null;
   const selected = view.allies.find((c) => c.id === selectedId) ?? null;
 
+  // After "Fuir", the own champion whose flee step a click picks: its allowed steps are the clickable positions.
+  const fleeing = store.screen.value === 'contacts' ? store.fleePick.value : null;
   // Positions the selected pawn can be ordered to, with the number of moves (a respawning one walks from its base).
-  const reach: Record<string, number> | null = selected && selected.status !== 'dead' ? store.reachableForSelected() : null;
+  const reach: Record<string, number> | null = fleeing
+    ? Object.fromEntries(store.fleeSteps(fleeing.contact, fleeing.champion).map((p) => [p, 1]))
+    : selected && selected.status !== 'dead' ? store.reachableForSelected() : null;
 
   const roundWin = placing ? { ...store.roundWindow(), ...placementWindow(data.rules) } : store.roundWindow();
   const now = roundWin.start;
@@ -207,13 +211,17 @@ export function MapView({ store }: { store: Store }) {
   const objectiveEntries = ordering && !placing
     ? objectivePromptEntries(view, data, roundWin, store.objectivePromptsClosed.value, pendingMoves, recalling)
     : [];
-  /** Act or arrival-only ring of a position for the selected token. */
-  const ring = (id: string) => (reach && selected ? rangeRing(reach[id], (d) => store.canAct(d, selected.id)) : null);
+  /** Act or arrival-only ring of a position for the selected token (a flee step: act). */
+  const ring = (id: string) => {
+    if (fleeing) return rangeRing(reach?.[id], () => true);
+    return reach && selected ? rangeRing(reach[id], (d) => store.canAct(d, selected.id)) : null;
+  };
 
   const order = (to: string) => {
-    if (!selected) return;
     try {
-      if (placing) store.placeChampion(selected.id, to);
+      if (fleeing) store.setFleeTo(fleeing.contact, fleeing.champion, to);
+      else if (!selected) return;
+      else if (placing) store.placeChampion(selected.id, to);
       else if (selected.status === 'respawning') store.setSpawn(selected.id, to);
       else store.setMove(selected.id, to);
     } catch (err) {
@@ -224,7 +232,9 @@ export function MapView({ store }: { store: Store }) {
   const tipText = (p: Position): string => {
     const parts = [p.label, kindLabel(p)];
     if (p.kind === 'tower') parts.push(`${dec(Math.max(0, view.towers[p.id] ?? 0))} / ${data.rules.towers.hp} PV`);
-    if (reach) {
+    if (fleeing) {
+      parts.push(reach?.[p.id] !== undefined ? 'fuir ici' : 'fuite impossible ici');
+    } else if (reach) {
       const d = reach[p.id];
       if (d === undefined) parts.push(placing ? 'départ interdit (côté adverse ou rivière)' : 'hors de portée ce round');
       else if (placing) parts.push('position de départ');

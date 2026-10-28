@@ -49,6 +49,31 @@ describe('resolveRound', () => {
     expect(events.some((e) => e.type === 'fight')).toBe(false);
   });
 
+  test('scuttle 1v2: a fleeing champion goes to its picked step (fleeTo), with no action', () => {
+    const { s, o } = scuttleScenario();
+    const bj = get(s, 'blue', 'jungle').id;
+    const { state, events } = resolveRound(s, d, o, { 'river-bot': { blue: 'flee', fleeTo: { [bj]: 'mid-t1-blue' } } });
+    expect(events).toContainEqual({ type: 'fled', champion: bj, to: 'mid-t1-blue' });
+    expect(get(state, 'blue', 'jungle').position).toBe('mid-t1-blue');
+    expect(events.some((e) => e.type === 'fight')).toBe(false);
+  });
+
+  test('scuttle 1v2: a flee step not allowed throws (a contact position, where an enemy came from, too far)', () => {
+    const { s, o } = scuttleScenario();
+    const bj = get(s, 'blue', 'jungle').id;
+    for (const to of ['scuttle-bot', 'mid-t1-red', 'top-lane']) {
+      expect(() => resolveRound(s, d, o, { 'river-bot': { blue: 'flee', fleeTo: { [bj]: to } } })).toThrow();
+    }
+  });
+
+  test('scuttle 1v2: fleeTo is ignored when the side does not flee', () => {
+    const { s, o } = scuttleScenario();
+    const bj = get(s, 'blue', 'jungle').id;
+    const { events } = resolveRound(s, d, o, { 'river-bot': { blue: 'fight', fleeTo: { [bj]: 'mid-t1-blue' } } });
+    expect(events).not.toContainEqual({ type: 'fled', champion: bj, to: 'mid-t1-blue' });
+    expect(events.some((e) => e.type === 'fight')).toBe(true);
+  });
+
   test('scuttle 1v2: blue choosing fight loses and dies, red takes the scuttle', () => {
     const { s, o } = scuttleScenario();
     const bj = get(s, 'blue', 'jungle').id;

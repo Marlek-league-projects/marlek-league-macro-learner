@@ -319,6 +319,7 @@ describe('promptContacts', () => {
     defaults: { blue: 'farm', red: 'farm' },
     invader: null,
     auto,
+    arrivals: { a: id, b: id },
     hp: { a: 100, b: 100 },
     nearby: { blue: [], red: [] },
   });

@@ -52,6 +52,13 @@ export interface GameEngine {
   spawnPoints(state: GameState, data: GameData, championId: string): string[];
   validateOrders(state: GameState, data: GameData, side: Side, orders: Order[]): void;
   detectContacts(state: GameState, data: GameData, orders: Orders): Contact[];
+  /**
+   * Where a champion of `contact` may flee (its `fleeTo`; `state`: the round's input state, as for `detectContacts`):
+   * the automatic step toward its base first (when it has one; without a pick it takes it, or stays), then the other
+   * neighbours of where it steps from, minus the contact's positions, the enemy base and where an enemy of the contact
+   * came from this round.
+   */
+  fleeSteps(state: GameState, data: GameData, contact: Contact, championId: string): string[];
   resolveRound(state: GameState, data: GameData, orders: Orders, choices: ContactChoices): RoundResult;
   viewFor(state: GameState, data: GameData, side: Side): PlayerView;
   /** What `view.side` assumes `enemy` has (xp, items, lead), from what it knows; the AI uses the same estimate. */
