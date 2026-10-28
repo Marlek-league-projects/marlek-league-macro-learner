@@ -58,11 +58,17 @@ export interface Rules {
     buffXp: number;
     smallGold: number;
     smallXp: number;
+    /**
+     * Camp gold and XP grow with the average level of all champions (both sides, dead or alive) when cleared:
+     * base × (1 + levelScaling × (average level − 1)).
+     */
+    levelScaling: number;
     fastClearAt: number;
   };
   economy: {
     farmGoldPerMin: number;
-    farmXpPerMin: number;
+    /** A solo laner's wave XP per minute, by stage (stronger minions and cannons as the game goes on). */
+    farmXpPerMin: PerStage;
     /** Share of a solo laner's farm xp each bot laner gets while the support is in lane. */
     duoXpShare: number;
     /** Support's share of the lane farm gold. */
@@ -71,7 +77,9 @@ export interface Rules {
     pressureFarmShare: number;
     passiveGoldPerMin: number;
     killGold: number;
+    /** Kill XP for a level-1 victim; each victim level above 1 adds `killXpPerLevel`. Split among the winners. */
     killXp: number;
+    killXpPerLevel: number;
     tradeLead: number;
     levelXp: number[];
   };

@@ -93,6 +93,16 @@ export function validateRules(rules: Rules): void {
   for (const key of ['survivorLoss', 'winnerLoss', 'tieLoss', 'gankExposed', 'gankHpLoss', 'fleeHpLoss', 'pressureHpLoss', 'objectiveFocus'] as const) {
     if (!finite(f[key]) || f[key] < 0) fail('rules.fight', `${key} = ${String(f[key])} is not a non-negative number`);
   }
+  checkPerStage('rules.economy.farmXpPerMin', rules.economy.farmXpPerMin);
+  rules.economy.farmXpPerMin.forEach((n, i) => {
+    if (!finite(n) || n < 0) fail('rules.economy.farmXpPerMin', `stage ${i} = ${String(n)} is not a non-negative number`);
+  });
+  if (!finite(rules.economy.killXpPerLevel) || rules.economy.killXpPerLevel < 0) {
+    fail('rules.economy', `killXpPerLevel = ${String(rules.economy.killXpPerLevel)} is not a non-negative number`);
+  }
+  if (!finite(rules.camps.levelScaling) || rules.camps.levelScaling < 0) {
+    fail('rules.camps', `levelScaling = ${String(rules.camps.levelScaling)} is not a non-negative number`);
+  }
   const share = rules.economy.pressureFarmShare;
   if (typeof share !== 'number' || !Number.isFinite(share) || share < 0 || share > 1) {
     fail('rules.economy', `pressureFarmShare = ${String(share)} is not a number in 0..1`);

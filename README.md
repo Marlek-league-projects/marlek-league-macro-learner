@@ -18,6 +18,7 @@ bun test             # engine, data and web tests
 bun run typecheck    # TypeScript strict, all packages
 bun run check-deps   # enforces the module boundaries (see Architecture)
 bun run build        # static site in packages/web/dist
+bun run xp-curve     # average level by role at 3, 6, 10, 15, 20 and 25 min (AI vs AI), against the XP targets
 ```
 
 CI runs typecheck, check-deps, tests and build. For screenshots, the app (any build) accepts `?autostart=1&rank=gold&seed=42` to skip the start screen and launch a game directly (on round 0's placement).
@@ -195,7 +196,7 @@ Tower damage bonuses stack: Voidgrubs plus Baron gives ×3. The Herald launch is
   - *objective* against *objective*: a race. The higher fight score keeps taking it and the other side leaves; nobody dies or loses HP. On a tie, both stay, and the numbers on the pit decide: the bigger side progresses it, equal numbers reset it.
   - *fight* (won, or against *flee*): the winner takes the kills but does not start, continue or take the pit objective this round; a capture in progress is lost. A champion on the Scuttle with a step left still takes the Scuttle.
   - A champion arriving on its last step (no action left), or recalling, cannot choose the objective, but still fights.
-- Jungle camps first spawn at 0:55 (Blue Buff, Red Buff, Wolves, Raptors) or 1:07 (Krugs, Gromp; `rules.camps.firstSpawnByCamp`). Krugs and Gromp spawn inside round 1 (0:55 → 1:15), so they count as up in that round, like an objective spawning in it. Camps respawn on their real timers (buffs 5:00, small camps 2:15) and give gold and XP to whoever clears them: one camp per round, the one the champion stands on with a step left (see [Movement](#movement)). Exception: in round 1, a champion placed on a camp clears that camp at the start of the round, wherever it moves, and has no action on arrival. `clearSpeed` no longer lets a jungler clear a second camp on the way. Clearing an enemy camp works like your own, and you then know its respawn timer.
+- Jungle camps first spawn at 0:55 (Blue Buff, Red Buff, Wolves, Raptors) or 1:07 (Krugs, Gromp; `rules.camps.firstSpawnByCamp`). Krugs and Gromp spawn inside round 1 (0:55 → 1:15), so they count as up in that round, like an objective spawning in it. Camps respawn on their real timers (buffs 5:00, small camps 2:15) and give gold and XP to whoever clears them, growing with the game like real camps (see *XP curve* in [Lead, gold and recall](#lead-gold-and-recall)): one camp per round, the one the champion stands on with a step left (see [Movement](#movement)). Exception: in round 1, a champion placed on a camp clears that camp at the start of the round, wherever it moves, and has no action on arrival. `clearSpeed` no longer lets a jungler clear a second camp on the way. Clearing an enemy camp works like your own, and you then know its respawn timer.
 
 ## Lead, gold and recall
 
@@ -205,6 +206,13 @@ Each champion has a **lead gauge** made of two parts:
 - **Items**: gold piles up as you play, but it only turns into power when you **recall** and buy items.
 
 *(design call)* The gauge is a single number: XP value plus the value of the items you own. Unspent gold is shown separately and only adds to the gauge on recall. Farming each round, kills, camps, plates and objectives all give XP and/or gold, with amounts in data.
+
+**XP curve.** XP sources grow as the game goes on, as in the real game, so levels follow a real game's curve (about level 4 at 3:00, 7 at 6:00, 10 at 10:00, 12 at 15:00, 14 at 20:00 and 16 at 25:00 for a solo laner; a little lower for the jungler and the bot lane, lowest for the support). Values in data:
+- **Waves**: a solo laner's wave XP per minute rises by stage (`economy.farmXpPerMin`: 650, 850, 1100, 1100, 1150), for stronger minions and cannons. The adc and support each get `duoXpShare` (85%) of it when they lane together.
+- **Camps**: gold and XP are multiplied by 1 + `camps.levelScaling` (0.2) × (average level − 1), the average over all 10 champions, dead or alive, when the camp is cleared. Every round spent away from your camps costs more as the game goes on.
+- **Kills**: `economy.killXp` (250) plus `economy.killXpPerLevel` (30) per victim level above 1, split among the winners.
+
+`bun run xp-curve` plays 10 AI-vs-AI games (Challenger on both sides) and prints the average level by role at each time against these targets (tolerance ±1 level); rerun it after changing an XP source.
 
 **End-of-game verdict** *(design call)*: each team scores its gold (including the value of items) plus fixed values for each objective and each tower plate or tower. The values live in data. The higher score wins.
 
@@ -332,7 +340,7 @@ Each level is a data profile with a frequency per mistake (for example, Iron gre
 
 At any time, the AI skips an objective when the enemies it knows near the pit would win the fight against the group it could bring there, instead of walking in only to flee.
 
-**Range and action.** The AI plays by the same step budget as you (see *Movement*). A target that needs an action (clearing a camp, taking a Scuttle, a live Dragon or Nashor, a laner's farm) counts as reached only where the AI still has a step left to act. One it can only arrive at is a walk toward it, scored lower (`aiTuning.walkPenalty`) because the round is lost: a jungler clears the camp in action range before walking to a farther buff, and a laner stops on the lane position where it still farms. Pushing a tower only needs presence. The AI invades only enemy camps whose timer it does not know to be down.
+**Range and action.** The AI plays by the same step budget as you (see *Movement*). A target that needs an action (clearing a camp, taking a Scuttle, a live Dragon or Nashor, a laner's farm) counts as reached only where the AI still has a step left to act. One it can only arrive at is a walk toward it, scored lower (`aiTuning.walkPenalty`) because the round is lost: a jungler clears the camp in action range before walking to a farther buff, and a laner stops on the lane position where it still farms. Pushing a tower only needs presence. The AI invades only enemy camps whose timer it does not know to be down. *(design call)* A gank costs the jungler its camps, so the AI jungler ranks a gank (`aiTuning.priorities.gank`) below a buff, a Scuttle or an invade in action range, and above a small camp.
 
 **Never under a tower without its wave** *(hard rule, never a mistake)*. An AI champion ends its move on a standing enemy tower only when it is that lane's front tower and the AI's wave is at it. This covers pushing, taking a tower after a won fight, Herald launches (the Herald waits for the wave) and pointless plays. When nothing else is allowed, the champion stays where it is.
 

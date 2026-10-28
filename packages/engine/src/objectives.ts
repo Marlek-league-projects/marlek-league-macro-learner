@@ -1,5 +1,6 @@
 import type { GameData, ObjectiveId, Side } from '@lml/data/contracts';
 import type { ChampionState, GameEvent, GameState, Orders, PitState } from './contracts';
+import { level } from './economy';
 import { lead } from './fight';
 import { damageTower, grant } from './lanes';
 import { roundWindow } from './time';
@@ -209,13 +210,18 @@ function clearOrder(state: GameState, ids: ReadonlySet<string>): ChampionState[]
     .sort((a, b) => Number(b.role === 'jungle') - Number(a.role === 'jungle') || a.id.localeCompare(b.id));
 }
 
-/** `c` clears `camp` if it is up by the end of the round: its gold and XP, its respawn timer, remembered by `c`'s side. */
+/**
+ * `c` clears `camp` if it is up by the end of the round: its gold and XP (scaled by the average level of all
+ * champions, dead or alive), its respawn timer, remembered by `c`'s side.
+ */
 function clearCamp(state: GameState, data: GameData, camp: string, c: ChampionState, events: GameEvent[]): void {
   const end = roundWindow(data.rules, state.round).end;
   if (!(camp in state.camps) || state.camps[camp]! > end) return;
   const r = data.rules.camps;
   const buff = BUFF_CAMPS.has(data.graph.positions[camp]!.camp!);
-  grant(c, buff ? r.buffGold : r.smallGold, buff ? r.buffXp : r.smallXp);
+  const avgLevel = state.champions.reduce((sum, x) => sum + level(x.xp, data.rules), 0) / state.champions.length;
+  const scale = 1 + r.levelScaling * (avgLevel - 1);
+  grant(c, (buff ? r.buffGold : r.smallGold) * scale, (buff ? r.buffXp : r.smallXp) * scale);
   state.camps[camp] = end + (buff ? r.buffRespawn : r.smallRespawn);
   state.campsSeen[c.side][camp] = state.camps[camp]!;
   events.push({ type: 'campCleared', camp, champion: c.id });

@@ -624,8 +624,11 @@ describe('AI lane stances', () => {
     place(s, 'red', 'top', 'top-lane');
     get(s, 'red', 'top').bonusLead += 100_000;
     s.lastSeen.red[get(s, 'blue', 'top').id] = { position: 'top-lane', round: 9 };
-    // The red jungler, 2 steps from the lane middle, ganks the blue top there and the red top joins it.
+    // The red jungler, 2 steps from the lane middle, ganks the blue top there and the red top joins it (its camps and
+    // the Scuttles down, so it has nothing to take that ranks above a gank).
     place(s, 'red', 'jungle', 'raptors-red');
+    for (const camp of Object.keys(s.camps)) if (d.graph.positions[camp]!.side === 'red') s.campsSeen.red[camp] = 10_000;
+    s.scuttlesSeen.red = { 'scuttle-top': 10_000, 'scuttle-bot': 10_000 };
     const bj = get(s, 'blue', 'jungle');
     if (jungler) {
       place(s, 'blue', 'jungle', jungler);

@@ -79,6 +79,24 @@ test('validateRules rejects a pressureFarmShare outside 0..1', () => {
   expect(() => validateRules(r)).toThrow(/pressureFarmShare/);
 });
 
+test('validateRules rejects bad xp scaling values', () => {
+  const a = structuredClone(data.rules);
+  a.economy.farmXpPerMin = [600, 600] as unknown as typeof a.economy.farmXpPerMin;
+  expect(() => validateRules(a)).toThrow(/rules\.economy\.farmXpPerMin/);
+  a.economy.farmXpPerMin = [600, -1, 600, 600, 600];
+  expect(() => validateRules(a)).toThrow(/rules\.economy\.farmXpPerMin/);
+  const b = structuredClone(data.rules);
+  b.economy.killXpPerLevel = -1;
+  expect(() => validateRules(b)).toThrow(/rules\.economy.*killXpPerLevel/);
+  delete (b.economy as Partial<typeof b.economy>).killXpPerLevel;
+  expect(() => validateRules(b)).toThrow(/rules\.economy.*killXpPerLevel/);
+  const c = structuredClone(data.rules);
+  c.camps.levelScaling = -0.1;
+  expect(() => validateRules(c)).toThrow(/rules\.camps.*levelScaling/);
+  delete (c.camps as Partial<typeof c.camps>).levelScaling;
+  expect(() => validateRules(c)).toThrow(/rules\.camps.*levelScaling/);
+});
+
 test('validateRules rejects bad health values', () => {
   const a = structuredClone(data.rules);
   a.health.fightWeight = 2;

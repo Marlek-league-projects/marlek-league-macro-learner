@@ -144,7 +144,7 @@ describe('farming', () => {
     expect(get(s, 'blue', 'adc').gold - passive).toBeCloseTo(110, 6);
     expect(get(s, 'blue', 'support').gold - passive).toBeCloseTo(33, 6);
     expect(get(s, 'blue', 'adc').goldEarned).toBeCloseTo(110 + passive, 6);
-    const duoXp = (d.rules.economy.farmXpPerMin * d.rules.economy.duoXpShare * 20) / 60;
+    const duoXp = (d.rules.economy.farmXpPerMin[0] * d.rules.economy.duoXpShare * 20) / 60;
     expect(get(s, 'blue', 'adc').xp).toBeCloseTo(duoXp, 6);
     expect(get(s, 'blue', 'support').xp).toBeCloseTo(duoXp, 6);
   });
@@ -154,7 +154,7 @@ describe('farming', () => {
     get(s, 'red', 'support').position = 'top-lane';
     get(s, 'red', 'top').position = 'top-lane';
     run(s);
-    const soloXp = (d.rules.economy.farmXpPerMin * 20) / 60;
+    const soloXp = (d.rules.economy.farmXpPerMin[0] * 20) / 60;
     expect(get(s, 'blue', 'support').xp).toBeCloseTo(soloXp * d.rules.economy.supportShare, 6);
     // With a non-bot carry, the support and the carry farm as if no duo.
     expect(get(s, 'red', 'support').xp).toBeCloseTo(soloXp * d.rules.economy.supportShare, 6);
@@ -166,11 +166,19 @@ describe('farming', () => {
     get(s, 'blue', 'jungle').position = 'top-lane';
     run(s);
     const passive = (d.rules.economy.passiveGoldPerMin * 20) / 60;
-    const solo = { gold: (d.rules.economy.farmGoldPerMin * 20) / 60, xp: (d.rules.economy.farmXpPerMin * 20) / 60 };
+    const solo = { gold: (d.rules.economy.farmGoldPerMin * 20) / 60, xp: (d.rules.economy.farmXpPerMin[0] * 20) / 60 };
     expect(get(s, 'blue', 'jungle').gold).toBeCloseTo(passive, 6);
     expect(get(s, 'blue', 'jungle').xp).toBe(0);
     expect(get(s, 'blue', 'top').gold - passive).toBeCloseTo(solo.gold, 6);
     expect(get(s, 'blue', 'top').xp).toBeCloseTo(solo.xp, 6);
+  });
+  test('wave xp per minute follows the stage (economy.farmXpPerMin)', () => {
+    for (const [round, stage] of [[1, 0], [7, 1], [17, 2], [41, 3], [59, 4]] as const) {
+      const s = fresh(round);
+      get(s, 'blue', 'top').position = 'top-lane';
+      run(s);
+      expect(get(s, 'blue', 'top').xp).toBeCloseTo((d.rules.economy.farmXpPerMin[stage] * 20) / 60, 6);
+    }
   });
   test('under lane pressure the smaller side farms at pressureFarmShare; not in a lane without pressure', () => {
     const farmed = (ganked: Set<Lane>): { gold: number; xp: number } => {
@@ -181,7 +189,7 @@ describe('farming', () => {
       const passive = (d.rules.economy.passiveGoldPerMin * 20) / 60;
       return { gold: get(s, 'red', 'adc').gold - passive, xp: get(s, 'red', 'adc').xp };
     };
-    const solo = { gold: (d.rules.economy.farmGoldPerMin * 20) / 60, xp: (d.rules.economy.farmXpPerMin * 20) / 60 };
+    const solo = { gold: (d.rules.economy.farmGoldPerMin * 20) / 60, xp: (d.rules.economy.farmXpPerMin[0] * 20) / 60 };
     const share = d.rules.economy.pressureFarmShare;
     const pressured = farmed(new Set());
     expect(pressured.gold).toBeCloseTo(solo.gold * share, 6);

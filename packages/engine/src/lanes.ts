@@ -186,7 +186,7 @@ export function updateLanes(
       const carries = here.filter((c) => c.role !== 'support');
       const share = side === pressured ? rules.economy.pressureFarmShare : 1;
       const gold = (rules.economy.farmGoldPerMin * win.seconds * share) / 60;
-      const soloXp = (rules.economy.farmXpPerMin * win.seconds * share) / 60;
+      const soloXp = (rules.economy.farmXpPerMin[win.stage] * win.seconds * share) / 60;
       // A real adc + support duo: each gets `duoXpShare` of a solo laner's xp. Otherwise a support takes
       // `supportShare` of it, as of the gold.
       const duo = here.some((c) => c.role === 'adc') && here.some((c) => c.role === 'support');

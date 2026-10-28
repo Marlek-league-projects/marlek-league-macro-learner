@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { loadGameData } from '@lml/data';
-import { defaultOrders, detectContacts, eventsFor, newGame, resolveFight, resolveRound, roundWindow } from '@lml/engine';
+import { defaultOrders, detectContacts, eventsFor, level, newGame, resolveFight, resolveRound, roundWindow } from '@lml/engine';
 import { retreatStep } from '../src/movement';
 import type { ChampionState, ContactChoices, GameEvent, GameState, Order, Orders, Stance } from '@lml/engine/contracts';
 
@@ -784,22 +784,27 @@ describe('acting after a lane pull-in', () => {
     const xpBefore = get(s, 'blue', 'mid').xp;
     return { r: resolveRound(s, d, o, { 'lane-top': { blue: 'fight', red: 'fight' } }), bj, xpBefore };
   }
-  const killXpShare = (events: GameEvent[]): number =>
-    (events.filter((e) => e.type === 'death').length * d.rules.economy.killXp) / 2;
+  /** The blue mid's half of the kill XP of every death (`killXp` grows with the victim's level). */
+  const killXpShare = (r: ReturnType<typeof resolveRound>): number =>
+    r.events.reduce((sum, e) => {
+      if (e.type !== 'death') return sum;
+      const victim = r.state.champions.find((c) => c.id === e.champion)!;
+      return sum + d.rules.economy.killXp + d.rules.economy.killXpPerLevel * (level(victim.xp, d.rules) - 1);
+    }, 0) / 2;
 
   test('an arrival-only champion pulled back to the fight gains no action and does not farm', () => {
     const { r, bj, xpBefore } = pulled('top-t1-blue', 'top-t1-red');
     expect(r.events.some((e) => e.type === 'fight' && e.winner === 'blue')).toBe(true);
     expect(get(r.state, 'blue', 'mid').position).toBe('top-lane');
     expect(r.events.filter((e) => e.type === 'moved' && e.champion === bj).every((e) => e.type === 'moved' && !e.acted)).toBe(true);
-    expect(get(r.state, 'blue', 'mid').xp - xpBefore).toBeCloseTo(killXpShare(r.events), 9);
+    expect(get(r.state, 'blue', 'mid').xp - xpBefore).toBeCloseTo(killXpShare(r), 9);
   });
 
   test('an acting champion pulled away keeps its action and farms', () => {
     const { r, bj, xpBefore } = pulled('top-t2-red', 'top-t1-red');
     expect(get(r.state, 'blue', 'mid').position).toBe('top-lane');
     expect(r.events.filter((e) => e.type === 'moved' && e.champion === bj).every((e) => e.type === 'moved' && e.acted)).toBe(true);
-    expect(get(r.state, 'blue', 'mid').xp - xpBefore).toBeGreaterThan(killXpShare(r.events) + 1e-9);
+    expect(get(r.state, 'blue', 'mid').xp - xpBefore).toBeGreaterThan(killXpShare(r) + 1e-9);
   });
 });
 

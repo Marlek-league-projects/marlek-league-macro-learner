@@ -12,6 +12,11 @@ export function level(xp: number, rules: Rules): number {
   return l;
 }
 
+/** XP a kill of `victim` gives, split among the winners: it grows with the victim's level. */
+export function killXp(victim: ChampionState, rules: Rules): number {
+  return rules.economy.killXp + rules.economy.killXpPerLevel * (level(victim.xp, rules) - 1);
+}
+
 /** Victims spend their unspent gold on items and die (and lose the herald); alive winners split kill gold and xp per victim. */
 export function applyKill(
   state: GameState,
@@ -34,7 +39,7 @@ export function applyKill(
     v.respawnRound = state.round + deadRounds;
     v.hasHerald = false;
     state.kills[v.side === 'blue' ? 'red' : 'blue'] += 1;
-    for (const w of takers) grant(w, economy.killGold / takers.length, economy.killXp / takers.length);
+    for (const w of takers) grant(w, economy.killGold / takers.length, killXp(v, data.rules) / takers.length);
     events.push({ type: 'death', champion: v.id, position: v.position, respawnRound: v.respawnRound });
   }
 }

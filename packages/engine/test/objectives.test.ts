@@ -447,6 +447,20 @@ describe('camps', () => {
     }
   });
 
+  test('camp gold and xp grow with the average level of all champions: × (1 + levelScaling × (average − 1))', () => {
+    const s = fresh(20);
+    // Average level 5: half the champions at level 3, half at level 7.
+    s.champions.forEach((c, i) => (c.xp = d.rules.economy.levelXp[i % 2 === 0 ? 2 : 6]!));
+    const jg = get(s, 'blue', 'jungle');
+    jg.position = 'krugs-blue';
+    jg.gold = 0;
+    const xp = jg.xp;
+    clear(s);
+    const scale = 1 + d.rules.camps.levelScaling * 4;
+    expect(jg.gold).toBeCloseTo(d.rules.camps.smallGold * scale, 9);
+    expect(jg.xp - xp).toBeCloseTo(d.rules.camps.smallXp * scale, 9);
+  });
+
   test('a champion with no step left on the camp does not clear it', () => {
     const s = fresh(2);
     const jg = get(s, 'blue', 'jungle');
@@ -464,7 +478,8 @@ describe('camps', () => {
       jg.position = camp;
       clear(s);
     }
-    expect(jg.xp).toBe(2 * d.rules.camps.buffXp + 4 * d.rules.camps.smallXp);
+    // At least the level-1 values: the jungler's own levels raise the average as it clears.
+    expect(jg.xp).toBeGreaterThanOrEqual(2 * d.rules.camps.buffXp + 4 * d.rules.camps.smallXp);
     expect(level(jg.xp, d.rules)).toBeGreaterThanOrEqual(4);
   });
 

@@ -1,5 +1,6 @@
 import type { GameData, Lane, ObjectiveId, Side } from '@lml/data/contracts';
 import type { PlayerView } from '../contracts';
+import { killXp } from '../economy';
 import { estimateEnemy } from '../estimate';
 import { lead } from '../fight';
 import { objectiveAt, type PitId } from '../objectives';
@@ -62,7 +63,7 @@ export function evaluate(view: PlayerView, data: GameData): number {
   let score = 0;
   for (const c of view.allies) {
     score += lead(c, rules) + c.gold;
-    if (c.status === 'dead') score -= rules.economy.killGold + rules.economy.killXp;
+    if (c.status === 'dead') score -= rules.economy.killGold + killXp(c, rules);
   }
   for (const e of view.enemies) {
     const est = estimateEnemy(view, data, e);

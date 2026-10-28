@@ -55,6 +55,19 @@ describe('death', () => {
     expect(a.gold - g).toBe(d.rules.economy.killGold / 2);
     expect(b.goldEarned).toBe(d.rules.economy.killGold / 2);
   });
+  test('kill xp grows with the victim level: killXp + killXpPerLevel per level above 1, split among the winners', () => {
+    const s = fresh(10);
+    const v = id(s, 'red', 'top');
+    v.xp = d.rules.economy.levelXp[5]!;
+    expect(level(v.xp, d.rules)).toBe(6);
+    const a = id(s, 'blue', 'top');
+    const b = id(s, 'blue', 'mid');
+    const [xa, xb] = [a.xp, b.xp];
+    applyKill(s, d, [v.id], [a.id, b.id], []);
+    const xp = d.rules.economy.killXp + 5 * d.rules.economy.killXpPerLevel;
+    expect(a.xp - xa).toBeCloseTo(xp / 2, 9);
+    expect(b.xp - xb).toBeCloseTo(xp / 2, 9);
+  });
   test('dead champion respawns when the round arrives', () => {
     const s = fresh(10);
     const v = id(s, 'red', 'top');

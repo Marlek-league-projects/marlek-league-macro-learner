@@ -547,6 +547,8 @@ describe('met enemies', () => {
     place(s, 'red', 'jungle', 'gromp-red');
     const rj = get(s, 'red', 'jungle').id;
     const bj = get(s, 'blue', 'jungle').id;
+    // Blue wins the fight, so red retreats out of sight.
+    get(s, 'blue', 'jungle').bonusLead += 1_000;
     const fullHp = get(s, 'red', 'jungle').hp;
     const r = resolveRound(s, d, ordersWith(s), { 'gromp-red': { blue: 'fight', red: 'fight' } });
     const red = r.state.champions.find((c) => c.id === rj)!;
