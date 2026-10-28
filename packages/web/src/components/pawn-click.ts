@@ -26,6 +26,11 @@ export function pawnClick(
   return { kind: 'none' };
 }
 
+/** While picking a flee step, a click on a pawn standing on an allowed step picks that step; any other does nothing. */
+export function fleePawnClick(pawn: ClickedPawn, steps: Record<string, number> | null): PawnClick {
+  return steps?.[pawn.position] !== undefined ? { kind: 'order', to: pawn.position } : { kind: 'none' };
+}
+
 /**
  * With a pawn selected, the icon and padding of a pawn standing on a position it cannot reach must not
  * swallow clicks meant for the node underneath; only its portrait stays clickable (to switch selection).

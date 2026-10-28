@@ -21,7 +21,7 @@ function text(node: ComponentChildren): string {
 }
 
 /** A store whose engine reports one prompted bot river contact (blue jungler against red jungler) and records the choices sent. */
-function rigged() {
+function rigged(steps?: string[]) {
   let sent: ContactChoices | null = null;
   let ids: Record<string, string> = {};
   const contact = (): Contact => ({
@@ -33,6 +33,7 @@ function rigged() {
   const spy: GameEngine = {
     ...engine,
     detectContacts: () => [contact()],
+    ...(steps ? { fleeSteps: () => steps } : {}),
     aiAnswers: () => ({ 'river-bot': { red: 'fight' } }),
     resolveRound: (s, d, o, choices) => {
       sent = choices;
@@ -95,5 +96,25 @@ describe('picking where to flee (web)', () => {
     const to = store.fleeSteps('river-bot', bj)[1]!;
     store.setFleeTo('river-bot', bj, to);
     expect(text(ContactPrompt({ store, contact: shown }))).toContain(`Fuite vers ${positionLabel(data, to)}`);
+  });
+
+  test('with one step there is nothing to choose: no click awaited, no "Choisir sur la carte"', () => {
+    const { store, bj } = rigged(['bot-t1-blue']);
+    store.choose('river-bot', 'flee');
+    expect(store.fleePick.value).toBeNull();
+    expect(() => store.pickFlee('river-bot', bj)).toThrow();
+    const out = text(ContactPrompt({ store, contact: store.contacts.value[0]! }));
+    expect(out).not.toContain('Choisir sur la carte');
+    expect(out).toContain('Fuite : 1 pas vers ta base (auto)');
+  });
+
+  test('with no step the champion stays, and the prompt says so', () => {
+    const { store } = rigged([]);
+    store.choose('river-bot', 'flee');
+    expect(store.fleePick.value).toBeNull();
+    const out = text(ContactPrompt({ store, contact: store.contacts.value[0]! }));
+    expect(out).not.toContain('Choisir sur la carte');
+    expect(out).not.toContain('vers ta base');
+    expect(out).toContain('Aucun pas de fuite : reste sur place');
   });
 });

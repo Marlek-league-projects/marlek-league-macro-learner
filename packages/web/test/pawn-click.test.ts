@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { nodeClickKeepsSelection, pawnClick, pawnHitPassesThrough } from '../src/components/pawn-click';
+import { fleePawnClick, nodeClickKeepsSelection, pawnClick, pawnHitPassesThrough } from '../src/components/pawn-click';
 
 const reach = { 'top-lane': 1, 'gromp-blue': 1 };
 
@@ -56,5 +56,17 @@ describe('nodeClickKeepsSelection', () => {
   test('reachable positions and clicks with nothing selected are left to the map', () => {
     expect(nodeClickKeepsSelection('top-lane', reach)).toBe(false);
     expect(nodeClickKeepsSelection('bot-lane', null)).toBe(false);
+  });
+});
+
+describe('fleePawnClick', () => {
+  const steps = { 'top-t1-blue': 1, 'scuttle-top': 1 };
+  test('a pawn on an allowed flee step picks that step, ally or enemy', () => {
+    expect(fleePawnClick({ id: 'Ashe', position: 'top-t1-blue', ally: true }, steps)).toEqual({ kind: 'order', to: 'top-t1-blue' });
+    expect(fleePawnClick({ id: 'Ornn', position: 'scuttle-top', ally: false }, steps)).toEqual({ kind: 'order', to: 'scuttle-top' });
+  });
+
+  test('a pawn elsewhere does nothing (never selects)', () => {
+    expect(fleePawnClick({ id: 'Ashe', position: 'bot-lane', ally: true }, steps)).toEqual({ kind: 'none' });
   });
 });

@@ -134,7 +134,7 @@ export interface Store {
   joinsOf(contactId: string): string[];
   /** Where an own champion of `contactId` may flee (engine.fleeSteps): the automatic step first, when it has one. */
   fleeSteps(contactId: string, champion: string): string[];
-  /** Waits for a map click on where `champion` flees (null: stops waiting). */
+  /** Waits for a map click on where `champion` flees (null: stops waiting); throws when it has no step to choose (under 2). */
   pickFlee(contactId: string, champion: string | null): void;
   /**
    * Flees `champion` to `to` (one of its `fleeSteps`; throws otherwise), null: back to the automatic step. Stops
@@ -573,11 +573,15 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     choose(contactId, choice) {
       const c = contactOf(contactId);
       if (!c.options.blue.includes(choice)) throw new Error(`${contactId}: ${choice} is not an option`);
-      // Fleeing waits for a click on where the first own champion goes; another reaction drops the picked steps.
+      // Fleeing waits for a click on where the first own champion goes (when it has a step to choose); another reaction
+      // drops the picked steps.
       const next = { ...choices.value[contactId], blue: choice };
       if (choice !== 'flee') delete next.fleeTo;
       choices.value = { ...choices.value, [contactId]: next };
-      if (choice === 'flee') fleePick.value = { contact: contactId, champion: c.blue[0]! };
+      if (choice === 'flee') {
+        const first = c.blue[0]!;
+        fleePick.value = engine.fleeSteps(current(), data, c, first).length > 1 ? { contact: contactId, champion: first } : null;
+      }
       else if (fleePick.value?.contact === contactId) fleePick.value = null;
     },
 
@@ -603,6 +607,7 @@ export function createStore(data: GameData, engine: GameEngine): Store {
     },
 
     pickFlee(contactId, id) {
+      if (id !== null && engine.fleeSteps(current(), data, contactOf(contactId), id).length < 2) throw new Error(`${id}: no flee step to choose`);
       fleePick.value = id === null ? null : { contact: contactId, champion: id };
     },
 

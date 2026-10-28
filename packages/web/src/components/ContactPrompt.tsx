@@ -49,7 +49,8 @@ function Joiners({ store, contact }: { store: Store; contact: Contact }) {
 
 /**
  * After "Fuir": where each own champion of the contact flees, the automatic step toward the base unless a step was
- * clicked on the map ("Choisir sur la carte" waits for that click; the map highlights the allowed steps).
+ * clicked on the map ("Choisir sur la carte" waits for that click; the map highlights the allowed steps). Offered only
+ * with at least 2 steps; with none, the champion stays.
  */
 function FleeSteps({ store, contact }: { store: Store; contact: Contact }) {
   const picking = store.fleePick.value;
@@ -57,7 +58,16 @@ function FleeSteps({ store, contact }: { store: Store; contact: Contact }) {
     <div class="joiners">
       {contact.blue.map((id) => {
         const to = store.fleeToOf(contact.id, id);
+        const steps = store.fleeSteps(contact.id, id).length;
         const waiting = picking?.contact === contact.id && picking.champion === id;
+        if (steps === 0) {
+          return (
+            <div key={id} class="joiner">
+              <Names store={store} ids={[id]} hp={contact.hp} />
+              <span class="note">Aucun pas de fuite : reste sur place</span>
+            </div>
+          );
+        }
         return (
           <div key={id} class="joiner">
             <Names store={store} ids={[id]} hp={contact.hp} />
@@ -65,7 +75,7 @@ function FleeSteps({ store, contact }: { store: Store; contact: Contact }) {
               {waiting ? 'Clique une case pour choisir où fuir' : to ? `Fuite vers ${positionLabel(store.data, to)}` : 'Fuite : 1 pas vers ta base (auto)'}
             </span>
             <span class="choices">
-              <button class={waiting ? 'on' : ''} onClick={() => store.pickFlee(contact.id, waiting ? null : id)}>Choisir sur la carte</button>
+              {steps > 1 && <button class={waiting ? 'on' : ''} onClick={() => store.pickFlee(contact.id, waiting ? null : id)}>Choisir sur la carte</button>}
               {to && <button onClick={() => store.setFleeTo(contact.id, id, null)}>Fuite auto</button>}
             </span>
           </div>

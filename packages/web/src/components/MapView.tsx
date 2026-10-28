@@ -21,7 +21,7 @@ import {
   wavePoint,
 } from './map-marks';
 import { hpColor, type Hud, hudText, hudTop, hudValues } from './hud';
-import { nodeClickKeepsSelection, pawnClick, pawnHitPassesThrough } from './pawn-click';
+import { fleePawnClick, nodeClickKeepsSelection, pawnClick, pawnHitPassesThrough } from './pawn-click';
 import { ReplayLayer } from './ReplayLayer';
 import {
   championImage,
@@ -405,6 +405,11 @@ export function MapView({ store }: { store: Store }) {
         class={`pawn${pawn.ally ? ' mine' : ''}${isSel ? ' sel' : ''}${pawn.away ? ' away' : ''}`}
         onClick={(e: MouseEvent) => {
           e.stopPropagation();
+          if (fleeing) {
+            const pick = fleePawnClick(pawn, reach);
+            if (pick.kind === 'order') order(pick.to);
+            return;
+          }
           if (!ordering) return;
           const action = pawnClick(pawn, selected?.id ?? null, reach);
           if (action.kind === 'select') store.select(action.id);
