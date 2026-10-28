@@ -5,7 +5,7 @@ import { advanceRespawns, applyKill, changeHp, completeRecall, finishIfOver, lev
 import { fightVictims, resolveFight } from './fight';
 import { updateLanes } from './lanes';
 import { budgetFrom, canAct, reachableFrom, retreatStep, validateOrders } from './movement';
-import { captureObjectives, clearCamps, launchHeralds, spawnObjectives } from './objectives';
+import { captureObjectives, clearCamps, clearStartCamps, launchHeralds, spawnObjectives } from './objectives';
 import { roundWindow } from './time';
 import { spotByWards, updateVision } from './vision';
 
@@ -31,6 +31,8 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   // 2. round start
   advanceRespawns(s, data);
   spawnObjectives(s, data);
+  // The start camp (round 1) is cleared before moves; clearing it is the round-1 action, even for one who stays.
+  const startCleared = clearStartCamps(s, data, events);
 
   // 3. unwards, on the target position before moving
   for (const { c, o } of steps) {
@@ -84,7 +86,7 @@ export function resolveRound(state: GameState, data: GameData, orders: Orders, c
   for (const c of s.champions) {
     if (c.status === 'respawning') continue;
     arrival[c.id] = c.position;
-    if (actsAt(c, c.previous, c.position)) arrivedActing.add(c.id);
+    if (!startCleared.has(c.id) && actsAt(c, c.previous, c.position)) arrivedActing.add(c.id);
   }
 
   // 5. contacts

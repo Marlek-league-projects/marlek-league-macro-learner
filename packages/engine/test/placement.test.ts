@@ -3,7 +3,7 @@ import { loadGameData } from '@lml/data';
 import type { Side } from '@lml/data/contracts';
 import {
   aiAnswers, aiOrders, aiPlacements, createEngine, createRng, defaultOrders, detectContacts, newGame, placeChampions,
-  placementPositions, resolveRound, viewFor,
+  placementPositions, reachableFrom, resolveRound, stepBudget, viewFor,
 } from '@lml/engine';
 import type { GameState } from '@lml/engine/contracts';
 
@@ -97,5 +97,51 @@ describe('round 0 placement', () => {
         expect(of(after, 'red', 'jungle').gold).toBeGreaterThan(0);
       }
     }
+  });
+
+  describe('start camp in round 1', () => {
+    const run = (g: GameState, id: string, to: string) => {
+      const orders = { blue: defaultOrders(g, d, 'blue'), red: defaultOrders(g, d, 'red') };
+      orders.blue = orders.blue.map((o) => (o.champion === id && o.kind === 'move' ? { ...o, to } : o));
+      return resolveRound(g, d, orders, {});
+    };
+    /** A position at least 2 steps from `from` that the champion can reach. */
+    const farAway = (g: GameState, id: string, from: string) => {
+      const c = g.champions.find((x) => x.id === id)!;
+      const reach = reachableFrom(d, from, stepBudget(d.rules, g.round), 'blue');
+      return Object.entries(reach).find(([, cost]) => cost >= 2)![0];
+    };
+
+    test('a jungler placed on a camp clears it wherever it moves, with no action on arrival', () => {
+      const g = placeChampions(newGame(d, 5), d, 'blue', { [of(newGame(d, 5), 'blue', 'jungle').id]: 'wolves-blue' });
+      const bj = of(g, 'blue', 'jungle');
+      const to = farAway(g, bj.id, 'wolves-blue');
+      const { state, events } = run(g, bj.id, to);
+      expect(events).toContainEqual({ type: 'campCleared', camp: 'wolves-blue', champion: bj.id });
+      expect(events.filter((e) => e.type === 'campCleared' && e.champion === bj.id)).toHaveLength(1);
+      expect(of(state, 'blue', 'jungle').position).toBe(to);
+      expect(events).toContainEqual(expect.objectContaining({ type: 'moved', champion: bj.id, acted: false }));
+      expect(state.camps['wolves-blue']).toBeGreaterThan(d.rules.camps.firstSpawnByCamp.wolves);
+    });
+
+    test('a laner placed on a camp clears it and gives up its round-1 farm', () => {
+      const g0 = newGame(d, 5);
+      const top = of(g0, 'blue', 'top');
+      const g = placeChampions(g0, d, 'blue', { [top.id]: 'gromp-blue' });
+      const { state, events } = run(g, top.id, 'top-lane');
+      expect(events).toContainEqual({ type: 'campCleared', camp: 'gromp-blue', champion: top.id });
+      const lone = run(g0, top.id, 'top-lane').state;
+      expect(events).toContainEqual(expect.objectContaining({ type: 'moved', champion: top.id, acted: false }));
+      expect(state.camps['gromp-blue']).toBeGreaterThan(d.rules.camps.firstSpawnByCamp.gromp);
+      expect(lone.camps['gromp-blue']).toBe(d.rules.camps.firstSpawnByCamp.gromp);
+    });
+
+    test('an enemy arriving on the camp finds it cleared; later rounds do not clear on departure', () => {
+      const g = placeChampions(newGame(d, 5), d, 'blue', { [of(newGame(d, 5), 'blue', 'jungle').id]: 'wolves-blue' });
+      const bj = of(g, 'blue', 'jungle');
+      const after = run(g, bj.id, 'bluebuff-blue').state;
+      const r2 = resolveRound(after, d, { blue: defaultOrders(after, d, 'blue'), red: defaultOrders(after, d, 'red') }, {});
+      expect(r2.events.filter((e) => e.type === 'campCleared' && e.camp === 'wolves-blue')).toHaveLength(0);
+    });
   });
 });

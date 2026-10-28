@@ -212,12 +212,15 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
   // A pending move leaving no step: the recall would drop it, so the button says why it is off.
   const recallBlocked = recall ? null : store.recallBlocked(c.id);
   const recallReplaced = store.recallReplaced.value.includes(c.id);
+  // Round 1: a champion on its start camp clears it first, whatever it then does.
+  const startCamp = (store.view.value?.round ?? 0) === 1 && data.graph.positions[c.position]?.kind === 'camp' && move !== null && move.to !== c.position;
 
   return (
     <>
       <div class="note">
         Portée : {budget} pas, une action coûte un pas. Clique une position allumée (pointillés : arrivée sans action).
       </div>
+      {startCamp && <div class="note">Fait le camp de départ, puis se déplace (sans action à l'arrivée)</div>}
       {c.role !== 'jungle' && (
         <div class="seg stance" title="Attitude en lane, gardée d'un round à l'autre">
           {STANCES.map((s) => (

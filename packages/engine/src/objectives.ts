@@ -202,26 +202,42 @@ export function captureObjectives(
   }
 }
 
+/** Junglers first, then by id, so a shared camp goes to a deterministic clearer. */
+function clearOrder(state: GameState, ids: ReadonlySet<string>): ChampionState[] {
+  return [...state.champions]
+    .filter((c) => c.status === 'alive' && ids.has(c.id))
+    .sort((a, b) => Number(b.role === 'jungle') - Number(a.role === 'jungle') || a.id.localeCompare(b.id));
+}
+
+/** `c` clears `camp` if it is up by the end of the round: its gold and XP, its respawn timer, remembered by `c`'s side. */
+function clearCamp(state: GameState, data: GameData, camp: string, c: ChampionState, events: GameEvent[]): void {
+  const end = roundWindow(data.rules, state.round).end;
+  if (!(camp in state.camps) || state.camps[camp]! > end) return;
+  const r = data.rules.camps;
+  const buff = BUFF_CAMPS.has(data.graph.positions[camp]!.camp!);
+  grant(c, buff ? r.buffGold : r.smallGold, buff ? r.buffXp : r.smallXp);
+  state.camps[camp] = end + (buff ? r.buffRespawn : r.smallRespawn);
+  state.campsSeen[c.side][camp] = state.camps[camp]!;
+  events.push({ type: 'campCleared', camp, champion: c.id });
+}
+
 /** Clears jungle camps: the camp each `acting` alive champion (a step left on arrival) stands on. */
 export function clearCamps(state: GameState, data: GameData, acting: ReadonlySet<string>, events: GameEvent[]): void {
-  const { rules, graph } = data;
-  const end = roundWindow(rules, state.round).end;
+  for (const c of clearOrder(state, acting)) {
+    if (data.graph.positions[c.position]?.kind === 'camp') clearCamp(state, data, c.position, c, events);
+  }
+}
 
-  const clear = (camp: string, c: ChampionState): void => {
-    if (!(camp in state.camps) || state.camps[camp]! > end) return;
-    const buff = BUFF_CAMPS.has(graph.positions[camp]!.camp!);
-    const r = rules.camps;
-    grant(c, buff ? r.buffGold : r.smallGold, buff ? r.buffXp : r.smallXp);
-    state.camps[camp] = end + (buff ? r.buffRespawn : r.smallRespawn);
-    state.campsSeen[c.side][camp] = state.camps[camp]!;
-    events.push({ type: 'campCleared', camp, champion: c.id });
-  };
-
-  // Junglers first, then by id, so a shared camp goes to a deterministic clearer.
-  const order = [...state.champions]
-    .filter((c) => c.status === 'alive' && acting.has(c.id))
-    .sort((a, b) => Number(b.role === 'jungle') - Number(a.role === 'jungle') || a.id.localeCompare(b.id));
-  for (const c of order) if (graph.positions[c.position]?.kind === 'camp') clear(c.position, c);
+/**
+ * Round 1, before moves: every alive champion placed on a camp clears it, wherever it then moves. Returns who stood on
+ * a camp (clearing it is their round-1 action).
+ */
+export function clearStartCamps(state: GameState, data: GameData, events: GameEvent[]): Set<string> {
+  if (state.round !== 1) return new Set();
+  const onCamp = new Set(state.champions.filter((c) => data.graph.positions[c.position]?.kind === 'camp').map((c) => c.id));
+  const clearers = clearOrder(state, onCamp);
+  for (const c of clearers) clearCamp(state, data, c.position, c, events);
+  return new Set(clearers.map((c) => c.id));
 }
 
 /**

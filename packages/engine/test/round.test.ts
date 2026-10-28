@@ -771,7 +771,7 @@ describe('acting after a lane pull-in', () => {
   });
 
   test('an acting champion pulled away keeps its action and farms', () => {
-    const { r, bj, xpBefore } = pulled('krugs-red', 'top-t1-red');
+    const { r, bj, xpBefore } = pulled('top-t2-red', 'top-t1-red');
     expect(get(r.state, 'blue', 'jungle').position).toBe('top-lane');
     expect(r.events.filter((e) => e.type === 'moved' && e.champion === bj).every((e) => e.type === 'moved' && e.acted)).toBe(true);
     expect(get(r.state, 'blue', 'jungle').xp - xpBefore).toBeGreaterThan(killXpShare(r.events) + 1e-9);
