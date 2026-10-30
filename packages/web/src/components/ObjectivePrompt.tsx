@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import type { Store } from '../store';
 import type { ObjectivePromptEntry } from './map-marks';
 import { championImage, championName, errorText, objectiveActionLabel, positionLabel } from './format';
+import { champSq, choices, contactBox, contactGrid, error as errorClass, note, on, overlay } from './ui';
 
 /**
  * At the start of the order phase, one entry per own champion standing on (or moving onto) a pit whose objective is up, being
@@ -19,20 +20,20 @@ export function ObjectivePrompt({ store, entries, dock }: { store: Store; entrie
     }
   };
   return (
-    <div class={`contacts-overlay objective-overlay ${dock}`}>
+    <div class={overlay(dock)}>
       <div>
         <strong>Objectif</strong>
-        <span class="note"> · Ton champion est sur le pit ou s'y rend.</span>
+        <span class={note}> · Ton champion est sur le pit ou s'y rend.</span>
       </div>
-      <div class="contacts">
+      <div class={contactGrid}>
         {entries.map((e) => (
-          <div key={e.champion} class="contact">
+          <div key={e.champion} class={contactBox}>
             <div>
-              <img class="sq" src={championImage(store.data, e.champion)} alt="" />
+              <img class={champSq} src={championImage(store.data, e.champion)} alt="" />
               <strong>{championName(store.data, e.champion)}</strong> · {positionLabel(store.data, e.pit)}
             </div>
-            <div class="choices">
-              <button class="on" onClick={() => run(() => store.doObjective(e.champion))}>
+            <div class={choices}>
+              <button class={on(true)} onClick={() => run(() => store.doObjective(e.champion))}>
                 {objectiveActionLabel(e.objective, e.withScuttle)}
               </button>
               <button onClick={() => run(() => store.otherOrder(e.champion))}>Autre ordre</button>
@@ -40,7 +41,7 @@ export function ObjectivePrompt({ store, entries, dock }: { store: Store; entrie
           </div>
         ))}
       </div>
-      {error && <div class="error">{error}</div>}
+      {error && <div class={errorClass}>{error}</div>}
     </div>
   );
 }

@@ -34,7 +34,7 @@ function Game({ store }: { store: Store }) {
     return (
       <>
         <GameOver store={store} />
-        <div class="teams-row">
+        <div class="grid grid-cols-2 gap-3">
           <TeamPanel store={store} team="ally" />
           <TeamPanel store={store} team="enemy" />
         </div>
@@ -42,9 +42,9 @@ function Game({ store }: { store: Store }) {
     );
   }
   return (
-    <div class="game">
+    <div class="my-2.5 grid grid-cols-[minmax(180px,230px)_minmax(0,1fr)_minmax(180px,230px)] items-start gap-3">
       <TeamPanel store={store} team="ally" />
-      <div class="center">
+      <div class="flex min-w-0 flex-col items-center gap-3">
         <MapView store={store} />
         <RoundPanel store={store} />
       </div>
@@ -58,16 +58,16 @@ export function App({ store }: { store: Store }) {
   const profile = store.data.aiProfiles.find((p) => p.rank === rank);
   const playing = store.screen.value !== 'start';
   return (
-    <div class="wrap">
-      <header class="head">
+    <div class="mx-auto max-w-[1600px] px-4 pt-3 pb-6">
+      <header>
         {playing ? (
           <ScoreBar store={store} subtitle={`League Macro Learner · IA ${profile?.label ?? rank} · graine ${seed}`} />
         ) : (
-          <h1>League Macro Learner</h1>
+          <h1 class="text-[13px] font-medium text-mut">League Macro Learner</h1>
         )}
       </header>
       {playing ? <Game store={store} /> : <StartScreen store={store} />}
-      <footer class="legal">{LEGAL}</footer>
+      <footer class="mt-4 text-center text-[11px] text-mut">{LEGAL}</footer>
     </div>
   );
 }

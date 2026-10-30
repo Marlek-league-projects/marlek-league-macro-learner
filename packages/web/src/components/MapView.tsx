@@ -441,13 +441,13 @@ export function MapView({ store }: { store: Store }) {
   const base = (side: Side) => positions[`base-${side}`];
   return (
     <div
-      class="mapbox"
+      class={`relative w-full rounded-[10px] bg-map p-1.5 ${store.screen.value === 'over' ? 'max-w-[calc(100vh-225px)] justify-self-center' : 'max-w-[calc(100vh-92px)]'}`}
       onClickCapture={(e: MouseEvent) => {
         // A click ending a drag of the actions panel is not an order.
         if (store.panelDragging.value) e.stopPropagation();
       }}
     >
-      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} onClick={() => ordering && store.select(null)}>
+      <svg class="block w-full" viewBox={`0 0 ${SIZE} ${SIZE}`} onClick={() => ordering && store.select(null)}>
         <Defs />
         <rect width={SIZE} height={SIZE} fill="#2b3428" />
         <image href="./assets/minimap.png" width={SIZE} height={SIZE} filter="url(#floor)" />
@@ -499,7 +499,7 @@ export function MapView({ store }: { store: Store }) {
         <ContactsOverlay store={store} dock={contactDock([...contactAt].map((id) => (positions[id]?.y ?? 0) / SIZE))} />
       )}
       {tip && (
-        <div class="tip" style={{ left: `${tip.x + 12}px`, top: `${tip.y + 12}px` }}>
+        <div class="pointer-events-none fixed z-9 rounded-[5px] bg-black/80 px-2 py-1 text-[12px] text-white" style={{ left: `${tip.x + 12}px`, top: `${tip.y + 12}px` }}>
           {tip.text}
         </div>
       )}

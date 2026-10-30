@@ -4,6 +4,9 @@ import { confirmError, confirmRound } from './confirm-round';
 import { EventLog } from './EventLog';
 import { shownRound } from './RoundBanner';
 import { championName, clock, idleText, noOrderText, OBJECTIVE_LABEL, objectiveTimers, placementWindow, positionLabel } from './format';
+import { error as errorClass, go, heading, note, panel } from './ui';
+
+const orderList = 'm-0 list-disc pl-4 *:my-0.5';
 
 /** Rounds until the objective spawning at `at` is up (it spawns during the round whose window ends at or after it). */
 function roundsUntil(store: Store, round: number, at: number): number | null {
@@ -20,10 +23,10 @@ function NextObjective({ store }: { store: Store }) {
   return (
     <>
       {alive.length > 0 && (
-        <div class="note">En jeu : {alive.map((o) => OBJECTIVE_LABEL[o]).join(', ')}</div>
+        <div class={note}>En jeu : {alive.map((o) => OBJECTIVE_LABEL[o]).join(', ')}</div>
       )}
       {next && wait !== null && (
-        <div class="note">
+        <div class={note}>
           Prochain objectif : {OBJECTIVE_LABEL[next.objective]} à {clock(next.at)}{' '}
           ({wait === 0 ? 'ce round' : `dans ${wait} round${wait > 1 ? 's' : ''}`})
         </div>
@@ -68,21 +71,21 @@ function Orders({ store }: { store: Store }) {
   return (
     <>
       <div>
-        <h3>Ordres du round</h3>
-        <div class="note">Clique un de tes pions sur la carte : ses actions s'ouvrent à côté de lui.</div>
-        <ul class="orders">
+        <h3 class={heading}>Ordres du round</h3>
+        <div class={note}>Clique un de tes pions sur la carte : ses actions s'ouvrent à côté de lui.</div>
+        <ul class={orderList}>
           {view.allies.map((c) => (
             <li key={c.id}>{championName(store.data, c.id)} : {orderText(store, c, pending[c.id])}</li>
           ))}
         </ul>
         {idle.length > 0 && (
-          <div class="note noorder">{noOrderText(idle.map((id) => championName(store.data, id)))}</div>
+          <div class="text-[12px] text-amber-500">{noOrderText(idle.map((id) => championName(store.data, id)))}</div>
         )}
       </div>
-      <button class="go" onClick={() => confirmRound(store)}>Valider le round</button>
-      {error && <div class="error">{error}</div>}
+      <button class={go} onClick={() => confirmRound(store)}>Valider le round</button>
+      {error && <div class={errorClass}>{error}</div>}
       {store.settings.value.teaching && (
-        <div class="note">Mode didactique : les explications s'affichent ici après la résolution du round.</div>
+        <div class={note}>Mode didactique : les explications s'affichent ici après la résolution du round.</div>
       )}
     </>
   );
@@ -94,19 +97,19 @@ function Placement({ store }: { store: Store }) {
   return (
     <>
       <div>
-        <h3>Placement de départ</h3>
-        <div class="note">
+        <h3 class={heading}>Placement de départ</h3>
+        <div class={note}>
           Clique un de tes champions puis n'importe quelle position de ton côté de la carte (tours, camps, base) ou le
           milieu d'une voie. Plusieurs champions peuvent partager une position. Les camps apparaissent à partir de{' '}
           {clock(store.data.rules.phases[0]?.start ?? 0)} : aucun n'est nettoyé avant le round 1.
         </div>
-        <ul class="orders placement-list">
+        <ul class={orderList}>
           {view.allies.map((c) => (
             <li key={c.id}>{championName(store.data, c.id)} : {positionLabel(store.data, c.position)}</li>
           ))}
         </ul>
       </div>
-      <button class="go" onClick={() => store.confirmPlacement()}>Valider le placement</button>
+      <button class={go} onClick={() => store.confirmPlacement()}>Valider le placement</button>
     </>
   );
 }
@@ -119,9 +122,9 @@ export function RoundPanel({ store }: { store: Store }) {
   if (round === 0) {
     const w = placementWindow(store.data.rules);
     return (
-      <div class="side">
+      <div class={`${panel} w-full max-w-[calc(100vh-92px)]`}>
         <div>
-          <h3>Résumé du round</h3>
+          <h3 class={heading}>Résumé du round</h3>
           <div><strong>Round 0 · placement</strong> · {clock(w.start)} → {clock(w.end)}</div>
         </div>
         <Placement store={store} />
@@ -131,27 +134,27 @@ export function RoundPanel({ store }: { store: Store }) {
   const win = store.roundWindow(round);
   const phase = store.data.rules.phases[win.phase];
   return (
-    <div class="side">
+    <div class={`${panel} w-full max-w-[calc(100vh-92px)]`}>
       <div>
-        <h3>Résumé du round</h3>
+        <h3 class={heading}>Résumé du round</h3>
         <div>
           <strong>Phase {win.phase + 1} · Round {round}/{store.totalRounds()}</strong> · {clock(win.start)} → {clock(win.end)}
         </div>
-        {phase && <div class="note">{phase.name}</div>}
+        {phase && <div class={note}>{phase.name}</div>}
         {screen !== 'review' && <NextObjective store={store} />}
       </div>
       {screen === 'orders' && <Orders store={store} />}
-      {screen === 'contacts' && <div class="note">Réponds aux contacts dans le panneau sur la carte.</div>}
+      {screen === 'contacts' && <div class={note}>Réponds aux contacts dans le panneau sur la carte.</div>}
       {screen === 'review' && (
         <>
           {store.previousView.value && (
-            <div class="replay-ctl">
+            <div class="flex gap-1.5 *:flex-1">
               <button onClick={() => store.replay()} title="Rejouer l'animation du tour">Revoir le tour</button>
               <button onClick={() => store.skipReplay()} disabled={!store.replaying.value}>Passer</button>
             </div>
           )}
           <EventLog store={store} />
-          <button class="go" onClick={() => store.next()}>Round suivant</button>
+          <button class={go} onClick={() => store.next()}>Round suivant</button>
         </>
       )}
     </div>

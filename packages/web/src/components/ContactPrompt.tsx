@@ -3,16 +3,20 @@
 import type { Contact } from '@lml/engine/contracts';
 import { playerDefault, type Store } from '../store';
 import { championImage, championName, choiceLabel, CONTACT_LABEL, positionLabel, zoneTitle } from './format';
+import { champSq, choices, contactBox, contactGrid, go, note, on, overlay } from './ui';
+
+const joinersBox = 'flex flex-col gap-1 border-t border-dashed border-line pt-1';
+const joinerRow = 'flex flex-col gap-0.5';
 
 /** The contact's champions with their HP: meeting there, each side sees the other's (contact = vision). */
 function Names({ store, ids, hp }: { store: Store; ids: string[]; hp: Record<string, number> }) {
   return (
-    <span class="names">
+    <span>
       {ids.map((id) => (
-        <span key={id} class="name">
-          <img class="sq" src={championImage(store.data, id)} alt="" />
+        <span key={id} class="mr-1.5 whitespace-nowrap text-txt">
+          <img class={champSq} src={championImage(store.data, id)} alt="" />
           {championName(store.data, id)}
-          {hp[id] !== undefined && <span class="note"> {Math.round(hp[id]!)} PV</span>}
+          {hp[id] !== undefined && <span class={note}> {Math.round(hp[id]!)} PV</span>}
         </span>
       ))}
     </span>
@@ -29,16 +33,16 @@ function Joiners({ store, contact }: { store: Store; contact: Contact }) {
   const joining = store.joinsOf(contact.id);
   const hp = Object.fromEntries((store.view.value?.allies ?? []).map((a) => [a.id, a.hp]));
   return (
-    <div class="joiners">
-      <div class="note">À 1 pas (rejoindre = pas d'autre action ce round) :</div>
+    <div class={joinersBox}>
+      <div class={note}>À 1 pas (rejoindre = pas d'autre action ce round) :</div>
       {contact.nearby.blue.map((id) => {
-        const on = joining.includes(id);
+        const joins = joining.includes(id);
         return (
-          <div key={id} class="joiner">
+          <div key={id} class={joinerRow}>
             <Names store={store} ids={[id]} hp={hp} />
-            <span class="choices">
-              <button class={on ? 'on' : ''} onClick={() => store.setJoin(contact.id, id, true)}>Rejoindre le combat</button>
-              <button class={on ? '' : 'on'} onClick={() => store.setJoin(contact.id, id, false)}>Rester</button>
+            <span class={choices}>
+              <button class={on(joins)} onClick={() => store.setJoin(contact.id, id, true)}>Rejoindre le combat</button>
+              <button class={on(!joins)} onClick={() => store.setJoin(contact.id, id, false)}>Rester</button>
             </span>
           </div>
         );
@@ -55,27 +59,27 @@ function Joiners({ store, contact }: { store: Store; contact: Contact }) {
 function FleeSteps({ store, contact }: { store: Store; contact: Contact }) {
   const picking = store.fleePick.value;
   return (
-    <div class="joiners">
+    <div class={joinersBox}>
       {contact.blue.map((id) => {
         const to = store.fleeToOf(contact.id, id);
         const steps = store.fleeSteps(contact.id, id).length;
         const waiting = picking?.contact === contact.id && picking.champion === id;
         if (steps === 0) {
           return (
-            <div key={id} class="joiner">
+            <div key={id} class={joinerRow}>
               <Names store={store} ids={[id]} hp={contact.hp} />
-              <span class="note">Aucun pas de fuite : reste sur place</span>
+              <span class={note}>Aucun pas de fuite : reste sur place</span>
             </div>
           );
         }
         return (
-          <div key={id} class="joiner">
+          <div key={id} class={joinerRow}>
             <Names store={store} ids={[id]} hp={contact.hp} />
-            <span class="note">
+            <span class={note}>
               {waiting ? 'Clique une case pour choisir où fuir' : to ? `Fuite vers ${positionLabel(store.data, to)}` : 'Fuite : 1 pas vers ta base (auto)'}
             </span>
-            <span class="choices">
-              {steps > 1 && <button class={waiting ? 'on' : ''} onClick={() => store.pickFlee(contact.id, waiting ? null : id)}>Choisir sur la carte</button>}
+            <span class={choices}>
+              {steps > 1 && <button class={on(waiting)} onClick={() => store.pickFlee(contact.id, waiting ? null : id)}>Choisir sur la carte</button>}
               {to && <button onClick={() => store.setFleeTo(contact.id, id, null)}>Fuite auto</button>}
             </span>
           </div>
@@ -95,16 +99,16 @@ export function ContactPrompt({ store, contact }: { store: Store; contact: Conta
   const title = view ? zoneTitle(contact, view, store.data, store.roundWindow().start) : positionLabel(store.data, contact.position);
   const where = contact.positions.map((id) => positionLabel(store.data, id)).join(', ');
   return (
-    <div class="contact">
+    <div class={contactBox}>
       <div>
         <strong>{CONTACT_LABEL[contact.kind]}</strong> · {title}
       </div>
-      <div class="note">Positions : {where}</div>
-      <div class="note">Toi : <Names store={store} ids={contact.blue} hp={contact.hp} /></div>
-      <div class="note">Adversaire : <Names store={store} ids={contact.red} hp={contact.hp} /></div>
-      <div class="choices">
+      <div class={note}>Positions : {where}</div>
+      <div class={note}>Toi : <Names store={store} ids={contact.blue} hp={contact.hp} /></div>
+      <div class={note}>Adversaire : <Names store={store} ids={contact.red} hp={contact.hp} /></div>
+      <div class={choices}>
         {contact.options.blue.map((choice) => (
-          <button key={choice} class={choice === chosen ? 'on' : ''} onClick={() => store.choose(contact.id, choice)}>
+          <button key={choice} class={on(choice === chosen)} onClick={() => store.choose(contact.id, choice)}>
             {choiceLabel(contact.kind, choice)}
           </button>
         ))}
@@ -121,15 +125,15 @@ export function ContactPrompt({ store, contact }: { store: Store; contact: Conta
  */
 export function ContactsOverlay({ store, dock }: { store: Store; dock: 'top' | 'bottom' }) {
   return (
-    <div class={`contacts-overlay ${dock}`}>
+    <div class={overlay(dock)}>
       <div>
         <strong>Contacts</strong>
-        <span class="note"> · Tes champions croisent l'adversaire. Choisis la réaction de chacun, et qui les rejoint depuis 1 pas.</span>
+        <span class={note}> · Tes champions croisent l'adversaire. Choisis la réaction de chacun, et qui les rejoint depuis 1 pas.</span>
       </div>
-      <div class="contacts">
+      <div class={contactGrid}>
         {store.contacts.value.map((c) => <ContactPrompt key={c.id} store={store} contact={c} />)}
       </div>
-      <button class="go" onClick={() => store.confirmContacts()}>Valider les choix</button>
+      <button class={go} onClick={() => store.confirmContacts()}>Valider les choix</button>
     </div>
   );
 }

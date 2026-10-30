@@ -4,6 +4,7 @@ import type { GameData } from '@lml/data/contracts';
 import type { Store } from '../store';
 import { championName, errorText, positionLabel, roleIcon } from './format';
 import { clampInside, dragSpotUsable, placePopover, visibleRegion } from './popover';
+import { note, on, roleIco, seg, wide } from './ui';
 import { deepWardSpots } from './ward-spots';
 
 const STANCES: { id: Stance; label: string }[] = [
@@ -15,11 +16,13 @@ const STANCES: { id: Stance; label: string }[] = [
 
 type Spot = 'from' | 'to';
 
+const indentedSeg = `${seg} mt-0.5 mb-1.5 ml-[18px]`;
+
 function SpotChoice({ value, onPick, onlyFrom }: { value: Spot | null; onPick: (s: Spot) => void; onlyFrom?: boolean }) {
   return (
-    <div class="seg indent">
-      <button class={value === 'from' ? 'on' : ''} onClick={() => onPick('from')}>Départ</button>
-      <button class={value === 'to' ? 'on' : ''} disabled={onlyFrom} onClick={() => onPick('to')}>Arrivée</button>
+    <div class={indentedSeg}>
+      <button class={on(value === 'from')} onClick={() => onPick('from')}>Départ</button>
+      <button class={on(value === 'to')} disabled={onlyFrom} onClick={() => onPick('to')}>Arrivée</button>
     </div>
   );
 }
@@ -29,9 +32,9 @@ function DeepWardChoice(
   { data, spots, value, onPick }: { data: GameData; spots: string[]; value: string | null; onPick: (p: string) => void },
 ) {
   return (
-    <div class="seg indent">
+    <div class={indentedSeg}>
       {spots.map((p) => (
-        <button key={p} class={value === p ? 'on' : ''} onClick={() => onPick(p)}>{positionLabel(data, p)}</button>
+        <button key={p} class={on(value === p)} onClick={() => onPick(p)}>{positionLabel(data, p)}</button>
       ))}
     </div>
   );
@@ -141,11 +144,11 @@ export function ActionsPanel(
   return (
     <div
       ref={ref}
-      class={`popover${store.panelDragging.value ? ' dragging' : ''}`}
+      class={`absolute z-5 flex w-[230px] flex-col gap-1.5 rounded-lg border border-line-strong bg-panel/95 px-2.5 py-2 text-[12px] shadow-[0_6px_18px_#000a] [&_button]:px-1.5 [&_button]:py-1 ${store.panelDragging.value ? 'opacity-92' : ''}`}
       style={at ? { left: `${at.left}px`, top: `${at.top}px` } : { visibility: 'hidden' }}
     >
       <div
-        class="ptitle"
+        class={`-mx-2.5 -mt-2 flex touch-none items-center gap-1 overflow-hidden whitespace-nowrap rounded-t-lg border-b border-line bg-raised py-[5px] pr-1.5 pl-2.5 select-none ${store.panelDragging.value ? 'cursor-grabbing' : 'cursor-grab'}`}
         title="Glisser pour déplacer · double-clic : replacer près du pion"
         onPointerDown={onDown}
         onPointerMove={onMove}
@@ -154,13 +157,13 @@ export function ActionsPanel(
         onLostPointerCapture={onLost}
         onDblClick={() => (store.panelAt.value = null)}
       >
-        <img class="ri" src={roleIcon(c.role)} alt="" />
+        <img class={roleIco} src={roleIcon(c.role)} alt="" />
         <strong>{championName(store.data, c.id)}</strong>
-        {c.status === 'alive' && <span class="muted">· {positionLabel(store.data, c.position)}</span>}
-        <button class="close" title="Fermer" onClick={() => store.select(null)}>×</button>
+        {c.status === 'alive' && <span class="overflow-hidden text-ellipsis text-mut">· {positionLabel(store.data, c.position)}</span>}
+        <button class="ml-auto border-none bg-transparent py-0! text-[16px] leading-[18px] text-mut" title="Fermer" onClick={() => store.select(null)}>×</button>
       </div>
       <ChampionActions store={store} c={c} order={store.pending.value[c.id]} run={run} />
-      {error?.champion === c.id && <div class="error">{error.text}</div>}
+      {error?.champion === c.id && <div class="text-[12px] text-red-400">{error.text}</div>}
     </div>
   );
 }
@@ -176,7 +179,7 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
   const { data } = store;
 
   if (c.status === 'dead') {
-    return <div class="neg">Mort (retour round {c.respawnRound})</div>;
+    return <div class="text-red-400">Mort (retour round {c.respawnRound})</div>;
   }
 
   if (c.status === 'respawning') {
@@ -184,15 +187,15 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
     const chosen = order?.kind === 'spawn' ? order.to : store.defaultSpawn(c.id);
     return (
       <>
-        <div class="note">Choisis où réapparaître :</div>
-        <div class="stack">
+        <div class={note}>Choisis où réapparaître :</div>
+        <div class="flex flex-col gap-1">
           {points.map((p) => (
-            <button key={p} class={p === chosen ? 'on' : ''} onClick={() => run(() => store.setSpawn(c.id, p))}>
+            <button key={p} class={on(p === chosen)} onClick={() => run(() => store.setSpawn(c.id, p))}>
               {positionLabel(data, p)}
             </button>
           ))}
         </div>
-        <button class="wide" onClick={() => run(() => store.clearOrder(c.id))}>Annuler l'ordre</button>
+        <button class={wide} onClick={() => run(() => store.clearOrder(c.id))}>Annuler l'ordre</button>
       </>
     );
   }
@@ -217,20 +220,20 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
 
   return (
     <>
-      <div class="note">
+      <div class={note}>
         Portée : {budget} pas, une action coûte un pas. Clique une position allumée (pointillés : arrivée sans action).
       </div>
-      {startCamp && <div class="note">Fait le camp de départ, puis se déplace (sans action à l'arrivée)</div>}
+      {startCamp && <div class={note}>Fait le camp de départ, puis se déplace (sans action à l'arrivée)</div>}
       {c.role !== 'jungle' && (
-        <div class="seg stance" title="Attitude en lane, gardée d'un round à l'autre">
+        <div class={`${seg} *:font-semibold`} title="Attitude en lane, gardée d'un round à l'autre">
           {STANCES.map((s) => (
-            <button key={s.id} class={stance === s.id ? 'on' : ''} onClick={() => run(() => store.setStance(c.id, s.id))}>
+            <button key={s.id} class={on(stance === s.id)} onClick={() => run(() => store.setStance(c.id, s.id))}>
               {s.label}
             </button>
           ))}
         </div>
       )}
-      <div class="opt">
+      <div class="flex flex-col gap-1 [&_label]:my-px [&_label]:block [&_input]:mt-[3px] [&_input]:mr-[3px] [&_input]:mb-[3px] [&_input]:ml-1">
         <label>
           <input
             type="checkbox"
@@ -266,26 +269,26 @@ function ChampionActions({ store, c, order, run }: ActionsProps) {
           </>
         )}
         <button
-          class={`wide${recall ? ' on' : ''}`}
+          class={`${wide} ${on(recall !== null)}`}
           disabled={recallBlocked !== null}
           title={recallBlocked ?? undefined}
           onClick={() => run(() => store.setRecall(c.id))}
         >
           {stepThenRecall ? 'Déplacement puis recall' : 'Recall'}
         </button>
-        {recallBlocked !== null && <div class="note">{recallBlocked}</div>}
+        {recallBlocked !== null && <div class={note}>{recallBlocked}</div>}
         {recallReplaced && (
-          <div class="note">Recall annulé : cette destination ne laisse pas de pas pour le recall.</div>
+          <div class={note}>Recall annulé : cette destination ne laisse pas de pas pour le recall.</div>
         )}
         {heraldTarget && (
           <button
-            class={`wide${move?.launchHerald ? ' on' : ''}`}
+            class={`${wide} ${on(move?.launchHerald === true)}`}
             onClick={() => run(() => store.setLaunchHerald(c.id, !move?.launchHerald))}
           >
             Lancer le Héraut
           </button>
         )}
-        <button class="wide" onClick={() => run(() => store.clearOrder(c.id))}>Annuler l'ordre</button>
+        <button class={wide} onClick={() => run(() => store.clearOrder(c.id))}>Annuler l'ordre</button>
       </div>
     </>
   );
