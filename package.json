@@ -1,5 +1,5 @@
 {
-  "name": "league-macro-learner",
+  "name": "marlek-league-macro-learner",
   "private": true,
   "type": "module",
   "workspaces": ["packages/*"],

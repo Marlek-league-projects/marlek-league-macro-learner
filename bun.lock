@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "league-macro-learner",
+      "name": "marlek-league-macro-learner",
       "devDependencies": {
         "@types/bun": "latest",
         "typescript": "^5.6.0",
